@@ -4,16 +4,44 @@
 
 :root {
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #1c1917;
+  color: #201d1a;
+  --bg-0: #e5dfd7;
+  --bg-1: #ede7df;
+  --bg-2: #f5f1eb;
+  --surface-0: #fbf8f3;
+  --surface-1: #f2ede6;
+  --surface-2: #e7e0d6;
+  --surface-3: #ded5ca;
+  --border-soft: rgba(77, 67, 58, 0.14);
+  --border-strong: rgba(54, 47, 42, 0.24);
+  --text-strong: #211d1a;
+  --text-body: #3a332e;
+  --text-muted: #6c625b;
+  --text-subtle: #8a7f76;
+  --accent-dark: #26211d;
+  --accent-blue: #3e617c;
+  --accent-green: #546f58;
+  --accent-amber: #8f6c45;
+  --shadow-soft: 0 16px 40px rgba(40, 33, 28, 0.08);
+  --shadow-panel: 0 24px 64px rgba(37, 31, 27, 0.08);
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.6), transparent 36%),
-    linear-gradient(180deg, #efebe7 0%, #e7e2dc 100%);
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.62), transparent 32%),
+    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 38%, #ddd6cd 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   background: transparent;
+  color: var(--text-body);
 }
 
 button,
@@ -23,20 +51,199 @@ textarea {
   font: inherit;
 }
 
-.paint-loader-stroke {
-  animation: paint-sway 1.05s ease-in-out infinite;
-  transform-origin: center bottom;
+button,
+input,
+select,
+textarea,
+summary {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    opacity 180ms ease;
 }
 
-@keyframes paint-sway {
-  0%,
-  100% {
-    transform: scaleY(0.8);
-    opacity: 0.45;
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 97, 124, 0.16);
+}
+
+::selection {
+  background: rgba(81, 103, 123, 0.18);
+}
+
+@layer components {
+  .studio-card {
+    position: relative;
+    overflow: hidden;
   }
 
-  45% {
-    transform: translateY(-1px) scaleY(1.08);
+  .studio-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 24%);
+  }
+
+  .studio-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em];
+    color: var(--text-subtle);
+  }
+
+  .studio-input,
+  .studio-select,
+  .studio-textarea {
+    @apply w-full rounded-[22px] border bg-[color:var(--surface-0)] px-4 py-3 text-[color:var(--text-strong)] shadow-sm;
+    border-color: var(--border-soft);
+  }
+
+  .studio-input::placeholder,
+  .studio-textarea::placeholder {
+    color: var(--text-subtle);
+  }
+
+  .studio-input:hover,
+  .studio-select:hover,
+  .studio-textarea:hover {
+    border-color: var(--border-strong);
+  }
+
+  .studio-button {
+    @apply inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold;
+  }
+
+  .studio-button-primary {
+    background: linear-gradient(180deg, #35302b 0%, #211d1a 100%);
+    color: #f8f5f0;
+    box-shadow: 0 12px 24px rgba(33, 29, 26, 0.18);
+  }
+
+  .studio-button-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 30px rgba(33, 29, 26, 0.2);
+  }
+
+  .studio-button-primary:disabled {
+    background: #b7ada3;
+    color: rgba(33, 29, 26, 0.48);
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+
+  .studio-button-secondary {
+    @apply border bg-[color:var(--surface-0)] text-[color:var(--text-body)];
+    border-color: var(--border-soft);
+  }
+
+  .studio-button-secondary:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    background: #fffdfa;
+    transform: translateY(-1px);
+  }
+
+  .studio-chip {
+    @apply inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em];
+    border-color: var(--border-soft);
+    background: rgba(250, 247, 242, 0.88);
+    color: var(--text-muted);
+  }
+
+  .studio-chip-accent {
+    border-color: rgba(38, 33, 29, 0.16);
+    background: #28221f;
+    color: #f7f3ef;
+  }
+
+  .studio-chip-info {
+    border-color: rgba(62, 97, 124, 0.18);
+    background: rgba(62, 97, 124, 0.08);
+    color: #345267;
+  }
+
+  .studio-chip-success {
+    border-color: rgba(84, 111, 88, 0.18);
+    background: rgba(84, 111, 88, 0.1);
+    color: #47604a;
+  }
+
+  .studio-chip-warm {
+    border-color: rgba(143, 108, 69, 0.18);
+    background: rgba(143, 108, 69, 0.1);
+    color: #725234;
+  }
+
+  .studio-metric {
+    @apply rounded-[24px] border p-4;
+    border-color: var(--border-soft);
+    background: rgba(251, 248, 243, 0.82);
+  }
+
+  .swatch-well {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0));
+  }
+
+  .paint-loader-orbit {
+    position: relative;
+    height: 3.25rem;
+    width: 3.25rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(59, 51, 44, 0.12);
+    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.5), rgba(231, 224, 214, 0.95));
+    overflow: hidden;
+  }
+
+  .paint-loader-orbit::before,
+  .paint-loader-orbit::after {
+    content: '';
+    position: absolute;
+    inset: 0.55rem;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    border-top-color: rgba(62, 97, 124, 0.38);
+    animation: orbit-spin 1.5s linear infinite;
+  }
+
+  .paint-loader-orbit::after {
+    inset: 1rem;
+    border-top-color: rgba(143, 108, 69, 0.42);
+    animation-duration: 1.1s;
+    animation-direction: reverse;
+  }
+
+  .paint-loader-drop {
+    animation: paint-drop 1.35s ease-in-out infinite;
+    transform-origin: center bottom;
+  }
+}
+
+@keyframes orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes paint-drop {
+  0%,
+  100% {
+    transform: translateY(0) scale(0.88);
+    opacity: 0.55;
+  }
+
+  50% {
+    transform: translateY(-1px) scale(1);
     opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --shadow-soft: 0 10px 28px rgba(40, 33, 28, 0.08);
   }
 }
