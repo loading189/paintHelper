@@ -57,10 +57,13 @@ const App = () => {
       rankingMode: state.settings.rankingMode,
       qualityLabel: recipe.qualityLabel,
       guidanceText: recipe.guidanceText,
+      nextAdjustments: recipe.nextAdjustments,
       scoreBreakdown: recipe.scoreBreakdown,
       exactParts: recipe.exactParts,
+      exactPercentages: recipe.exactPercentages,
       exactRatioText: recipe.exactRatioText,
       practicalParts: recipe.practicalParts,
+      practicalPercentages: recipe.practicalPercentages,
       practicalRatioText: recipe.practicalRatioText,
       recipeText: recipe.recipeText,
     };
@@ -82,31 +85,31 @@ const App = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-6 px-6 py-5">
+    <div className="min-h-screen bg-transparent text-stone-900">
+      <header className="border-b border-stone-200/90 bg-white/70 backdrop-blur-md">
+        <div className="mx-auto flex max-w-[1440px] flex-wrap items-end justify-between gap-6 px-6 py-7 lg:px-10">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-sky-600">Paint Mix Matcher</p>
-            <h1 className="mt-1 text-3xl font-bold">Local-only spectral paint recipe finder</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Build your inventory, enter a target hex, and rank deterministic recipes driven by a local Spectral.js pigment-style mixing engine.
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-stone-500">Paint Mix Matcher</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-950 sm:text-4xl">Local-only spectral paint recipe finder</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600 sm:text-base">
+              A neutral studio workspace for believable pigment-style starting mixes, driven by a local Spectral.js engine and tuned for painterly decisions.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-            <span className="rounded-full bg-slate-100 px-3 py-2">Enabled paints: {counts.enabledPaints}</span>
-            <span className="rounded-full bg-slate-100 px-3 py-2">Saved recipes: {counts.savedRecipes}</span>
-            <span className="rounded-full bg-slate-100 px-3 py-2">Storage: local browser only</span>
+          <div className="flex flex-wrap gap-3 text-sm text-stone-600">
+            <span className="rounded-full border border-stone-200 bg-white/85 px-3 py-2">Enabled paints: {counts.enabledPaints}</span>
+            <span className="rounded-full border border-stone-200 bg-white/85 px-3 py-2">Saved recipes: {counts.savedRecipes}</span>
+            <span className="rounded-full border border-stone-200 bg-white/85 px-3 py-2">Storage: local browser only</span>
           </div>
         </div>
       </header>
 
-      <nav className="mx-auto flex max-w-7xl gap-2 px-6 py-5">
+      <nav className="mx-auto flex max-w-[1440px] flex-wrap gap-2 px-6 py-5 lg:px-10">
         {navItems.map((item) => (
           <button
             key={item.id}
             type="button"
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              view === item.id ? 'bg-slate-900 text-white' : 'bg-white text-slate-700'
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+              view === item.id ? 'border-stone-800 bg-stone-900 text-stone-50' : 'border-stone-200 bg-white/80 text-stone-700 hover:bg-white'
             }`}
             onClick={() => setView(item.id)}
           >
@@ -115,7 +118,7 @@ const App = () => {
         ))}
       </nav>
 
-      <main className="mx-auto max-w-7xl px-6 pb-10">
+      <main className="mx-auto max-w-[1440px] px-6 pb-12 lg:px-10">
         {view === 'mixer' ? (
           <MixerPage
             paints={state.paints}

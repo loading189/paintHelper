@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatRatio, practicalRatioFromWeights, simplifyRatio } from './ratio';
+import { distributePercentages, formatRatio, practicalRatioFromWeights, simplifyRatio } from './ratio';
 
 describe('simplifyRatio', () => {
   it('reduces whole-number weights', () => {
@@ -31,5 +31,15 @@ describe('practicalRatioFromWeights', () => {
 
     expect(first).toEqual(second);
     expect(formatRatio(first)).toBe(formatRatio(second));
+  });
+});
+
+describe('distributePercentages', () => {
+  it('converts practical parts into whole-number percentages that sum to 100', () => {
+    expect(distributePercentages([6, 1])).toEqual([86, 14]);
+  });
+
+  it('keeps exact percentages mathematically aligned with equal ratios', () => {
+    expect(distributePercentages([1, 1, 1])).toEqual([34, 33, 33]);
   });
 });

@@ -10,9 +10,9 @@ export type RankingMode = 'strict-closest-color' | 'painter-friendly-balanced' |
 export type PreferredRole = 'base' | 'hue-builder' | 'support' | 'neutralizer' | 'lightener';
 export type RecipeQualityLabel =
   | 'Excellent spectral starting point'
-  | 'Strong spectral starting point'
-  | 'Usable spectral starting point'
-  | 'Needs hand-tuning';
+  | 'Strong starting point'
+  | 'Usable starting point'
+  | 'Rough direction only';
 export type RecipeBadge =
   | 'Best overall'
   | 'Best hue path'
@@ -108,9 +108,11 @@ export type RecipeScoreBreakdown = {
   neutralizerPenalty: number;
   blackPenalty: number;
   whitePenalty: number;
+  earlyWhitePenalty: number;
   singlePaintPenalty: number;
   naturalMixBonus: number;
   chromaticPathBonus: number;
+  twoPaintUsabilityBonus: number;
   vividTargetPenalty: number;
   hasRequiredHueConstructionPath: boolean;
   staysInTargetHueFamily: boolean;
@@ -129,10 +131,13 @@ export type MixRecipe = {
   rankingMode?: RankingMode;
   qualityLabel?: RecipeQualityLabel;
   guidanceText?: string[];
+  nextAdjustments?: string[];
   scoreBreakdown?: RecipeScoreBreakdown;
   exactParts?: number[];
+  exactPercentages?: number[];
   exactRatioText?: string;
   practicalParts?: number[];
+  practicalPercentages?: number[];
   practicalRatioText?: string;
   recipeText?: string;
 };
@@ -169,8 +174,10 @@ export type RankedRecipe = {
   distanceScore: number;
   components: RecipeComponent[];
   exactParts: number[];
+  exactPercentages: number[];
   exactRatioText: string;
   practicalParts: number[];
+  practicalPercentages: number[];
   practicalRatioText: string;
   parts: number[];
   ratioText: string;
@@ -179,6 +186,7 @@ export type RankedRecipe = {
   qualityLabel: RecipeQualityLabel;
   badges: RecipeBadge[];
   guidanceText: string[];
+  nextAdjustments: string[];
   targetAnalysis: ColorAnalysis;
   predictedAnalysis: ColorAnalysis;
   whyThisRanked: string[];
