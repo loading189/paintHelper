@@ -87,6 +87,11 @@ export type MixRecipe = {
   qualityLabel?: RecipeQualityLabel;
   guidanceText?: string[];
   scoreBreakdown?: RecipeScoreBreakdown;
+  exactParts?: number[];
+  exactRatioText?: string;
+  practicalParts?: number[];
+  practicalRatioText?: string;
+  recipeText?: string;
 };
 
 export type SinglePaintPenaltySettings = {
@@ -132,6 +137,10 @@ export type RankedRecipe = {
   predictedHex: string;
   distanceScore: number;
   components: RecipeComponent[];
+  exactParts: number[];
+  exactRatioText: string;
+  practicalParts: number[];
+  practicalRatioText: string;
   parts: number[];
   ratioText: string;
   recipeText: string;

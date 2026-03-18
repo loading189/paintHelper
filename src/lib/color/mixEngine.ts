@@ -8,7 +8,7 @@ import type {
   RecipeScoreBreakdown,
   UserSettings,
 } from '../../types/models';
-import { simplifyRatio } from '../utils/ratio';
+import { formatRatio, practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
 import { analyzeColor, hueDifference } from './colorAnalysis';
 import { colorDistance, hexToRgb, linearRgbToSrgbRgb, rgbToHex, srgbRgbToLinearRgb } from './colorMath';
 import { assignRecipeBadges, buildMixStrategy, buildRecipeGuidance, buildRecipeWhyThisRanked, determineRecipeQuality } from './guidance';
@@ -636,15 +636,22 @@ export const rankRecipes = (
       );
       const orderedPaintNames = components.map((component) => paintNameMap.get(component.paintId) ?? component.paintId);
       const orderedWeights = components.map((component) => component.weight);
-      const parts = simplifyRatio(orderedWeights);
+      const exactParts = simplifyRatio(orderedWeights);
+      const practicalParts = practicalRatioFromWeights(orderedWeights);
+      const exactRatioText = formatRatio(exactParts);
+      const practicalRatioText = formatRatio(practicalParts);
 
       const recipe: RankedRecipeCandidate = {
         predictedHex,
         distanceScore: scoreBreakdown.finalScore,
         components,
-        parts,
-        ratioText: parts.join(':'),
-        recipeText: buildRecipeText(orderedPaintNames, parts),
+        exactParts,
+        exactRatioText,
+        practicalParts,
+        practicalRatioText,
+        parts: practicalParts,
+        ratioText: practicalRatioText,
+        recipeText: buildRecipeText(orderedPaintNames, practicalParts),
         scoreBreakdown,
         qualityLabel: determineRecipeQuality(scoreBreakdown.finalScore),
         badges: [],
@@ -656,9 +663,16 @@ export const rankRecipes = (
         predictedLinear: mixedLinear,
       };
 
-      recipe.guidanceText = buildRecipeGuidance(scoreBreakdown, targetAnalysis, predictedAnalysis, paints, components.map((component) => component.paintId));
+      recipe.guidanceText = buildRecipeGuidance(
+        scoreBreakdown,
+        targetAnalysis,
+        predictedAnalysis,
+        paints,
+        components.map((component) => component.paintId),
+        practicalRatioText,
+      );
       recipe.whyThisRanked = buildRecipeWhyThisRanked(scoreBreakdown, targetAnalysis, predictedAnalysis, paints, components.map((component) => component.paintId));
-      recipe.mixStrategy = buildMixStrategy(paints, recipe.components, targetAnalysis);
+      recipe.mixStrategy = buildMixStrategy(paints, recipe.components, targetAnalysis, practicalRatioText);
 
       return recipe;
     })

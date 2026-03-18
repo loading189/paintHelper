@@ -103,9 +103,10 @@ export const buildRecipeGuidance = (
   predictedAnalysis: ColorAnalysis,
   paints: Paint[],
   componentPaintIds: string[],
+  practicalRatioText: string,
 ): string[] => {
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
-  const lines: string[] = [];
+  const lines: string[] = [`Start with a practical ${practicalRatioText} mix, then fine-tune by eye.`];
 
   if ((targetAnalysis.valueClassification === 'dark' || targetAnalysis.valueClassification === 'very dark') && targetAnalysis.hueFamily !== 'neutral') {
     lines.push(`Establish the ${targetAnalysis.hueFamily} hue family first, then darken only as needed.`);
@@ -147,6 +148,7 @@ export const buildMixStrategy = (
   paints: Paint[],
   components: RankedRecipe['components'],
   targetAnalysis: ColorAnalysis,
+  practicalRatioText: string,
 ): string[] => {
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
   const ordered = [...components].sort((left, right) => right.percentage - left.percentage);
@@ -156,15 +158,13 @@ export const buildMixStrategy = (
   const earthSupport = ordered
     .map((component) => paintMap.get(component.paintId))
     .find((paint) => paint?.heuristics?.naturalBias === 'earth');
-  const lines: string[] = [];
+  const lines: string[] = [`Use the practical ${practicalRatioText} ratio as your first pile size guide.`];
 
   const chromaticPaints = ordered
     .map((component) => paintMap.get(component.paintId))
-    .filter((paint): paint is Paint =>
-      paint !== undefined &&
-      !paint.isBlack &&
-      !paint.isWhite &&
-      paint.heuristics?.naturalBias === 'chromatic',
+    .filter(
+      (paint): paint is Paint =>
+        paint !== undefined && !paint.isBlack && !paint.isWhite && paint.heuristics?.naturalBias === 'chromatic',
     );
   const yellowPaint = chromaticPaints.find((paint) => paint.name.toLowerCase().includes('yellow'));
   const bluePaint = chromaticPaints.find((paint) => paint.name.toLowerCase().includes('blue'));
@@ -174,7 +174,9 @@ export const buildMixStrategy = (
   const dominantIsBlackForChromaticTarget = Boolean(dominant?.isBlack && targetAnalysis.hueFamily !== 'neutral');
 
   if (targetAnalysis.hueFamily === 'green' && isDarkChromaticTarget && yellowPaint && bluePaint) {
-    lines.push(`Build the green first with ${yellowPaint.name} + ${bluePaint.name}, then mute or darken with ${earthSupport?.name ?? (hasBlack ? 'black' : 'umber or black')}.`);
+    lines.push(
+      `Build the green first with ${yellowPaint.name} + ${bluePaint.name}, then mute or darken with ${earthSupport?.name ?? (hasBlack ? 'black' : 'umber or black')}.`,
+    );
   } else if (isDarkChromaticTarget && chromaticPaints.length >= 2) {
     lines.push(`Block in the ${targetAnalysis.hueFamily} family with ${chromaticPaints[0].name} + ${chromaticPaints[1].name} before introducing deeper support.`);
   } else if (dominant && !dominantIsBlackForChromaticTarget) {
