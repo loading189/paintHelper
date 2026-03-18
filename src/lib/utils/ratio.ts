@@ -18,7 +18,7 @@ export type PracticalRatioOptions = {
 
 const EPSILON = 1e-9;
 
-const getNormalizedShares = (weights: number[]): number[] => {
+export const getNormalizedShares = (weights: number[]): number[] => {
   const total = weights.reduce((sum, weight) => sum + weight, 0);
 
   if (total <= 0) {
@@ -125,6 +125,37 @@ export const practicalRatioFromWeights = (
   }
 
   return bestRatio ?? exactRatio;
+};
+
+export const distributePercentages = (weights: number[]): number[] => {
+  if (weights.length === 0) {
+    return [];
+  }
+
+  const shares = getNormalizedShares(weights).map((share, index) => ({
+    index,
+    exact: share * 100,
+  }));
+
+  const floored = shares.map((share) => ({
+    ...share,
+    rounded: Math.floor(share.exact),
+    remainder: share.exact - Math.floor(share.exact),
+  }));
+
+  let remaining = 100 - floored.reduce((sum, share) => sum + share.rounded, 0);
+  const sortedByRemainder = [...floored].sort((left, right) => right.remainder - left.remainder || left.index - right.index);
+
+  while (remaining > 0) {
+    const target = sortedByRemainder.shift();
+    if (!target) {
+      break;
+    }
+    floored[target.index].rounded += 1;
+    remaining -= 1;
+  }
+
+  return floored.map((share) => share.rounded);
 };
 
 export const formatRatio = (parts: number[]): string => parts.join(':');

@@ -79,10 +79,13 @@ const sanitizeRecipe = (recipe: MixRecipe): MixRecipe => ({
   targetHex: normalizeHex(recipe.targetHex) ?? '#000000',
   predictedHex: normalizeHex(recipe.predictedHex) ?? '#000000',
   exactParts: Array.isArray(recipe.exactParts) ? recipe.exactParts.filter((part) => typeof part === 'number') : undefined,
-  practicalParts: Array.isArray(recipe.practicalParts) ? recipe.practicalParts.filter((part) => typeof part === 'number') : undefined,
+  exactPercentages: Array.isArray(recipe.exactPercentages) ? recipe.exactPercentages.filter((part) => typeof part === 'number') : undefined,
   exactRatioText: typeof recipe.exactRatioText === 'string' ? recipe.exactRatioText : undefined,
+  practicalParts: Array.isArray(recipe.practicalParts) ? recipe.practicalParts.filter((part) => typeof part === 'number') : undefined,
+  practicalPercentages: Array.isArray(recipe.practicalPercentages) ? recipe.practicalPercentages.filter((part) => typeof part === 'number') : undefined,
   practicalRatioText: typeof recipe.practicalRatioText === 'string' ? recipe.practicalRatioText : undefined,
   guidanceText: Array.isArray(recipe.guidanceText) ? recipe.guidanceText.filter((line): line is string => typeof line === 'string') : undefined,
+  nextAdjustments: Array.isArray(recipe.nextAdjustments) ? recipe.nextAdjustments.filter((line): line is string => typeof line === 'string') : undefined,
 });
 
 export const sanitizeSettings = (settings: Partial<UserSettings> | undefined): UserSettings => ({

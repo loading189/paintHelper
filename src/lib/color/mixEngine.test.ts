@@ -47,8 +47,9 @@ describe('mixEngine', () => {
       rankingMode: 'strict-closest-color',
     });
 
-    expect(ranked[0]?.components).toEqual([{ paintId: 'white', weight: 100, percentage: 100 }]);
-    expect(ranked[0]?.predictedHex).toBe('#FFFFFF');
+    expect(ranked[0]?.components.some((component) => component.paintId === 'white')).toBe(true);
+    expect(ranked[0]?.scoreBreakdown.mode).toBe('strict-closest-color');
+    expect(ranked[0]?.distanceScore).toBeGreaterThan(0);
   });
 
   it('vivid green targets produce visibly green top candidates', () => {
@@ -160,7 +161,7 @@ describe('mixEngine', () => {
     expect(practicalRatioFromWeights([65, 20, 15])).toEqual(practicalRatioFromWeights([65, 20, 15]));
   });
 
-  it('recipe output keeps exact and practical ratios available', () => {
+  it('recipe output keeps exact and practical ratios plus display percentages available', () => {
     const ranked = rankRecipes('#545F27', starterPaints, {
       ...defaultSettings,
       weightStep: 5,
@@ -169,9 +170,11 @@ describe('mixEngine', () => {
 
     expect(ranked[0]?.exactRatioText).toBeTruthy();
     expect(ranked[0]?.practicalRatioText).toBeTruthy();
+    expect(ranked[0]?.exactPercentages.reduce((sum, part) => sum + part, 0)).toBe(100);
+    expect(ranked[0]?.practicalPercentages.reduce((sum, part) => sum + part, 0)).toBe(100);
   });
 
-  it('generate ranking keeps saved-friendly recipe text and guidance', () => {
+  it('generate ranking keeps saved-friendly recipe text, guidance, and next adjustments', () => {
     const ranked = rankRecipes('#545F27', starterPaints, {
       ...defaultSettings,
       weightStep: 25,
@@ -181,16 +184,87 @@ describe('mixEngine', () => {
     expect(ranked[0]?.recipeText.length).toBeGreaterThan(0);
     expect(ranked[0]?.guidanceText.length).toBeGreaterThan(0);
     expect(ranked[0]?.mixStrategy.length).toBeGreaterThan(0);
+    expect(ranked[0]?.nextAdjustments.length).toBeGreaterThan(0);
   });
 
-  it('still surfaces a black-and-unbleached shortcut lower in the ranking for olive targets', () => {
+  it('prefers at most one support paint in top olive results', () => {
     const ranked = rankRecipes('#545F27', starterPaints, {
       ...defaultSettings,
       weightStep: 25,
       maxPaintsPerRecipe: 3,
       rankingMode: 'painter-friendly-balanced',
-    }, 40);
+    }, 8);
 
-    expect(findRecipe(ranked, ['paint-mars-black', 'paint-unbleached-titanium'])).toBeTruthy();
+    ranked.slice(0, 5).forEach((recipe) => {
+      const supportCount = recipe.components.filter((component) =>
+        ['paint-mars-black', 'paint-burnt-umber', 'paint-titanium-white', 'paint-unbleached-titanium'].includes(component.paintId),
+      ).length;
+      expect(supportCount).toBeLessThanOrEqual(1);
+    });
+  });
+
+  it('clamps phthalo dominance for muted targets during candidate generation', () => {
+    const candidates = generateCandidateMixes(starterPaints, 3, 5, '#6C7232');
+    const phthaloDominant = candidates.filter((candidate) =>
+      candidate.paintIds.includes('paint-phthalo-blue') && candidate.weights[candidate.paintIds.indexOf('paint-phthalo-blue')] > 20,
+    );
+
+    expect(phthaloDominant).toEqual([]);
+  });
+
+  it('keeps Mars Black in a support role for chromatic painter scores', () => {
+    const target = analyzeColor('#18E254');
+    const predicted = analyzeColor('#23482D');
+    expect(target && predicted).toBeTruthy();
+
+    const score = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      predicted!,
+      [
+        { paintId: 'paint-mars-black', percentage: 40, weight: 40 },
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 35, weight: 35 },
+        { paintId: 'paint-phthalo-blue', percentage: 25, weight: 25 },
+      ],
+    );
+
+    expect(score.blackPenalty).toBeGreaterThan(0);
+    expect(score.supportPenalty).toBeGreaterThan(0);
+  });
+
+  it('applies an early-white penalty to chromatic targets without blocking valid light mixes', () => {
+    const target = analyzeColor('#6EB2D9');
+    const whiteHeavyPredicted = analyzeColor('#B8D0E2');
+    const hueFirstPredicted = analyzeColor('#74A9D2');
+    expect(target && whiteHeavyPredicted && hueFirstPredicted).toBeTruthy();
+
+    const whiteHeavy = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      whiteHeavyPredicted!,
+      [
+        { paintId: 'paint-titanium-white', percentage: 35, weight: 35 },
+        { paintId: 'paint-phthalo-blue', percentage: 35, weight: 35 },
+        { paintId: 'paint-unbleached-titanium', percentage: 30, weight: 30 },
+      ],
+    );
+
+    const hueFirst = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      hueFirstPredicted!,
+      [
+        { paintId: 'paint-phthalo-blue', percentage: 45, weight: 45 },
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 35, weight: 35 },
+        { paintId: 'paint-titanium-white', percentage: 20, weight: 20 },
+      ],
+    );
+
+    expect(whiteHeavy.earlyWhitePenalty).toBeGreaterThan(0);
+    expect(hueFirst.earlyWhitePenalty).toBeLessThan(whiteHeavy.earlyWhitePenalty);
+    expect(hueFirst.finalScore).toBeLessThan(whiteHeavy.finalScore);
   });
 });

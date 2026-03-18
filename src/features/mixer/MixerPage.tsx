@@ -17,9 +17,9 @@ const rankingModeLabels: Record<UserSettings['rankingMode'], string> = {
 };
 
 const rankingModeDescriptions: Record<UserSettings['rankingMode'], string> = {
-  'strict-closest-color': 'Strict Closest Color ranks by the raw spectral color match with minimal painter heuristics.',
-  'painter-friendly-balanced': 'Painter-Friendly Balanced keeps spectral matching first, then favors believable painterly construction paths.',
-  'simpler-recipes-preferred': 'Simpler Recipes Preferred still uses the spectral engine, but leans harder toward mixes you can set up quickly.',
+  'strict-closest-color': 'Ranks by the raw spectral match first, with very little painterly filtering.',
+  'painter-friendly-balanced': 'Keeps spectral plausibility first, then rewards believable hue builds and restrained support paint use.',
+  'simpler-recipes-preferred': 'Still uses the spectral engine, but gives a slight edge to practical two-paint mixes when they are genuinely close.',
 };
 
 type MixerPageProps = {
@@ -97,54 +97,56 @@ export const MixerPage = ({
   };
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[320px,320px,minmax(0,1fr)]">
+    <div className="grid gap-6 xl:grid-cols-[340px,340px,minmax(0,1fr)] 2xl:grid-cols-[360px,360px,minmax(0,1fr)]">
       <Card>
         <SectionTitle>Mixer controls</SectionTitle>
-        <div className="mt-4 space-y-4">
-          <label className="block space-y-1 text-sm font-medium text-slate-700">
+        <p className="mt-2 text-sm leading-6 text-stone-600">Keep the workspace quiet, set a target, then generate a fresh mix set only when you are ready.</p>
+
+        <div className="mt-5 space-y-4">
+          <label className="block space-y-1.5 text-sm font-medium text-stone-700">
             Target hex
             <input
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
+              className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2.5 text-stone-900"
               value={mixerState.draftHex}
               onChange={(event) => handleDraftChange(event.target.value)}
               placeholder="#7A8FB3"
             />
           </label>
-          <label className="block space-y-1 text-sm font-medium text-slate-700">
+          <label className="block space-y-1.5 text-sm font-medium text-stone-700">
             Target picker
             <input
               type="color"
-              className="h-12 w-full rounded-xl border border-slate-300 p-1"
+              className="h-14 w-full rounded-2xl border border-stone-300 bg-white p-1.5"
               value={draftNormalizedHex ?? '#000000'}
               onChange={(event) => handleDraftChange(event.target.value)}
             />
           </label>
           <button
-            className={`w-full rounded-xl px-4 py-2 text-sm font-semibold text-white ${generateDisabled ? 'bg-slate-400' : 'bg-slate-900'}`}
+            className={`w-full rounded-2xl px-4 py-3 text-sm font-semibold transition ${generateDisabled ? 'bg-stone-300 text-stone-500' : 'bg-stone-900 text-stone-50 hover:bg-stone-800'}`}
             type="button"
             disabled={generateDisabled}
             onClick={() => {
               void handleGenerate();
             }}
           >
-            {mixerState.isGenerating ? 'Mixing...' : 'Generate Recipes'}
+            {mixerState.isGenerating ? 'Mixing…' : 'Generate Recipes'}
           </button>
-          {showInvalidHexMessage ? <p className="text-sm text-rose-600">Enter a valid 6-digit hex color.</p> : null}
-          {enabledPaints.length === 0 ? <p className="text-sm text-amber-700">Enable at least one paint in My Paints to generate mixes.</p> : null}
+          {showInvalidHexMessage ? <p className="text-sm text-rose-700">Enter a valid 6-digit hex color.</p> : null}
+          {enabledPaints.length === 0 ? <p className="text-sm text-amber-800">Enable at least one paint in My Paints to generate mixes.</p> : null}
           {resultsAreStale && generatedHex ? (
-            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              Draft target changed. Visible recipes are still for {generatedHex}. Click Generate Recipes to remix.
+            <p className="rounded-2xl border border-stone-300 bg-stone-100 px-3 py-2.5 text-sm text-stone-700">
+              Target changed — generate recipes to refresh this mix set. Current cards still reflect {generatedHex}.
             </p>
           ) : null}
           {mixerState.isGenerating ? <PaintMixerLoading /> : null}
         </div>
 
-        <div className="mt-6 space-y-4">
+        <div className="mt-8 space-y-4 border-t border-stone-200 pt-6">
           <SectionTitle>Settings</SectionTitle>
-          <label className="block space-y-1 text-sm font-medium text-slate-700">
+          <label className="block space-y-1.5 text-sm font-medium text-stone-700">
             Ranking mode
             <select
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
+              className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2.5"
               value={settings.rankingMode}
               onChange={(event) =>
                 onSettingsChange({
@@ -160,10 +162,10 @@ export const MixerPage = ({
               ))}
             </select>
           </label>
-          <label className="block space-y-1 text-sm font-medium text-slate-700">
+          <label className="block space-y-1.5 text-sm font-medium text-stone-700">
             Weight step size
             <select
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
+              className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2.5"
               value={settings.weightStep}
               onChange={(event) => onSettingsChange({ ...settings, weightStep: Number(event.target.value) })}
             >
@@ -171,10 +173,10 @@ export const MixerPage = ({
               <option value={5}>5%</option>
             </select>
           </label>
-          <label className="block space-y-1 text-sm font-medium text-slate-700">
+          <label className="block space-y-1.5 text-sm font-medium text-stone-700">
             Max paints per recipe
             <select
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
+              className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2.5"
               value={settings.maxPaintsPerRecipe}
               onChange={(event) =>
                 onSettingsChange({ ...settings, maxPaintsPerRecipe: Number(event.target.value) as 1 | 2 | 3 })
@@ -185,115 +187,109 @@ export const MixerPage = ({
               <option value={3}>3</option>
             </select>
           </label>
-          <label className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-            Show percentages
-            <input
-              type="checkbox"
-              checked={settings.showPercentages}
-              onChange={(event) => onSettingsChange({ ...settings, showPercentages: event.target.checked })}
-            />
-          </label>
-          <label className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-            Show parts ratios
-            <input
-              type="checkbox"
-              checked={settings.showPartsRatios}
-              onChange={(event) => onSettingsChange({ ...settings, showPartsRatios: event.target.checked })}
-            />
-          </label>
-          <label className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-            Discourage black-only matches
-            <input
-              type="checkbox"
-              checked={settings.singlePaintPenaltySettings.discourageBlackOnlyMatches}
-              onChange={(event) =>
+          {[
+            {
+              label: 'Show percentages',
+              checked: settings.showPercentages,
+              onChange: (checked: boolean) => onSettingsChange({ ...settings, showPercentages: checked }),
+            },
+            {
+              label: 'Show parts ratios',
+              checked: settings.showPartsRatios,
+              onChange: (checked: boolean) => onSettingsChange({ ...settings, showPartsRatios: checked }),
+            },
+            {
+              label: 'Discourage black-only matches',
+              checked: settings.singlePaintPenaltySettings.discourageBlackOnlyMatches,
+              onChange: (checked: boolean) =>
                 onSettingsChange({
                   ...settings,
                   singlePaintPenaltySettings: {
                     ...settings.singlePaintPenaltySettings,
-                    discourageBlackOnlyMatches: event.target.checked,
+                    discourageBlackOnlyMatches: checked,
                   },
-                })
-              }
-            />
-          </label>
-          <label className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-            Discourage white-only matches
-            <input
-              type="checkbox"
-              checked={settings.singlePaintPenaltySettings.discourageWhiteOnlyMatches}
-              onChange={(event) =>
+                }),
+            },
+            {
+              label: 'Discourage white-only matches',
+              checked: settings.singlePaintPenaltySettings.discourageWhiteOnlyMatches,
+              onChange: (checked: boolean) =>
                 onSettingsChange({
                   ...settings,
                   singlePaintPenaltySettings: {
                     ...settings.singlePaintPenaltySettings,
-                    discourageWhiteOnlyMatches: event.target.checked,
+                    discourageWhiteOnlyMatches: checked,
                   },
-                })
-              }
-            />
-          </label>
-          <label className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-            Favor multi-paint mixes when close
-            <input
-              type="checkbox"
-              checked={settings.singlePaintPenaltySettings.favorMultiPaintMixesWhenClose}
-              onChange={(event) =>
+                }),
+            },
+            {
+              label: 'Favor multi-paint mixes when close',
+              checked: settings.singlePaintPenaltySettings.favorMultiPaintMixesWhenClose,
+              onChange: (checked: boolean) =>
                 onSettingsChange({
                   ...settings,
                   singlePaintPenaltySettings: {
                     ...settings.singlePaintPenaltySettings,
-                    favorMultiPaintMixesWhenClose: event.target.checked,
+                    favorMultiPaintMixesWhenClose: checked,
                   },
-                })
-              }
-            />
-          </label>
+                }),
+            },
+          ].map((toggle) => (
+            <label key={toggle.label} className="flex items-center justify-between rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm font-medium text-stone-700">
+              {toggle.label}
+              <input type="checkbox" checked={toggle.checked} onChange={(event) => toggle.onChange(event.target.checked)} />
+            </label>
+          ))}
         </div>
       </Card>
 
       <Card>
         <SectionTitle>Target analysis</SectionTitle>
-        <div className="mt-4 space-y-4">
-          <div className="h-56 rounded-3xl border border-slate-200" style={{ backgroundColor: draftNormalizedHex ?? '#CBD5E1' }} />
-          <div>
-            <p className="text-sm text-slate-500">Draft hex</p>
-            <p className="text-xl font-semibold text-slate-900">{draftNormalizedHex ?? 'Invalid hex'}</p>
-            {generatedHex ? <p className="mt-1 text-xs text-slate-500">Last generated target: {generatedHex}</p> : null}
+        <p className="mt-2 text-sm leading-6 text-stone-600">Judge the target against a neutral surround before comparing recipes.</p>
+        <div className="mt-5 space-y-5">
+          <div className="rounded-[28px] border border-stone-200 bg-stone-100 p-4">
+            <div className="rounded-[24px] border border-stone-300 bg-stone-200 p-3">
+              <div className="h-56 rounded-[20px] border border-black/8" style={{ backgroundColor: draftNormalizedHex ?? '#cbd5d1' }} />
+            </div>
           </div>
           <div>
-            <p className="text-sm text-slate-500">RGB</p>
-            <p className="text-base text-slate-800">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Draft hex</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight text-stone-950">{draftNormalizedHex ?? 'Invalid hex'}</p>
+            {generatedHex ? <p className="mt-1 text-xs text-stone-500">Last generated target: {generatedHex}</p> : null}
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">RGB</p>
+            <p className="mt-1 text-base text-stone-800">
               {previewAnalysis ? `${previewAnalysis.rgb.r}, ${previewAnalysis.rgb.g}, ${previewAnalysis.rgb.b}` : '—'}
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Value</p>
-              <p className="mt-1 font-semibold text-slate-900">{previewAnalysis?.valueClassification ?? '—'}</p>
+            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-stone-500">Value</p>
+              <p className="mt-1 font-semibold capitalize text-stone-900">{previewAnalysis?.valueClassification ?? '—'}</p>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Hue family</p>
-              <p className="mt-1 font-semibold text-slate-900">{previewAnalysis?.hueFamily ?? '—'}</p>
+            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-stone-500">Hue family</p>
+              <p className="mt-1 font-semibold capitalize text-stone-900">{previewAnalysis?.hueFamily ?? '—'}</p>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Saturation</p>
-              <p className="mt-1 font-semibold text-slate-900">{previewAnalysis?.saturationClassification ?? '—'}</p>
+            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-stone-500">Saturation</p>
+              <p className="mt-1 font-semibold capitalize text-stone-900">{previewAnalysis?.saturationClassification ?? '—'}</p>
             </div>
           </div>
           <div>
-            <p className="text-sm text-slate-500">Palette insight</p>
-            <ul className="mt-2 space-y-2 text-sm text-slate-700">
-              {targetInsights.length > 0 ? targetInsights.map((insight) => <li key={insight}>• {insight}</li>) : <li>• Enter a valid target color to see palette-aware hints.</li>}
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Palette insight</p>
+            <ul className="mt-2 space-y-2 text-sm leading-6 text-stone-700">
+              {targetInsights.length > 0 ? targetInsights.map((insight) => <li key={insight}>• {insight}</li>) : <li>• Enter a valid target color to see palette-aware guidance.</li>}
             </ul>
           </div>
           <div>
-            <p className="text-sm text-slate-500">Recent colors</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Recent colors</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {recentColors.map((color) => (
                 <button
                   key={color}
-                  className="h-9 w-9 rounded-full border border-slate-200"
+                  className="h-10 w-10 rounded-full border border-stone-300 bg-white"
                   type="button"
                   style={{ backgroundColor: color }}
                   title={color}
@@ -305,21 +301,21 @@ export const MixerPage = ({
         </div>
       </Card>
 
-      <div className="space-y-4">
+      <div className="space-y-4 lg:space-y-5">
         <div>
           <SectionTitle>Spectral recipe suggestions</SectionTitle>
-          <p className="mt-1 text-sm text-slate-600">{rankingModeDescriptions[settings.rankingMode]}</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600">{rankingModeDescriptions[settings.rankingMode]}</p>
         </div>
 
         {topRecipe ? (
           <Card>
-            <SectionTitle>Mix strategy for the top result</SectionTitle>
-            <p className="mt-1 text-sm font-semibold text-slate-900">{topRecipe.recipeText}</p>
-            <p className="mt-1 text-sm text-slate-600">Practical mix: {topRecipe.practicalRatioText}</p>
+            <SectionTitle>Top-result palette setup</SectionTitle>
+            <p className="mt-2 text-base font-semibold text-stone-950">{topRecipe.recipeText}</p>
+            <p className="mt-1 text-sm text-stone-600">Practical mix: {topRecipe.practicalRatioText}</p>
             {topRecipe.practicalRatioText !== topRecipe.exactRatioText ? (
-              <p className="mt-1 text-xs text-slate-500">Exact simplified ratio: {topRecipe.exactRatioText}</p>
+              <p className="mt-1 text-xs text-stone-500">Exact simplified ratio: {topRecipe.exactRatioText}</p>
             ) : null}
-            <ul className="mt-3 space-y-2 text-sm text-slate-700">
+            <ul className="mt-4 space-y-2 text-sm leading-6 text-stone-700">
               {topRecipe.mixStrategy.map((line) => (
                 <li key={line}>• {line}</li>
               ))}
@@ -341,12 +337,12 @@ export const MixerPage = ({
           ))
         ) : (
           <Card>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm leading-6 text-stone-600">
               {enabledPaints.length === 0
                 ? 'No enabled paints are available for recipe generation.'
                 : generatedAnalysis
                   ? 'No deterministic mixes matched this target with the current settings.'
-                  : 'Generate recipes to see deterministic spectral predictions and painter-first starting mixes.'}
+                  : 'Generate recipes to see neutral, deterministic spectral predictions and painter-first starting mixes.'}
             </p>
           </Card>
         )}
