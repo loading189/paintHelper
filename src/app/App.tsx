@@ -54,6 +54,10 @@ const App = () => {
       createdAt: new Date().toISOString(),
       savedName,
       notes: '',
+      rankingMode: state.settings.rankingMode,
+      qualityLabel: recipe.qualityLabel,
+      guidanceText: recipe.guidanceText,
+      scoreBreakdown: recipe.scoreBreakdown,
     };
 
     setState((current) => ({ ...current, recipes: [saved, ...current.recipes] }));
@@ -80,7 +84,7 @@ const App = () => {
             <p className="text-sm font-semibold uppercase tracking-[0.25em] text-sky-600">Paint Mix Matcher</p>
             <h1 className="mt-1 text-3xl font-bold">Local-only deterministic paint recipe finder</h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Build your inventory, enter a target hex, and rank practical mix recipes using weighted linear RGB averages.
+              Build your inventory, enter a target hex, and rank deterministic paint mixes with painter-friendly heuristics layered on top of linear RGB blending.
             </p>
           </div>
           <div className="flex flex-wrap gap-3 text-sm text-slate-600">

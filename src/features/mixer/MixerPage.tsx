@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card } from '../../components/Card';
 import { SectionTitle } from '../../components/SectionTitle';
-import { hexToRgb, normalizeHex } from '../../lib/color/colorMath';
+import { analyzeColor, generateTargetPaletteInsights } from '../../lib/color/colorAnalysis';
+import { normalizeHex } from '../../lib/color/colorMath';
 import { rankRecipes } from '../../lib/color/mixEngine';
 import type { Paint, RankedRecipe, UserSettings } from '../../types/models';
 import { RecipeCard } from './RecipeCard';
 
 const DEFAULT_TARGET = '#7A8FB3';
+
+const rankingModeLabels: Record<UserSettings['rankingMode'], string> = {
+  'strict-closest-color': 'Strict Closest Color',
+  'painter-friendly-balanced': 'Painter-Friendly Balanced',
+  'simpler-recipes-preferred': 'Simpler Recipes Preferred',
+};
 
 type MixerPageProps = {
   paints: Paint[];
@@ -31,9 +38,8 @@ export const MixerPage = ({
   const [touched, setTouched] = useState(false);
 
   const normalizedHex = normalizeHex(targetInput);
-  const targetRgb = normalizedHex ? hexToRgb(normalizedHex) : null;
+  const targetAnalysis = normalizedHex ? analyzeColor(normalizedHex) : null;
   const enabledPaints = paints.filter((paint) => paint.isEnabled);
-
 
   useEffect(() => {
     if (onLoadTargetHex) {
@@ -41,13 +47,12 @@ export const MixerPage = ({
     }
   }, [onLoadTargetHex]);
 
-  const recipes = useMemo(
-    () =>
-      normalizedHex
-        ? rankRecipes(normalizedHex, paints, settings.maxPaintsPerRecipe, settings.weightStep, 3)
-        : [],
-    [normalizedHex, paints, settings.maxPaintsPerRecipe, settings.weightStep],
+  const recipes = useMemo(() => (normalizedHex ? rankRecipes(normalizedHex, paints, settings, 4) : []), [normalizedHex, paints, settings]);
+  const targetInsights = useMemo(
+    () => (targetAnalysis ? generateTargetPaletteInsights(targetAnalysis, paints) : []),
+    [targetAnalysis, paints],
   );
+  const topRecipe = recipes[0] ?? null;
 
   const applyTarget = (value: string) => {
     setTargetInput(value);
@@ -102,6 +107,25 @@ export const MixerPage = ({
         <div className="mt-6 space-y-4">
           <SectionTitle>Settings</SectionTitle>
           <label className="block space-y-1 text-sm font-medium text-slate-700">
+            Ranking mode
+            <select
+              className="w-full rounded-xl border border-slate-300 px-3 py-2"
+              value={settings.rankingMode}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  rankingMode: event.target.value as UserSettings['rankingMode'],
+                })
+              }
+            >
+              {Object.entries(rankingModeLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1 text-sm font-medium text-slate-700">
             Weight step size
             <select
               className="w-full rounded-xl border border-slate-300 px-3 py-2"
@@ -142,11 +166,59 @@ export const MixerPage = ({
               onChange={(event) => onSettingsChange({ ...settings, showPartsRatios: event.target.checked })}
             />
           </label>
+          <label className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+            Discourage black-only matches
+            <input
+              type="checkbox"
+              checked={settings.singlePaintPenaltySettings.discourageBlackOnlyMatches}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  singlePaintPenaltySettings: {
+                    ...settings.singlePaintPenaltySettings,
+                    discourageBlackOnlyMatches: event.target.checked,
+                  },
+                })
+              }
+            />
+          </label>
+          <label className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+            Discourage white-only matches
+            <input
+              type="checkbox"
+              checked={settings.singlePaintPenaltySettings.discourageWhiteOnlyMatches}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  singlePaintPenaltySettings: {
+                    ...settings.singlePaintPenaltySettings,
+                    discourageWhiteOnlyMatches: event.target.checked,
+                  },
+                })
+              }
+            />
+          </label>
+          <label className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+            Favor multi-paint mixes when close
+            <input
+              type="checkbox"
+              checked={settings.singlePaintPenaltySettings.favorMultiPaintMixesWhenClose}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  singlePaintPenaltySettings: {
+                    ...settings.singlePaintPenaltySettings,
+                    favorMultiPaintMixesWhenClose: event.target.checked,
+                  },
+                })
+              }
+            />
+          </label>
         </div>
       </Card>
 
       <Card>
-        <SectionTitle>Target color</SectionTitle>
+        <SectionTitle>Target analysis</SectionTitle>
         <div className="mt-4 space-y-4">
           <div className="h-56 rounded-3xl border border-slate-200" style={{ backgroundColor: normalizedHex ?? '#CBD5E1' }} />
           <div>
@@ -156,8 +228,28 @@ export const MixerPage = ({
           <div>
             <p className="text-sm text-slate-500">RGB</p>
             <p className="text-base text-slate-800">
-              {targetRgb ? `${targetRgb.r}, ${targetRgb.g}, ${targetRgb.b}` : '—'}
+              {targetAnalysis ? `${targetAnalysis.rgb.r}, ${targetAnalysis.rgb.g}, ${targetAnalysis.rgb.b}` : '—'}
             </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Value</p>
+              <p className="mt-1 font-semibold text-slate-900">{targetAnalysis?.valueClassification ?? '—'}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Hue family</p>
+              <p className="mt-1 font-semibold text-slate-900">{targetAnalysis?.hueFamily ?? '—'}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Saturation</p>
+              <p className="mt-1 font-semibold text-slate-900">{targetAnalysis?.saturationClassification ?? '—'}</p>
+            </div>
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">Palette insight</p>
+            <ul className="mt-2 space-y-2 text-sm text-slate-700">
+              {targetInsights.length > 0 ? targetInsights.map((insight) => <li key={insight}>• {insight}</li>) : <li>• Enter a valid target color to see palette-aware hints.</li>}
+            </ul>
           </div>
           <div>
             <p className="text-sm text-slate-500">Recent colors</p>
@@ -179,9 +271,24 @@ export const MixerPage = ({
 
       <div className="space-y-4">
         <div>
-          <SectionTitle>Top recipe suggestions</SectionTitle>
-          <p className="mt-1 text-sm text-slate-600">Deterministic ranking in linear RGB using only enabled paints from your local inventory.</p>
+          <SectionTitle>Painter-first recipe suggestions</SectionTitle>
+          <p className="mt-1 text-sm text-slate-600">
+            {rankingModeLabels[settings.rankingMode]} keeps the engine deterministic while balancing color distance with value, hue, saturation, and painterly heuristics.
+          </p>
         </div>
+
+        {topRecipe ? (
+          <Card>
+            <SectionTitle>Mix strategy for the top result</SectionTitle>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{topRecipe.recipeText}</p>
+            <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              {topRecipe.mixStrategy.map((line) => (
+                <li key={line}>• {line}</li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
+
         {normalizedHex && enabledPaints.length > 0 && recipes.length > 0 ? (
           recipes.map((recipe, index) => (
             <RecipeCard
@@ -199,7 +306,7 @@ export const MixerPage = ({
             <p className="text-sm text-slate-600">
               {enabledPaints.length === 0
                 ? 'No enabled paints are available for recipe generation.'
-                : 'Generate recipes to see the closest mixes.'}
+                : 'Generate recipes to see deterministic, painter-friendly starting mixes.'}
             </p>
           </Card>
         )}

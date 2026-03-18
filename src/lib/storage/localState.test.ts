@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getInitialState, loadAppState, saveAppState, storageKey } from './localState';
+import { defaultSettings } from './seedData';
+import { getInitialState, loadAppState, sanitizeSettings, saveAppState, storageKey } from './localState';
 
 const createStorage = (seed?: string) => {
   let value = seed;
@@ -24,6 +25,27 @@ describe('localState', () => {
     saveAppState(state, storage);
     expect(storage.read()).not.toBeUndefined();
     expect(loadAppState(storage)).toEqual(state);
+  });
+
+  it('sanitizes new ranking mode settings deterministically', () => {
+    expect(
+      sanitizeSettings({
+        rankingMode: 'simpler-recipes-preferred',
+        singlePaintPenaltySettings: {
+          discourageBlackOnlyMatches: false,
+          discourageWhiteOnlyMatches: false,
+          favorMultiPaintMixesWhenClose: true,
+        },
+      }),
+    ).toMatchObject({
+      ...defaultSettings,
+      rankingMode: 'simpler-recipes-preferred',
+      singlePaintPenaltySettings: {
+        discourageBlackOnlyMatches: false,
+        discourageWhiteOnlyMatches: false,
+        favorMultiPaintMixesWhenClose: true,
+      },
+    });
   });
 
   it('uses the expected storage key', () => {

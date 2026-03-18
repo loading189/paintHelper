@@ -65,6 +65,7 @@ export const PaintsPage = ({ paints, onCreate, onUpdate, onDelete }: PaintsPageP
           isEnabled: item.isEnabled ?? true,
           opacity: item.opacity,
           temperatureBias: item.temperatureBias,
+          heuristics: item.heuristics,
         });
       });
 
@@ -171,6 +172,8 @@ export const PaintsPage = ({ paints, onCreate, onUpdate, onDelete }: PaintsPageP
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
                 {paint.isWhite ? <span className="rounded-full bg-slate-100 px-2 py-1">White</span> : null}
                 {paint.isBlack ? <span className="rounded-full bg-slate-100 px-2 py-1">Black</span> : null}
+                {paint.heuristics?.tintStrength ? <span className="rounded-full bg-slate-100 px-2 py-1">Tint {paint.heuristics.tintStrength}</span> : null}
+                {paint.heuristics?.naturalBias ? <span className="rounded-full bg-slate-100 px-2 py-1">{paint.heuristics.naturalBias}</span> : null}
               </div>
             </article>
           ))}

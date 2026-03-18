@@ -40,7 +40,8 @@ export const SavedRecipesPage = ({ recipes, paints, onDelete, onLoadIntoMixer, o
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900">{recipe.savedName || 'Untitled recipe'}</h3>
-                  <p className="text-sm text-slate-500">Distance {formatDistance(recipe.distanceScore)} · {new Date(recipe.createdAt).toLocaleString()}</p>
+                  <p className="text-sm text-slate-500">Painter score {formatDistance(recipe.distanceScore)} · {new Date(recipe.createdAt).toLocaleString()}</p>
+                  {recipe.qualityLabel ? <p className="mt-1 text-sm font-medium text-emerald-700">{recipe.qualityLabel}</p> : null}
                   <ul className="mt-3 space-y-2 text-sm text-slate-700">
                     {recipe.components.map((component) => (
                       <li key={component.paintId}>
