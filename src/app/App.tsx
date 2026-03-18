@@ -8,10 +8,10 @@ import { createId } from '../lib/utils/id';
 
 type View = 'mixer' | 'paints' | 'recipes';
 
-const navItems: Array<{ id: View; label: string }> = [
-  { id: 'mixer', label: 'Mixer' },
-  { id: 'paints', label: 'My Paints' },
-  { id: 'recipes', label: 'Saved Recipes' },
+const navItems: Array<{ id: View; label: string; blurb: string }> = [
+  { id: 'mixer', label: 'Mixer', blurb: 'Target match workstation' },
+  { id: 'paints', label: 'My Paints', blurb: 'Inventory and tube roles' },
+  { id: 'recipes', label: 'Saved Recipes', blurb: 'Archived mix references' },
 ];
 
 const App = () => {
@@ -27,8 +27,9 @@ const App = () => {
     () => ({
       enabledPaints: state.paints.filter((paint) => paint.isEnabled).length,
       savedRecipes: state.recipes.length,
+      recentTargets: state.recentTargetColors.length,
     }),
-    [state.paints, state.recipes],
+    [state.paints, state.recipes, state.recentTargetColors],
   );
 
   const upsertPaint = (paint: Paint) => {
@@ -36,9 +37,7 @@ const App = () => {
       const existing = current.paints.some((item) => item.id === paint.id);
       return {
         ...current,
-        paints: existing
-          ? current.paints.map((item) => (item.id === paint.id ? paint : item))
-          : [...current.paints, paint],
+        paints: existing ? current.paints.map((item) => (item.id === paint.id ? paint : item)) : [...current.paints, paint],
       };
     });
   };
@@ -77,48 +76,75 @@ const App = () => {
   const addRecentColor = (hex: string) => {
     setState((current) => ({
       ...current,
-      recentTargetColors: [
-        { hex, usedAt: new Date().toISOString() },
-        ...current.recentTargetColors.filter((entry) => entry.hex !== hex),
-      ].slice(0, 8),
+      recentTargetColors: [{ hex, usedAt: new Date().toISOString() }, ...current.recentTargetColors.filter((entry) => entry.hex !== hex)].slice(0, 8),
     }));
   };
 
   return (
-    <div className="min-h-screen bg-transparent text-stone-900">
-      <header className="border-b border-stone-200/90 bg-white/70 backdrop-blur-md">
-        <div className="mx-auto flex max-w-[1440px] flex-wrap items-end justify-between gap-6 px-6 py-7 lg:px-10">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-stone-500">Paint Mix Matcher</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-950 sm:text-4xl">Local-only spectral paint recipe finder</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600 sm:text-base">
-              A neutral studio workspace for believable pigment-style starting mixes, driven by a local Spectral.js engine and tuned for painterly decisions.
-            </p>
+    <div className="min-h-screen bg-transparent text-[color:var(--text-body)]">
+      <header className="border-b border-[color:var(--border-soft)] bg-[rgba(250,246,240,0.76)] backdrop-blur-xl">
+        <div className="mx-auto max-w-[1520px] px-5 py-8 sm:px-6 lg:px-10 lg:py-10">
+          <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr),360px] xl:items-end">
+            <div>
+              <p className="studio-eyebrow">Paint Mix Matcher</p>
+              <h1 className="mt-3 max-w-4xl text-4xl font-semibold tracking-[-0.04em] text-[color:var(--text-strong)] sm:text-5xl xl:text-[3.7rem]">
+                Spectral paint mixing, presented like a studio-grade color workstation.
+              </h1>
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-[color:var(--text-muted)] sm:text-base">
+                Local-only recipe generation, practical pile ratios, and painterly adjustment cues in a neutral workspace designed for color-critical judgment.
+              </p>
+            </div>
+
+            <div className="rounded-[32px] border border-[color:var(--border-soft)] bg-[rgba(251,248,243,0.86)] p-5 shadow-[var(--shadow-soft)]">
+              <p className="studio-eyebrow">Session overview</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                {[
+                  { label: 'Enabled paints', value: counts.enabledPaints, note: 'active in recipe search' },
+                  { label: 'Saved recipes', value: counts.savedRecipes, note: 'stored locally in browser' },
+                  { label: 'Recent targets', value: counts.recentTargets, note: 'quick return palette checks' },
+                ].map((item) => (
+                  <div key={item.label} className="studio-metric">
+                    <p className="studio-eyebrow">{item.label}</p>
+                    <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">{item.value}</p>
+                    <p className="mt-1 text-sm text-[color:var(--text-muted)]">{item.note}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] px-4 py-3 text-sm text-[color:var(--text-muted)]">
+                Deterministic engine, no cloud sync, no auth, no backend.
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3 text-sm text-stone-600">
-            <span className="rounded-full border border-stone-200 bg-white/85 px-3 py-2">Enabled paints: {counts.enabledPaints}</span>
-            <span className="rounded-full border border-stone-200 bg-white/85 px-3 py-2">Saved recipes: {counts.savedRecipes}</span>
-            <span className="rounded-full border border-stone-200 bg-white/85 px-3 py-2">Storage: local browser only</span>
-          </div>
+
+          <nav className="mt-8 grid gap-3 sm:grid-cols-3">
+            {navItems.map((item) => {
+              const isActive = view === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`rounded-[28px] border px-5 py-4 text-left ${
+                    isActive
+                      ? 'border-[rgba(38,33,29,0.16)] bg-[linear-gradient(180deg,rgba(40,34,31,0.96),rgba(28,24,21,0.96))] text-stone-50 shadow-[0_18px_28px_rgba(33,29,26,0.18)]'
+                      : 'border-[color:var(--border-soft)] bg-[rgba(251,248,243,0.78)] text-[color:var(--text-body)] hover:border-[color:var(--border-strong)] hover:bg-[rgba(255,252,247,0.92)]'
+                  }`}
+                  onClick={() => setView(item.id)}
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className={`text-lg font-semibold tracking-[-0.02em] ${isActive ? 'text-stone-50' : 'text-[color:var(--text-strong)]'}`}>{item.label}</p>
+                      <p className={`mt-1 text-sm ${isActive ? 'text-stone-300' : 'text-[color:var(--text-muted)]'}`}>{item.blurb}</p>
+                    </div>
+                    <span className={`studio-chip ${isActive ? 'studio-chip-accent border-white/10 bg-white/10 text-stone-100' : ''}`}>{item.id === 'mixer' ? 'Primary' : 'Library'}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </nav>
         </div>
       </header>
 
-      <nav className="mx-auto flex max-w-[1440px] flex-wrap gap-2 px-6 py-5 lg:px-10">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-              view === item.id ? 'border-stone-800 bg-stone-900 text-stone-50' : 'border-stone-200 bg-white/80 text-stone-700 hover:bg-white'
-            }`}
-            onClick={() => setView(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
-
-      <main className="mx-auto max-w-[1440px] px-6 pb-12 lg:px-10">
+      <main className="mx-auto max-w-[1520px] px-5 pb-14 pt-8 sm:px-6 lg:px-10 lg:pb-20">
         {view === 'mixer' ? (
           <MixerPage
             paints={state.paints}

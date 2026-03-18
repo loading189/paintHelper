@@ -1,5 +1,15 @@
-import type { PropsWithChildren } from 'react';
+import type { HTMLAttributes, PropsWithChildren } from 'react';
 
-export const Card = ({ children }: PropsWithChildren) => (
-  <section className="rounded-[28px] border border-stone-200/90 bg-white/92 p-6 shadow-[0_14px_40px_rgba(41,37,36,0.06)] backdrop-blur-sm">{children}</section>
+type CardProps = PropsWithChildren<{
+  className?: string;
+}> &
+  HTMLAttributes<HTMLElement>;
+
+export const Card = ({ children, className = '', ...rest }: CardProps) => (
+  <section
+    className={`studio-card rounded-[32px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)]/95 p-6 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:p-7 ${className}`.trim()}
+    {...rest}
+  >
+    {children}
+  </section>
 );

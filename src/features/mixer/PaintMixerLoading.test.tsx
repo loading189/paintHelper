@@ -6,7 +6,7 @@ describe('PaintMixerLoading', () => {
   it('renders the painterly loading copy', () => {
     const markup = renderToStaticMarkup(<PaintMixerLoading />);
 
-    expect(markup).toContain('Mixing spectral swatches…');
-    expect(markup).toContain('result feels deliberate');
+    expect(markup).toContain('Building spectral paint studies…');
+    expect(markup).toContain('considered lab pass');
   });
 });

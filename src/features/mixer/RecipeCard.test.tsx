@@ -68,12 +68,12 @@ const recipe: RankedRecipe = {
     normalizedHex: '#80916A',
     rgb: { r: 128, g: 145, b: 106 },
     value: 0.5,
-    valueClassification: 'mid',
     hue: 80,
     hueFamily: 'green',
     saturation: 0.3,
     saturationClassification: 'muted',
     chroma: 0.2,
+    valueClassification: 'mid',
   },
   whyThisRanked: ['Spectral prediction lands close overall, not just in flat RGB.'],
   mixStrategy: ['Use 6:1 as the first palette pile guide.'],
@@ -89,18 +89,18 @@ describe('RecipeCard', () => {
     expect(markup).toContain('6:1');
     expect(markup).toContain('86%');
     expect(markup).toContain('14%');
-    expect(markup).toContain('Exact percentages');
-    expect(markup).toContain('85% · 15%');
+    expect(markup).toContain('Exact percentages: 85% · 15%');
   });
 
-  it('renders target and predicted swatches plus next adjustments', () => {
+  it('renders comparison, adjustment, and reasoning sections for the redesigned card', () => {
     const markup = renderToStaticMarkup(
       <RecipeCard rank={1} recipe={recipe} paints={paints} showPercentages showPartsRatios onSave={() => undefined} />,
     );
 
-    expect(markup).toContain('Target');
-    expect(markup).toContain('Predicted');
+    expect(markup).toContain('Target versus predicted');
+    expect(markup).toContain('Difference cue');
     expect(markup).toContain('Next adjustments');
+    expect(markup).toContain('Why this ranked');
     expect(markup).toContain('Add a small touch more Ultramarine Blue to cool the green.');
     expect(markup).toContain('Best overall');
   });
