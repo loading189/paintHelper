@@ -194,30 +194,30 @@ const getPaintHueFamilies = (paints: Paint[], components: RecipeComponent[]): Hu
   return [...new Set(families)];
 };
 
-const hasChromaticPathForTarget = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): boolean => {
-  const chromaticFamilies = getPaintHueFamilies(paints, components);
-  const componentPaints = components
-    .map((component) => paints.find((paint) => paint.id === component.paintId))
-    .filter((paint): paint is Paint => Boolean(paint));
-  const hasChromaticPaint = componentPaints.some((paint) => paint.heuristics?.naturalBias === 'chromatic');
-
-  if (!hasChromaticPaint) {
-    return false;
-  }
-
+const getRequiredConstructionFamilies = (targetAnalysis: ColorAnalysis): HueFamily[] => {
   if (targetAnalysis.hueFamily === 'green') {
-    return chromaticFamilies.includes('yellow') && chromaticFamilies.includes('blue');
+    return ['yellow', 'blue'];
   }
 
   if (targetAnalysis.hueFamily === 'orange') {
-    return chromaticFamilies.includes('red') && chromaticFamilies.includes('yellow');
+    return ['yellow', 'red'];
   }
 
   if (targetAnalysis.hueFamily === 'violet') {
-    return chromaticFamilies.includes('red') && chromaticFamilies.includes('blue');
+    return ['red', 'blue'];
   }
 
-  return false;
+  return [];
+};
+
+const hasRequiredHueConstructionPath = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): boolean => {
+  const requiredFamilies = getRequiredConstructionFamilies(targetAnalysis);
+  if (requiredFamilies.length === 0) {
+    return true;
+  }
+
+  const chromaticFamilies = getPaintHueFamilies(paints, components);
+  return requiredFamilies.every((family) => chromaticFamilies.includes(family));
 };
 
 const staysInBroadHueFamily = (
@@ -231,7 +231,7 @@ const staysInBroadHueFamily = (
     return true;
   }
 
-  return hasChromaticPathForTarget(paints, components, targetAnalysis);
+  return hasRequiredHueConstructionPath(paints, components, targetAnalysis);
 };
 
 const getComplexityPenalty = (settings: UserSettings, paints: Paint[], components: RecipeComponent[]): number => {
@@ -356,6 +356,50 @@ const getHueFamilyPenalty = (
   return 0.28;
 };
 
+const getRequiredHueConstructionPenalty = (
+  settings: UserSettings,
+  paints: Paint[],
+  components: RecipeComponent[],
+  targetAnalysis: ColorAnalysis,
+): number => {
+  if (!isPainterMode(settings) || !isChromaticTarget(targetAnalysis)) {
+    return 0;
+  }
+
+  const requiredFamilies = getRequiredConstructionFamilies(targetAnalysis);
+  if (requiredFamilies.length === 0 || hasRequiredHueConstructionPath(paints, components, targetAnalysis)) {
+    return 0;
+  }
+
+  if (targetAnalysis.hueFamily === 'green') {
+    return 0.3;
+  }
+
+  return 0.2;
+};
+
+const getPainterFamilyConstructionBonus = (
+  settings: UserSettings,
+  paints: Paint[],
+  components: RecipeComponent[],
+  targetAnalysis: ColorAnalysis,
+): number => {
+  if (!isPainterMode(settings) || !isChromaticTarget(targetAnalysis)) {
+    return 0;
+  }
+
+  const requiredFamilies = getRequiredConstructionFamilies(targetAnalysis);
+  if (requiredFamilies.length === 0 || !hasRequiredHueConstructionPath(paints, components, targetAnalysis)) {
+    return 0;
+  }
+
+  if (targetAnalysis.hueFamily === 'green') {
+    return 0.12;
+  }
+
+  return 0.08;
+};
+
 const getBlackDominancePenalty = (
   settings: UserSettings,
   paints: Paint[],
@@ -372,13 +416,19 @@ const getBlackDominancePenalty = (
     return paint?.isBlack ? sum + component.percentage : sum;
   }, 0);
 
-  if (blackShare < 70) {
+  if (blackShare <= 50) {
     return 0;
   }
 
   const preservesHueFamily = staysInBroadHueFamily(paints, components, targetAnalysis, predictedAnalysis);
-  const scaledShare = Math.min(1, (blackShare - 70) / 30);
-  return preservesHueFamily ? 0.03 + scaledShare * 0.05 : 0.16 + scaledShare * 0.1;
+  const hasConstructionPath = hasRequiredHueConstructionPath(paints, components, targetAnalysis);
+  const qualifiesForException = preservesHueFamily && hasConstructionPath;
+
+  if (blackShare > 70) {
+    return qualifiesForException ? 0.11 : 0.28;
+  }
+
+  return qualifiesForException ? 0.05 : 0.16;
 };
 
 const getChromaticPathBonus = (
@@ -398,18 +448,18 @@ const getChromaticPathBonus = (
   const hasEarthSupport = componentPaints.some((paint) => paint.heuristics?.naturalBias === 'earth');
   const hasBlackSupport = componentPaints.some((paint) => paint.isBlack);
 
-  if (!hasChromaticPathForTarget(paints, components, targetAnalysis)) {
+  if (!hasRequiredHueConstructionPath(paints, components, targetAnalysis)) {
     return 0;
   }
 
   if (targetAnalysis.hueFamily === 'green') {
     return targetAnalysis.valueClassification === 'dark' || targetAnalysis.valueClassification === 'very dark'
-      ? 0.18 + (hasEarthSupport || hasBlackSupport ? 0.03 : 0)
-      : 0.12;
+      ? 0.06 + (hasEarthSupport || hasBlackSupport ? 0.02 : 0)
+      : 0.05;
   }
 
   if (targetAnalysis.hueFamily === 'orange' || targetAnalysis.hueFamily === 'violet') {
-    return 0.1;
+    return 0.04;
   }
 
   return 0;
@@ -442,8 +492,11 @@ export const scoreRecipe = (
       singlePaintPenalty: 0,
       earthToneBonus: 0,
       hueFamilyPenalty: 0,
+      requiredHueConstructionPenalty: 0,
+      painterFamilyConstructionBonus: 0,
       blackDominancePenalty: 0,
       chromaticPathBonus: 0,
+      hasRequiredHueConstructionPath: hasRequiredHueConstructionPath(paints, components, targetAnalysis),
       staysInTargetHueFamily: staysInBroadHueFamily(paints, components, targetAnalysis, predictedAnalysis),
       finalScore: baseDistance,
     };
@@ -455,23 +508,28 @@ export const scoreRecipe = (
   const singlePaintPenalty = getSinglePaintPenalty(settings, paints, components, targetAnalysis, predictedAnalysis);
   const earthToneBonus = getEarthToneBonus(paints, components, targetAnalysis);
   const hueFamilyPenalty = getHueFamilyPenalty(settings, paints, components, targetAnalysis, predictedAnalysis);
+  const requiredHueConstructionPenalty = getRequiredHueConstructionPenalty(settings, paints, components, targetAnalysis);
+  const painterFamilyConstructionBonus = getPainterFamilyConstructionBonus(settings, paints, components, targetAnalysis);
   const blackDominancePenalty = getBlackDominancePenalty(settings, paints, components, targetAnalysis, predictedAnalysis);
   const chromaticPathBonus = getChromaticPathBonus(settings, paints, components, targetAnalysis);
   const modeMultiplier = settings.rankingMode === 'simpler-recipes-preferred' ? 1.6 : 1;
   const staysInTargetHueFamily = staysInBroadHueFamily(paints, components, targetAnalysis, predictedAnalysis);
+  const hasConstructionPath = hasRequiredHueConstructionPath(paints, components, targetAnalysis);
 
   const finalScore =
-    baseDistance * 0.54 +
-    valueDifference * 0.18 +
-    hueDelta * 0.18 +
+    baseDistance * 0.18 +
+    valueDifference * 0.22 +
+    hueDelta * 0.14 +
     saturationDifference * 0.1 +
     complexityPenalty * modeMultiplier +
     blackPenalty +
     whitePenalty +
     singlePaintPenalty +
     hueFamilyPenalty +
+    requiredHueConstructionPenalty +
     blackDominancePenalty -
     earthToneBonus -
+    painterFamilyConstructionBonus -
     chromaticPathBonus;
 
   return {
@@ -486,8 +544,11 @@ export const scoreRecipe = (
     singlePaintPenalty,
     earthToneBonus,
     hueFamilyPenalty,
+    requiredHueConstructionPenalty,
+    painterFamilyConstructionBonus,
     blackDominancePenalty,
     chromaticPathBonus,
+    hasRequiredHueConstructionPath: hasConstructionPath,
     staysInTargetHueFamily,
     finalScore,
   };
@@ -577,7 +638,7 @@ export const rankRecipes = (
       const orderedWeights = components.map((component) => component.weight);
       const parts = simplifyRatio(orderedWeights);
 
-      const recipe = {
+      const recipe: RankedRecipeCandidate = {
         predictedHex,
         distanceScore: scoreBreakdown.finalScore,
         components,
@@ -593,7 +654,7 @@ export const rankRecipes = (
         whyThisRanked: [],
         mixStrategy: [],
         predictedLinear: mixedLinear,
-      } satisfies RankedRecipeCandidate;
+      };
 
       recipe.guidanceText = buildRecipeGuidance(scoreBreakdown, targetAnalysis, predictedAnalysis, paints, components.map((component) => component.paintId));
       recipe.whyThisRanked = buildRecipeWhyThisRanked(scoreBreakdown, targetAnalysis, predictedAnalysis, paints, components.map((component) => component.paintId));

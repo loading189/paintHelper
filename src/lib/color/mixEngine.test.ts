@@ -159,6 +159,9 @@ describe('mixEngine', () => {
     expect(ranked[0]?.scoreBreakdown.staysInTargetHueFamily).toBe(true);
     expect(ranked[0]?.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium')).toBe(true);
     expect(ranked[0]?.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue')).toBe(true);
+    expect(ranked.slice(0, 3).some((recipe) =>
+      recipe.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue'),
+    )).toBe(true);
     expect(ranked.some((recipe) => recipe.badges.includes('Best overall') && recipe.scoreBreakdown.staysInTargetHueFamily)).toBe(true);
   });
 
@@ -190,15 +193,49 @@ describe('mixEngine', () => {
       recipe.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium') &&
       recipe.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue'),
     );
-    const blackHeavyRecipe = ranked.find((recipe) =>
-      recipe.components.some((component) => component.paintId === 'paint-mars-black' && component.percentage >= 75) &&
-      !recipe.scoreBreakdown.staysInTargetHueFamily,
+    const blackYellowOnlyRecipe = ranked.find((recipe) =>
+      recipe.components.some((component) => component.paintId === 'paint-mars-black') &&
+      recipe.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium') &&
+      !recipe.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue'),
     );
 
     expect(yellowBlueRecipe).toBeTruthy();
     expect(yellowBlueRecipe?.scoreBreakdown.chromaticPathBonus).toBeGreaterThan(0);
-    expect(blackHeavyRecipe).toBeTruthy();
-    expect((yellowBlueRecipe?.distanceScore ?? Infinity)).toBeLessThan(blackHeavyRecipe?.distanceScore ?? -Infinity);
+    expect(yellowBlueRecipe?.scoreBreakdown.hasRequiredHueConstructionPath).toBe(true);
+    expect(blackYellowOnlyRecipe).toBeTruthy();
+    expect(yellowBlueRecipe?.distanceScore).toBeLessThan(blackYellowOnlyRecipe?.distanceScore ?? Infinity);
+    expect(blackYellowOnlyRecipe?.scoreBreakdown.requiredHueConstructionPenalty).toBeGreaterThan(0);
+  });
+
+  it('does not award Best overall to a black-dominant green mix without blue', () => {
+    const ranked = rankRecipes('#545F27', starterPaints, {
+      ...defaultSettings,
+      weightStep: 25,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 120);
+
+    const blackDominantWithoutBlue = ranked.find((recipe) =>
+      recipe.components.some((component) => component.paintId === 'paint-mars-black' && component.percentage >= 50) &&
+      recipe.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium') &&
+      !recipe.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue'),
+    );
+
+    expect(blackDominantWithoutBlue).toBeTruthy();
+    expect(blackDominantWithoutBlue?.badges).not.toContain('Best overall');
+    expect(blackDominantWithoutBlue?.scoreBreakdown.requiredHueConstructionPenalty).toBeGreaterThan(0);
+  });
+
+  it('advises dark green recipes to build green before darkening', () => {
+    const ranked = rankRecipes('#545F27', starterPaints, {
+      ...defaultSettings,
+      weightStep: 25,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 12);
+
+    expect(ranked[0]?.mixStrategy.join(' ')).toMatch(/Build the green first|Block in the green family/);
+    expect(ranked[0]?.mixStrategy[0]).not.toMatch(/Start with Mars Black/);
   });
 
   it('exposes score components for black and white penalties', () => {
@@ -237,6 +274,7 @@ describe('mixEngine', () => {
     expect(blackBreakdown.blackPenalty).toBeGreaterThan(0);
     expect(blackBreakdown.blackDominancePenalty).toBeGreaterThan(0);
     expect(blackBreakdown.hueFamilyPenalty).toBeGreaterThan(0);
+    expect(blackBreakdown.requiredHueConstructionPenalty).toBeGreaterThan(0);
     expect(whiteBreakdown.whitePenalty).toBeGreaterThan(0);
   });
 });

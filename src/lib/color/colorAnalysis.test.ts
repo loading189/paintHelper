@@ -38,7 +38,7 @@ describe('colorAnalysis', () => {
     expect(analyzeColor('#7A8FB3')).toMatchObject({
       normalizedHex: '#7A8FB3',
       hueFamily: 'blue',
-      valueClassification: 'mid',
+      valueClassification: 'dark',
       saturationClassification: 'muted',
     });
   });

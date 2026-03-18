@@ -44,6 +44,10 @@ export const buildRecipeWhyThisRanked = (
     reasons.push(`Stays in the target ${targetAnalysis.hueFamily} family instead of drifting neutral or brown.`);
   }
 
+  if (scoreBreakdown.hasRequiredHueConstructionPath && targetAnalysis.hueFamily !== 'neutral') {
+    reasons.push('Uses the expected painterly hue-building path for this color family.');
+  }
+
   if (scoreBreakdown.chromaticPathBonus > 0) {
     reasons.push('Rewards a painterly chromatic path built from the expected hue-building colors.');
   }
@@ -68,6 +72,10 @@ export const buildRecipeWhyThisRanked = (
 
   if (scoreBreakdown.hueFamilyPenalty > 0) {
     reasons.push('Penalized for leaving the target hue family in a painter-oriented mode.');
+  }
+
+  if (scoreBreakdown.requiredHueConstructionPenalty > 0) {
+    reasons.push('Penalized because the recipe skips the expected color-building paints for this hue family.');
   }
 
   if (scoreBreakdown.blackDominancePenalty > 0) {
@@ -113,6 +121,10 @@ export const buildRecipeGuidance = (
     lines.push(`Keeps a better ${targetAnalysis.hueFamily} bias than a generic neutral shortcut.`);
   }
 
+  if (scoreBreakdown.hasRequiredHueConstructionPath && targetAnalysis.hueFamily !== 'neutral') {
+    lines.push(`Builds the ${targetAnalysis.hueFamily} family from the expected painterly color pair first.`);
+  }
+
   if (scoreBreakdown.chromaticPathBonus > 0) {
     lines.push('This mix uses a painterly color-building path rather than relying on value alone.');
   }
@@ -148,19 +160,33 @@ export const buildMixStrategy = (
 
   const chromaticPaints = ordered
     .map((component) => paintMap.get(component.paintId))
-    .filter((paint): paint is Paint => Boolean(paint) && !paint.isBlack && !paint.isWhite && paint.heuristics?.naturalBias === 'chromatic');
+    .filter((paint): paint is Paint =>
+      paint !== undefined &&
+      !paint.isBlack &&
+      !paint.isWhite &&
+      paint.heuristics?.naturalBias === 'chromatic',
+    );
+  const yellowPaint = chromaticPaints.find((paint) => paint.name.toLowerCase().includes('yellow'));
+  const bluePaint = chromaticPaints.find((paint) => paint.name.toLowerCase().includes('blue'));
   const isDarkChromaticTarget =
     (targetAnalysis.valueClassification === 'very dark' || targetAnalysis.valueClassification === 'dark') &&
     targetAnalysis.hueFamily !== 'neutral';
+  const dominantIsBlackForChromaticTarget = Boolean(dominant?.isBlack && targetAnalysis.hueFamily !== 'neutral');
 
-  if (isDarkChromaticTarget && chromaticPaints.length >= 2) {
+  if (targetAnalysis.hueFamily === 'green' && isDarkChromaticTarget && yellowPaint && bluePaint) {
+    lines.push(`Build the green first with ${yellowPaint.name} + ${bluePaint.name}, then mute or darken with ${earthSupport?.name ?? (hasBlack ? 'black' : 'umber or black')}.`);
+  } else if (isDarkChromaticTarget && chromaticPaints.length >= 2) {
     lines.push(`Block in the ${targetAnalysis.hueFamily} family with ${chromaticPaints[0].name} + ${chromaticPaints[1].name} before introducing deeper support.`);
-  } else if (dominant) {
+  } else if (dominant && !dominantIsBlackForChromaticTarget) {
     lines.push(`Start with ${dominant.name}, then adjust with smaller additions.`);
+  } else if (chromaticPaints[0]) {
+    lines.push(`Start with ${chromaticPaints[0].name}, then adjust with smaller additions.`);
   }
 
-  if (secondary) {
+  if (secondary && !secondary.isBlack) {
     lines.push(`Add ${secondary.name} gradually so you can steer hue without overshooting.`);
+  } else if (dominantIsBlackForChromaticTarget && chromaticPaints[1]) {
+    lines.push(`Add ${chromaticPaints[1].name} gradually so the hue stays established before deeper darkening.`);
   }
 
   const highStrengthPaint = ordered
@@ -192,7 +218,10 @@ export const assignRecipeBadges = (recipes: RankedRecipe[]): RankedRecipe[] => {
 
   const byPredicted = recipes.map((recipe) => ({ ...recipe, badges: [...recipe.badges] }));
   const targetIsNeutral = byPredicted[0].targetAnalysis.hueFamily === 'neutral';
-  const firstHueAligned = byPredicted.find((recipe) => recipe.scoreBreakdown.staysInTargetHueFamily);
+  const firstHueAligned = byPredicted.find((recipe) =>
+    recipe.scoreBreakdown.staysInTargetHueFamily &&
+    (targetIsNeutral || recipe.scoreBreakdown.hasRequiredHueConstructionPath),
+  );
   const topRecipe = byPredicted[0];
 
   if (targetIsNeutral) {
@@ -201,7 +230,7 @@ export const assignRecipeBadges = (recipes: RankedRecipe[]): RankedRecipe[] => {
     if (firstHueAligned) {
       firstHueAligned.badges.push('Best overall');
     }
-    if (!topRecipe.scoreBreakdown.staysInTargetHueFamily) {
+    if (!topRecipe.scoreBreakdown.staysInTargetHueFamily || !topRecipe.scoreBreakdown.hasRequiredHueConstructionPath) {
       topRecipe.badges.push('Best value block-in');
     }
   }
