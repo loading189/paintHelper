@@ -21,6 +21,9 @@ const breakdownRows: Array<{ key: keyof RankedRecipe['scoreBreakdown']; label: s
   { key: 'whitePenalty', label: 'White-only penalty' },
   { key: 'singlePaintPenalty', label: 'Single-paint penalty' },
   { key: 'earthToneBonus', label: 'Earth-tone bonus' },
+  { key: 'hueFamilyPenalty', label: 'Hue-family penalty' },
+  { key: 'blackDominancePenalty', label: 'Black-dominance penalty' },
+  { key: 'chromaticPathBonus', label: 'Chromatic path bonus' },
 ];
 
 export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRatios, onSave }: RecipeCardProps) => {

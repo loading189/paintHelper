@@ -15,6 +15,12 @@ const rankingModeLabels: Record<UserSettings['rankingMode'], string> = {
   'simpler-recipes-preferred': 'Simpler Recipes Preferred',
 };
 
+const rankingModeDescriptions: Record<UserSettings['rankingMode'], string> = {
+  'strict-closest-color': 'Strict Closest Color ranks by closest numeric color distance only.',
+  'painter-friendly-balanced': 'Painter-Friendly Balanced stays deterministic while layering painter heuristics on top of numeric color distance.',
+  'simpler-recipes-preferred': 'Simpler Recipes Preferred keeps the painter heuristics but leans harder toward fewer paints.',
+};
+
 type MixerPageProps = {
   paints: Paint[];
   settings: UserSettings;
@@ -273,7 +279,7 @@ export const MixerPage = ({
         <div>
           <SectionTitle>Painter-first recipe suggestions</SectionTitle>
           <p className="mt-1 text-sm text-slate-600">
-            {rankingModeLabels[settings.rankingMode]} keeps the engine deterministic while balancing color distance with value, hue, saturation, and painterly heuristics.
+            {rankingModeDescriptions[settings.rankingMode]}
           </p>
         </div>
 
