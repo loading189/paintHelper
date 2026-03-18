@@ -123,10 +123,14 @@ describe('mixEngine', () => {
       maxPaintsPerRecipe: 3,
     });
 
-    expect(ranked[0]?.badges).toContain('Best overall');
+    expect(ranked[0]?.badges).toContain('Best value block-in');
     expect(ranked[0]?.guidanceText.length).toBeGreaterThan(0);
     expect(ranked[0]?.whyThisRanked.length).toBeGreaterThan(0);
     expect(ranked[0]?.mixStrategy.length).toBeGreaterThan(0);
+    expect(ranked.every((recipe) =>
+      !recipe.badges.includes('Best overall') ||
+      (recipe.scoreBreakdown.staysInTargetHueFamily && recipe.scoreBreakdown.hasRequiredHueConstructionPath),
+    )).toBe(true);
   });
 
   it('switches ordering when ranking mode changes', () => {
@@ -148,7 +152,7 @@ describe('mixEngine', () => {
 
 
 
-  it('keeps dark olive greens in the green family for painter-friendly balanced mode', () => {
+  it('does not let dark olive construction-path mixes count as hue-family matches when the prediction is visibly off', () => {
     const ranked = rankRecipes('#545F27', starterPaints, {
       ...defaultSettings,
       weightStep: 25,
@@ -156,16 +160,15 @@ describe('mixEngine', () => {
       rankingMode: 'painter-friendly-balanced',
     }, 12);
 
-    expect(ranked[0]?.scoreBreakdown.staysInTargetHueFamily).toBe(true);
+    expect(ranked[0]?.scoreBreakdown.staysInTargetHueFamily).toBe(false);
+    expect(ranked[0]?.scoreBreakdown.hasRequiredHueConstructionPath).toBe(true);
     expect(ranked[0]?.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium')).toBe(true);
     expect(ranked[0]?.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue')).toBe(true);
-    expect(ranked.slice(0, 3).some((recipe) =>
-      recipe.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue'),
-    )).toBe(true);
-    expect(ranked.some((recipe) => recipe.badges.includes('Best overall') && recipe.scoreBreakdown.staysInTargetHueFamily)).toBe(true);
+    expect(ranked[0]?.badges).toContain('Best value block-in');
+    expect(ranked.some((recipe) => recipe.badges.includes('Best overall'))).toBe(false);
   });
 
-  it('ranks a valid green-family olive mix above black and unbleached titanium for dark olive targets', () => {
+  it('still ranks yellow-plus-blue olive constructions ahead of black and unbleached titanium shortcuts for dark olive targets', () => {
     const ranked = rankRecipes('#545F27', starterPaints, {
       ...defaultSettings,
       weightStep: 25,
@@ -173,12 +176,12 @@ describe('mixEngine', () => {
       rankingMode: 'painter-friendly-balanced',
     }, 40);
 
-    const greenFamilyIndex = ranked.findIndex((recipe) => recipe.scoreBreakdown.staysInTargetHueFamily);
+    const yellowBlueIndex = ranked.findIndex((recipe) => recipe.scoreBreakdown.hasRequiredHueConstructionPath);
     const blackTitaniumIndex = findRecipeIndexByPaintIds(ranked, ['paint-mars-black', 'paint-unbleached-titanium']);
 
-    expect(greenFamilyIndex).toBeGreaterThanOrEqual(0);
+    expect(yellowBlueIndex).toBeGreaterThanOrEqual(0);
     expect(blackTitaniumIndex).toBeGreaterThanOrEqual(0);
-    expect(greenFamilyIndex).toBeLessThan(blackTitaniumIndex);
+    expect(yellowBlueIndex).toBeLessThan(blackTitaniumIndex);
   });
 
   it('rewards a yellow and blue olive path over black-heavy brownish mixes when scores are close', () => {
@@ -276,5 +279,51 @@ describe('mixEngine', () => {
     expect(blackBreakdown.hueFamilyPenalty).toBeGreaterThan(0);
     expect(blackBreakdown.requiredHueConstructionPenalty).toBeGreaterThan(0);
     expect(whiteBreakdown.whitePenalty).toBeGreaterThan(0);
+  });
+
+  it('does not treat a yellow-gold yellow-plus-blue swatch as staying in the target green family for #18E254', () => {
+    const target = analyzeColor('#18E254');
+    const predicted = analyzeColor('#C0A61A');
+    const targetRgb = hexToRgb('#18E254');
+    const predictedRgb = hexToRgb('#C0A61A');
+    expect(target && predicted && targetRgb && predictedRgb).toBeTruthy();
+
+    const breakdown = scoreRecipe(
+      {
+        ...defaultSettings,
+        rankingMode: 'painter-friendly-balanced',
+      },
+      starterPaints,
+      target!,
+      srgbRgbToLinearRgb(targetRgb!),
+      predicted!,
+      srgbRgbToLinearRgb(predictedRgb!),
+      [
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 75, weight: 75 },
+        { paintId: 'paint-phthalo-blue', percentage: 25, weight: 25 },
+      ],
+    );
+
+    expect(breakdown.hasRequiredHueConstructionPath).toBe(true);
+    expect(breakdown.staysInTargetHueFamily).toBe(false);
+    expect(breakdown.vividTargetSanityPenalty).toBeGreaterThan(0);
+  });
+
+  it('does not award Best overall to visibly yellow-gold candidates for vivid green target #18E254', () => {
+    const ranked = rankRecipes('#18E254', starterPaints, {
+      ...defaultSettings,
+      weightStep: 25,
+      maxPaintsPerRecipe: 2,
+      rankingMode: 'painter-friendly-balanced',
+    }, 20);
+
+    const yellowGoldWithConstructionPath = ranked.find((recipe) =>
+      recipe.scoreBreakdown.hasRequiredHueConstructionPath &&
+      recipe.predictedAnalysis.hueFamily !== 'green',
+    );
+
+    expect(yellowGoldWithConstructionPath).toBeTruthy();
+    expect(yellowGoldWithConstructionPath?.badges).not.toContain('Best overall');
+    expect(ranked.some((recipe) => recipe.badges.includes('Best overall'))).toBe(false);
   });
 });

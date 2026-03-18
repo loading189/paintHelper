@@ -38,6 +38,7 @@ const recipe: RankedRecipe = {
     painterFamilyConstructionBonus: 0,
     blackDominancePenalty: 0,
     chromaticPathBonus: 0,
+    vividTargetSanityPenalty: 0,
     hasRequiredHueConstructionPath: true,
     staysInTargetHueFamily: true,
     finalScore: 0.12,
