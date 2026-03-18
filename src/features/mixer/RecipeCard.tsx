@@ -22,6 +22,8 @@ const breakdownRows: Array<{ key: keyof RankedRecipe['scoreBreakdown']; label: s
   { key: 'singlePaintPenalty', label: 'Single-paint penalty' },
   { key: 'earthToneBonus', label: 'Earth-tone bonus' },
   { key: 'hueFamilyPenalty', label: 'Hue-family penalty' },
+  { key: 'requiredHueConstructionPenalty', label: 'Hue-construction penalty' },
+  { key: 'painterFamilyConstructionBonus', label: 'Family-construction bonus' },
   { key: 'blackDominancePenalty', label: 'Black-dominance penalty' },
   { key: 'chromaticPathBonus', label: 'Chromatic path bonus' },
 ];
