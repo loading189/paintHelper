@@ -71,7 +71,9 @@ select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(62, 97, 124, 0.16);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.86),
+    0 0 0 4px rgba(62, 97, 124, 0.18);
 }
 
 ::selection {
@@ -95,6 +97,25 @@ summary:focus-visible {
   .studio-eyebrow {
     @apply text-[11px] font-semibold uppercase tracking-[0.18em];
     color: var(--text-subtle);
+  }
+
+  .studio-panel {
+    @apply rounded-[28px] border p-4 sm:p-5;
+    border-color: var(--border-soft);
+    background: rgba(251, 248, 243, 0.82);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+
+  .studio-panel-muted {
+    background: rgba(242, 237, 230, 0.78);
+  }
+
+  .studio-panel-strong {
+    border-color: rgba(38, 33, 29, 0.12);
+    background: linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(243, 236, 227, 0.96));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.52),
+      0 20px 44px rgba(40, 33, 28, 0.08);
   }
 
   .studio-input,
@@ -148,6 +169,18 @@ summary:focus-visible {
     transform: translateY(-1px);
   }
 
+  .studio-button-danger {
+    border: 1px solid rgba(146, 92, 92, 0.18);
+    background: rgba(146, 92, 92, 0.08);
+    color: #7f514f;
+  }
+
+  .studio-button-danger:hover:not(:disabled) {
+    border-color: rgba(146, 92, 92, 0.26);
+    background: rgba(146, 92, 92, 0.12);
+    transform: translateY(-1px);
+  }
+
   .studio-chip {
     @apply inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em];
     border-color: var(--border-soft);
@@ -183,6 +216,63 @@ summary:focus-visible {
     @apply rounded-[24px] border p-4;
     border-color: var(--border-soft);
     background: rgba(251, 248, 243, 0.82);
+  }
+
+  .studio-toggle {
+    @apply flex cursor-pointer items-start justify-between gap-4 rounded-[24px] border px-4 py-4;
+    border-color: var(--border-soft);
+    background: rgba(242, 237, 230, 0.7);
+  }
+
+  .studio-toggle:hover {
+    border-color: var(--border-strong);
+    background: rgba(247, 242, 235, 0.9);
+  }
+
+  .studio-disclosure {
+    @apply rounded-[30px] border p-4 sm:p-5;
+    border-color: var(--border-soft);
+    background: rgba(251, 248, 243, 0.84);
+  }
+
+  .studio-disclosure[open] {
+    border-color: var(--border-strong);
+    background: rgba(251, 248, 243, 0.92);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+
+  .studio-disclosure-summary {
+    @apply cursor-pointer list-none rounded-[22px] -m-1 p-1;
+  }
+
+  .studio-disclosure-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .studio-disclosure-caret {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm;
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+    background: rgba(250, 247, 242, 0.9);
+  }
+
+  .group[open] .studio-disclosure-caret {
+    transform: rotate(180deg);
+    border-color: rgba(62, 97, 124, 0.18);
+    color: #345267;
+    background: rgba(62, 97, 124, 0.08);
+  }
+
+  .studio-recent-chip {
+    @apply flex items-center gap-3 rounded-full border px-3 py-2 text-sm text-[color:var(--text-body)];
+    border-color: var(--border-soft);
+    background: rgba(251, 248, 243, 0.9);
+  }
+
+  .studio-recent-chip:hover {
+    border-color: var(--border-strong);
+    background: rgba(255, 252, 247, 0.98);
+    transform: translateY(-1px);
   }
 
   .swatch-well {

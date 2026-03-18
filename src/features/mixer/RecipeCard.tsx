@@ -44,7 +44,7 @@ const badgeClassName = (badge: string): string => {
   if (badge.toLowerCase().includes('usable') || badge.toLowerCase().includes('friendly')) {
     return 'studio-chip-success';
   }
-  return 'studio-chip';
+  return '';
 };
 
 export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRatios, onSave }: RecipeCardProps) => {
@@ -56,11 +56,11 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
     <Card className="p-5 sm:p-7">
       <div className="flex flex-col gap-5 border-b border-[color:var(--border-soft)] pb-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <span className="studio-chip">Rank #{rank}</span>
             <span className="studio-chip studio-chip-success">{recipe.qualityLabel}</span>
             {recipe.badges.map((badge) => (
-              <span key={badge} className={`studio-chip ${badgeClassName(badge)}`}>
+              <span key={badge} className={`studio-chip ${badgeClassName(badge)}`.trim()}>
                 {badge}
               </span>
             ))}
@@ -68,7 +68,7 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
 
           <div>
             <p className="studio-eyebrow">Recipe title</p>
-            <h3 className="mt-2 max-w-4xl text-[1.65rem] font-semibold leading-tight tracking-[-0.04em] text-[color:var(--text-strong)] sm:text-[1.85rem]">
+            <h3 className="mt-2 max-w-4xl text-[1.55rem] font-semibold leading-tight tracking-[-0.04em] text-[color:var(--text-strong)] sm:text-[1.8rem]">
               {recipe.recipeText}
             </h3>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[color:var(--text-muted)]">
@@ -78,7 +78,7 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
         </div>
 
         <div className="flex flex-wrap gap-3 lg:flex-col lg:items-end">
-          <div className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] px-4 py-3 text-right">
+          <div className="studio-panel min-w-[180px] px-4 py-3 text-right">
             <p className="studio-eyebrow">Painter score</p>
             <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">{formatDistance(recipe.scoreBreakdown.finalScore)}</p>
           </div>
@@ -88,17 +88,17 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1.05fr),minmax(0,0.95fr)]">
+      <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1.08fr),minmax(0,0.92fr)]">
         <div className="space-y-6">
-          <section className="rounded-[30px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)]/72 p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-3">
+          <section className="studio-panel studio-panel-strong">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="studio-eyebrow">Comparison</p>
                 <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[color:var(--text-strong)]">Target versus predicted</p>
               </div>
               <span className="studio-chip studio-chip-info">Difference cue {formatDistance(recipe.scoreBreakdown.finalScore)}</span>
             </div>
-            <div className="mt-5 grid gap-4 xl:grid-cols-2">
+            <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr),110px,minmax(0,1fr)] md:items-center">
               <SwatchTile
                 label="Target"
                 hex={recipe.targetAnalysis.normalizedHex}
@@ -106,6 +106,11 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
                 footer="Target swatch for direct neutral-ground comparison."
                 testId="target-swatch-panel"
               />
+              <div className="studio-panel studio-panel-muted flex flex-col items-center justify-center gap-2 px-4 py-5 text-center md:min-h-[220px]">
+                <span className="studio-chip studio-chip-accent">Δ {formatDistance(recipe.scoreBreakdown.finalScore)}</span>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-subtle)]">Direct compare</p>
+                <p className="text-sm leading-6 text-[color:var(--text-muted)]">Use hue family and value first, then adjust by chroma.</p>
+              </div>
               <SwatchTile
                 label="Predicted"
                 hex={recipe.predictedHex}
@@ -129,7 +134,7 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
             </div>
           </section>
 
-          <section className="rounded-[30px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-4 sm:p-5">
+          <section className="studio-panel studio-panel-strong">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="studio-eyebrow">Mix</p>
@@ -138,25 +143,30 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
               <span className="studio-chip studio-chip-success">Use this first on the palette</span>
             </div>
 
-            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.15fr),minmax(0,0.85fr)]">
-              <div className="rounded-[26px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] px-5 py-5">
-                <p className="studio-eyebrow">Practical ratio</p>
-                <p className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-[color:var(--text-strong)]">{recipe.practicalRatioText}</p>
-                <p className="mt-3 text-sm leading-7 text-[color:var(--text-muted)]">
+            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.2fr),minmax(0,0.8fr)]">
+              <div className="rounded-[28px] border border-[rgba(38,33,29,0.12)] bg-[linear-gradient(180deg,rgba(40,34,31,0.98),rgba(30,26,23,0.96))] px-5 py-5 text-stone-50 shadow-[0_18px_34px_rgba(33,29,26,0.16)]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="studio-eyebrow text-stone-300">Practical ratio</p>
+                  <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-100">
+                    Physical starting pile
+                  </span>
+                </div>
+                <p className="mt-4 text-5xl font-semibold tracking-[-0.06em] text-white sm:text-[3.6rem]">{recipe.practicalRatioText}</p>
+                <p className="mt-3 max-w-xl text-sm leading-7 text-stone-300">
                   Build this pile first before fine-tuning. It is the clearest physical instruction on the card.
                 </p>
-                {practicalDiffers ? <p className="mt-2 text-sm text-[color:var(--text-subtle)]">Rounded from exact {recipe.exactRatioText} to keep the hand-mixed pile readable.</p> : null}
+                {practicalDiffers ? <p className="mt-2 text-sm text-stone-400">Rounded from exact {recipe.exactRatioText} to keep the hand-mixed pile readable.</p> : null}
               </div>
 
               <div className="grid gap-3">
                 {showPercentages ? (
-                  <div className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] px-4 py-4 text-sm">
+                  <div className="studio-panel studio-panel-muted px-4 py-4 text-sm">
                     <p className="studio-eyebrow">Practical percentages</p>
                     <p className="mt-2 text-lg font-semibold text-[color:var(--text-strong)]">{recipe.practicalPercentages.map((percentage) => `${percentage}%`).join(' · ')}</p>
                     <p className="mt-2 text-sm text-[color:var(--text-muted)]">Shown to mirror the practical ratio, not to replace it.</p>
                   </div>
                 ) : null}
-                <div className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] px-4 py-4 text-sm">
+                <div className="studio-panel studio-panel-muted px-4 py-4 text-sm">
                   <p className="studio-eyebrow">Exact detail</p>
                   <p className="mt-2 font-semibold text-[color:var(--text-strong)]">{recipe.exactRatioText}</p>
                   {showPercentages ? <p className="mt-2 text-[color:var(--text-muted)]">Exact percentages: {recipe.exactPercentages.map((percentage) => `${percentage}%`).join(' · ')}</p> : null}
@@ -168,7 +178,10 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
               {recipe.components.map((component, index) => {
                 const paint = paintMap.get(component.paintId);
                 return (
-                  <li key={component.paintId} className="flex flex-col gap-3 rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <li
+                    key={component.paintId}
+                    className="flex flex-col gap-3 rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
                     <div className="flex items-center gap-3">
                       <span className="h-11 w-11 rounded-2xl border border-black/10" style={{ backgroundColor: paint?.hex ?? '#c7beb2' }} />
                       <div>
@@ -188,7 +201,7 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-[30px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)]/72 p-4 sm:p-5">
+          <section className="studio-panel studio-panel-muted">
             <p className="studio-eyebrow">Guidance</p>
             <div className="mt-4 grid gap-4 xl:grid-cols-2">
               <div className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] px-4 py-4 text-sm text-[color:var(--text-body)]">
@@ -227,15 +240,20 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
             </ul>
           </section>
 
-          <details className="group rounded-[30px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-4 sm:p-5">
-            <summary className="cursor-pointer list-none">
+          <details className="studio-disclosure group">
+            <summary className="studio-disclosure-summary">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="studio-eyebrow">Reasoning</p>
                   <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[color:var(--text-strong)]">Why this ranked</p>
                   <p className="mt-2 text-sm leading-6 text-[color:var(--text-muted)]">{recipe.whyThisRanked[0] ?? 'Open for score detail and ranking rationale.'}</p>
                 </div>
-                <span className="studio-chip">Expand details</span>
+                <div className="flex items-center gap-2">
+                  <span className="studio-chip studio-chip-info">Expand details</span>
+                  <span aria-hidden="true" className="studio-disclosure-caret">
+                    ↓
+                  </span>
+                </div>
               </div>
             </summary>
 
