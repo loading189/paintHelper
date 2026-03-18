@@ -87,9 +87,9 @@ const App = () => {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-6 px-6 py-5">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.25em] text-sky-600">Paint Mix Matcher</p>
-            <h1 className="mt-1 text-3xl font-bold">Local-only deterministic paint recipe finder</h1>
+            <h1 className="mt-1 text-3xl font-bold">Local-only spectral paint recipe finder</h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Build your inventory, enter a target hex, and rank deterministic paint mixes with painter-friendly heuristics layered on top of linear RGB blending.
+              Build your inventory, enter a target hex, and rank deterministic recipes driven by a local Spectral.js pigment-style mixing engine.
             </p>
           </div>
           <div className="flex flex-wrap gap-3 text-sm text-slate-600">

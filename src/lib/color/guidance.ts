@@ -1,29 +1,18 @@
 import type { ColorAnalysis, Paint, RankedRecipe, RecipeBadge, RecipeQualityLabel, RecipeScoreBreakdown } from '../../types/models';
 
-const formatBias = (candidateHue: number | null, targetHue: number | null): string | null => {
-  if (candidateHue === null || targetHue === null) {
-    return null;
-  }
-
-  const delta = ((candidateHue - targetHue + 540) % 360) - 180;
-  if (Math.abs(delta) < 8) {
-    return 'Very close in hue direction.';
-  }
-
-  return delta > 0 ? 'Slightly cooler than the target.' : 'Slightly warmer than the target.';
-};
+const getPaintMap = (paints: Paint[]) => new Map(paints.map((paint) => [paint.id, paint]));
 
 export const determineRecipeQuality = (score: number): RecipeQualityLabel => {
-  if (score < 0.16) {
-    return 'Excellent starting point';
+  if (score < 0.18) {
+    return 'Excellent spectral starting point';
   }
-  if (score < 0.28) {
-    return 'Strong starting point';
+  if (score < 0.32) {
+    return 'Strong spectral starting point';
   }
-  if (score < 0.42) {
-    return 'Usable starting point';
+  if (score < 0.48) {
+    return 'Usable spectral starting point';
   }
-  return 'Rough direction only';
+  return 'Needs hand-tuning';
 };
 
 export const buildRecipeWhyThisRanked = (
@@ -33,72 +22,38 @@ export const buildRecipeWhyThisRanked = (
   paints: Paint[],
   componentPaintIds: string[],
 ): string[] => {
-  const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
+  const paintMap = getPaintMap(paints);
   const reasons: string[] = [];
 
-  if (scoreBreakdown.valueDifference <= 0.08) {
-    reasons.push('Closest in value, which makes it easier to judge later hue tweaks.');
+  if (scoreBreakdown.spectralDistance < 0.08) {
+    reasons.push('Spectral prediction lands very close overall, not just in flat RGB.');
   }
-
   if (scoreBreakdown.staysInTargetHueFamily && targetAnalysis.hueFamily !== 'neutral') {
-    reasons.push(`Stays in the target ${targetAnalysis.hueFamily} family instead of drifting neutral or brown.`);
+    reasons.push(`Keeps the result in the target ${targetAnalysis.hueFamily} family.`);
   }
-
   if (scoreBreakdown.hasRequiredHueConstructionPath && targetAnalysis.hueFamily !== 'neutral') {
-    reasons.push('Uses the expected painterly hue-building path for this color family.');
+    reasons.push('Builds the hue from the painterly source colors you would usually start with on the palette.');
   }
-
   if (scoreBreakdown.chromaticPathBonus > 0) {
-    reasons.push('Rewards a painterly chromatic path built from the expected hue-building colors.');
+    reasons.push('Rewards a chromatic build before darkening or muting support enters the mix.');
   }
-
-  if (scoreBreakdown.earthToneBonus > 0) {
-    const earthPaint = componentPaintIds
-      .map((paintId) => paintMap.get(paintId))
-      .find((paint) => paint?.heuristics?.naturalBias === 'earth');
+  if (scoreBreakdown.naturalMixBonus > 0) {
+    const earthPaint = componentPaintIds.map((id) => paintMap.get(id)).find((paint) => paint?.heuristics?.naturalBias === 'earth');
     if (earthPaint) {
-      reasons.push(`Muted naturally with ${earthPaint.name}.`);
+      reasons.push(`Uses ${earthPaint.name} to mute the mix naturally instead of collapsing the hue.`);
     }
   }
-
-  const hueBias = formatBias(predictedAnalysis.hue, targetAnalysis.hue);
-  if (hueBias) {
-    reasons.push(hueBias);
+  if (scoreBreakdown.vividTargetPenalty > 0) {
+    reasons.push('Penalized because vivid targets need a visibly convincing chromatic result.');
+  }
+  if (scoreBreakdown.blackPenalty > 0 || scoreBreakdown.supportPenalty > 0) {
+    reasons.push('Support paints are kept secondary so they do not overpower the main hue path.');
+  }
+  if (Math.abs(predictedAnalysis.value - targetAnalysis.value) <= 0.05) {
+    reasons.push('Value is already close enough that later hand-tuning can stay focused on hue and chroma.');
   }
 
-  if (componentPaintIds.length === 1 && scoreBreakdown.singlePaintPenalty === 0) {
-    reasons.push('Very close overall; single-paint shortcut is acceptable here.');
-  }
-
-  if (scoreBreakdown.hueFamilyPenalty > 0) {
-    reasons.push('Penalized for leaving the target hue family in a painter-oriented mode.');
-  }
-
-  if (scoreBreakdown.vividTargetSanityPenalty > 0) {
-    reasons.push('Penalized extra because a vivid target needs a visibly convincing hue family match.');
-  }
-
-  if (scoreBreakdown.requiredHueConstructionPenalty > 0) {
-    reasons.push('Penalized because the recipe skips the expected color-building paints for this hue family.');
-  }
-
-  if (scoreBreakdown.blackDominancePenalty > 0) {
-    reasons.push('Penalized because black dominates before the hue family is clearly established.');
-  }
-
-  if (scoreBreakdown.blackPenalty > 0) {
-    reasons.push('Penalized slightly to avoid a black-only shortcut when a better hue mix exists.');
-  }
-
-  if (scoreBreakdown.whitePenalty > 0) {
-    reasons.push('Penalized slightly to avoid a white-only shortcut when a better mix is nearby.');
-  }
-
-  if (reasons.length === 0) {
-    reasons.push('Balanced score across color distance, value, hue, and practical mixing complexity.');
-  }
-
-  return reasons.slice(0, 4);
+  return [...new Set(reasons)].slice(0, 4);
 };
 
 export const buildRecipeGuidance = (
@@ -109,43 +64,30 @@ export const buildRecipeGuidance = (
   componentPaintIds: string[],
   practicalRatioText: string,
 ): string[] => {
-  const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
-  const lines: string[] = [`Start with a practical ${practicalRatioText} mix, then fine-tune by eye.`];
+  const paintMap = getPaintMap(paints);
+  const orderedPaints = componentPaintIds.map((id) => paintMap.get(id)).filter((paint): paint is Paint => Boolean(paint));
+  const lines: string[] = [`Start with the practical ${practicalRatioText} ratio, then adjust in small pile-size increments.`];
 
-  if ((targetAnalysis.valueClassification === 'dark' || targetAnalysis.valueClassification === 'very dark') && targetAnalysis.hueFamily !== 'neutral') {
-    lines.push(`Establish the ${targetAnalysis.hueFamily} hue family first, then darken only as needed.`);
-  } else if (scoreBreakdown.valueDifference <= 0.06) {
-    lines.push('Closest in value; adjust hue by eye after establishing the value block-in.');
-  } else if (predictedAnalysis.value < targetAnalysis.value) {
-    lines.push('Good hue direction, but likely needs a touch more light to reach the target value.');
-  } else {
-    lines.push('Good hue direction, but may need slight darkening to settle the value.');
+  const strongest = orderedPaints.find((paint) => paint.heuristics?.tintStrength === 'very-high' || paint.heuristics?.tintStrength === 'high');
+  if (strongest) {
+    lines.push(`Add ${strongest.name} cautiously; it has enough tinting strength to swing the mix fast.`);
   }
 
-  if (scoreBreakdown.staysInTargetHueFamily && targetAnalysis.hueFamily !== 'neutral') {
-    lines.push(`Keeps a better ${targetAnalysis.hueFamily} bias than a generic neutral shortcut.`);
+  if (targetAnalysis.hueFamily !== 'neutral' && scoreBreakdown.hasRequiredHueConstructionPath) {
+    lines.push(`Establish the ${targetAnalysis.hueFamily} hue first, then correct value and chroma.`);
   }
 
-  if (scoreBreakdown.hasRequiredHueConstructionPath && targetAnalysis.hueFamily !== 'neutral') {
-    lines.push(`Builds the ${targetAnalysis.hueFamily} family from the expected painterly color pair first.`);
+  if (predictedAnalysis.value < targetAnalysis.value - 0.04) {
+    lines.push('The prediction is slightly dark; lift value after the hue reads correctly.');
+  } else if (predictedAnalysis.value > targetAnalysis.value + 0.04) {
+    lines.push('The prediction is slightly light; lower value with support paint only after checking the hue.');
   }
 
-  if (scoreBreakdown.chromaticPathBonus > 0) {
-    lines.push('This mix uses a painterly color-building path rather than relying on value alone.');
+  if (targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'neutral') {
+    lines.push('Because the target is muted, let the earth support do the softening instead of reaching for black too early.');
   }
 
-  const earthPaint = componentPaintIds
-    .map((paintId) => paintMap.get(paintId))
-    .find((paint) => paint?.heuristics?.naturalBias === 'earth');
-  if (earthPaint && (targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'neutral')) {
-    lines.push(`Muted naturally with ${earthPaint.name}.`);
-  }
-
-  if (componentPaintIds.length === 1 && scoreBreakdown.singlePaintPenalty === 0) {
-    lines.push('Single-paint shortcut: useful if you want speed over exact nuance.');
-  }
-
-  return [...new Set(lines)].slice(0, 3);
+  return [...new Set(lines)].slice(0, 4);
 };
 
 export const buildMixStrategy = (
@@ -154,64 +96,37 @@ export const buildMixStrategy = (
   targetAnalysis: ColorAnalysis,
   practicalRatioText: string,
 ): string[] => {
-  const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
+  const paintMap = getPaintMap(paints);
   const ordered = [...components].sort((left, right) => right.percentage - left.percentage);
-  const dominant = ordered[0] ? paintMap.get(ordered[0].paintId) : null;
-  const secondary = ordered[1] ? paintMap.get(ordered[1].paintId) : null;
-  const hasBlack = ordered.some((component) => paintMap.get(component.paintId)?.isBlack);
-  const earthSupport = ordered
-    .map((component) => paintMap.get(component.paintId))
-    .find((paint) => paint?.heuristics?.naturalBias === 'earth');
-  const lines: string[] = [`Use the practical ${practicalRatioText} ratio as your first pile size guide.`];
+  const orderedPaints = ordered.map((component) => paintMap.get(component.paintId)).filter((paint): paint is Paint => Boolean(paint));
+  const dominant = orderedPaints[0];
+  const chromatic = orderedPaints.filter((paint) => !paint.isBlack && !paint.isWhite && paint.heuristics?.naturalBias === 'chromatic');
+  const support = orderedPaints.find((paint) => paint.heuristics?.preferredRole === 'neutralizer' || paint.isBlack);
+  const lines: string[] = [`Use ${practicalRatioText} as the first palette pile guide.`];
 
-  const chromaticPaints = ordered
-    .map((component) => paintMap.get(component.paintId))
-    .filter(
-      (paint): paint is Paint =>
-        paint !== undefined && !paint.isBlack && !paint.isWhite && paint.heuristics?.naturalBias === 'chromatic',
-    );
-  const yellowPaint = chromaticPaints.find((paint) => paint.name.toLowerCase().includes('yellow'));
-  const bluePaint = chromaticPaints.find((paint) => paint.name.toLowerCase().includes('blue'));
-  const isDarkChromaticTarget =
-    (targetAnalysis.valueClassification === 'very dark' || targetAnalysis.valueClassification === 'dark') &&
-    targetAnalysis.hueFamily !== 'neutral';
-  const dominantIsBlackForChromaticTarget = Boolean(dominant?.isBlack && targetAnalysis.hueFamily !== 'neutral');
-
-  if (targetAnalysis.hueFamily === 'green' && isDarkChromaticTarget && yellowPaint && bluePaint) {
-    lines.push(
-      `Build the green first with ${yellowPaint.name} + ${bluePaint.name}, then mute or darken with ${earthSupport?.name ?? (hasBlack ? 'black' : 'umber or black')}.`,
-    );
-  } else if (isDarkChromaticTarget && chromaticPaints.length >= 2) {
-    lines.push(`Block in the ${targetAnalysis.hueFamily} family with ${chromaticPaints[0].name} + ${chromaticPaints[1].name} before introducing deeper support.`);
-  } else if (dominant && !dominantIsBlackForChromaticTarget) {
-    lines.push(`Start with ${dominant.name}, then adjust with smaller additions.`);
-  } else if (chromaticPaints[0]) {
-    lines.push(`Start with ${chromaticPaints[0].name}, then adjust with smaller additions.`);
+  if (targetAnalysis.hueFamily === 'green' && chromatic.length >= 2) {
+    const yellow = chromatic.find((paint) => paint.name.includes('Yellow'));
+    const blue = chromatic.find((paint) => paint.name.includes('Blue'));
+    if (yellow && blue) {
+      lines.push(`Make the green with ${yellow.name} + ${blue.name} first, then introduce ${support?.name ?? 'support paint'} only if needed.`);
+    }
+  } else if (targetAnalysis.hueFamily === 'orange') {
+    lines.push('Build orange from yellow and red first. Keep white and earth colors for later correction.');
+  } else if (targetAnalysis.hueFamily === 'violet') {
+    lines.push('Build violet from your red-blue pair before deciding whether it needs more value or less chroma.');
+  } else if (dominant) {
+    lines.push(`Start from ${dominant.name} as the base pile, then feed the smaller colors into it.`);
   }
 
-  if (secondary && !secondary.isBlack) {
-    lines.push(`Add ${secondary.name} gradually so you can steer hue without overshooting.`);
-  } else if (dominantIsBlackForChromaticTarget && chromaticPaints[1]) {
-    lines.push(`Add ${chromaticPaints[1].name} gradually so the hue stays established before deeper darkening.`);
+  const strongPaint = orderedPaints.find((paint) => paint.heuristics?.tintStrength === 'very-high');
+  if (strongPaint) {
+    lines.push(`Touch in ${strongPaint.name} with the knife tip or very small brush-load increments.`);
   }
 
-  const highStrengthPaint = ordered
-    .map((component) => paintMap.get(component.paintId))
-    .find((paint) => paint?.heuristics?.tintStrength === 'very-high' || paint?.heuristics?.tintStrength === 'high');
-  if (highStrengthPaint) {
-    lines.push(`Use ${highStrengthPaint.name} sparingly; it has strong tinting power.`);
-  }
-
-  if ((targetAnalysis.valueClassification === 'very dark' || targetAnalysis.valueClassification === 'dark') && targetAnalysis.hueFamily !== 'neutral') {
-    lines.push(`Establish the ${targetAnalysis.hueFamily} family first, then darken or support it with ${earthSupport?.name ?? (hasBlack ? 'black' : 'umber or black')}.`);
-  } else if (targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'neutral') {
-    lines.push('Establish a neutral base first, then push chroma only if needed.');
-  } else {
-    lines.push('Establish value first, then make small chroma adjustments by eye.');
-  }
-
-  if (ordered.some((component) => paintMap.get(component.paintId)?.name === 'Unbleached Titanium')) {
-    lines.push('Unbleached Titanium can keep the light area warmer and more natural than pure white.');
+  if (targetAnalysis.valueClassification === 'very dark' || targetAnalysis.valueClassification === 'dark') {
+    lines.push('Do not let dark support paint replace the hue path. Darken after the family reads correctly.');
+  } else if (targetAnalysis.valueClassification === 'light' || targetAnalysis.valueClassification === 'very light') {
+    lines.push('Keep white additions late and incremental so the hue does not go chalky too early.');
   }
 
   return [...new Set(lines)].slice(0, 4);
@@ -222,55 +137,34 @@ export const assignRecipeBadges = (recipes: RankedRecipe[]): RankedRecipe[] => {
     return recipes;
   }
 
-  const byPredicted = recipes.map((recipe) => ({ ...recipe, badges: [...recipe.badges] }));
-  const targetIsNeutral = byPredicted[0].targetAnalysis.hueFamily === 'neutral';
-  const firstHueAligned = byPredicted.find((recipe) => {
-    if (targetIsNeutral) {
-      return true;
-    }
+  const updated = recipes.map((recipe) => ({ ...recipe, badges: [...recipe.badges] }));
+  updated[0].badges.push('Best overall');
 
-    if (!recipe.scoreBreakdown.staysInTargetHueFamily) {
-      return false;
-    }
-
-    return recipe.scoreBreakdown.hasRequiredHueConstructionPath;
-  });
-  const topRecipe = byPredicted[0];
-
-  if (targetIsNeutral) {
-    topRecipe.badges.push('Best overall');
-  } else {
-    if (firstHueAligned) {
-      firstHueAligned.badges.push('Best overall');
-    }
-    if (!topRecipe.scoreBreakdown.staysInTargetHueFamily || !topRecipe.scoreBreakdown.hasRequiredHueConstructionPath) {
-      topRecipe.badges.push('Best value block-in');
-    }
-  }
-
-  const simplest = byPredicted.reduce((best, current) => {
-    const currentKey = `${current.components.length}-${current.scoreBreakdown.finalScore.toFixed(6)}`;
-    const bestKey = `${best.components.length}-${best.scoreBreakdown.finalScore.toFixed(6)}`;
-    return current.components.length < best.components.length || currentKey < bestKey ? current : best;
-  }, byPredicted[0]);
+  const simplest = updated.reduce((best, current) => (current.components.length < best.components.length ? current : best), updated[0]);
   simplest.badges.push('Simplest');
 
-  const bestHue = byPredicted.reduce((best, current) =>
+  const bestHue = updated.reduce((best, current) =>
     current.scoreBreakdown.hueDifference < best.scoreBreakdown.hueDifference ? current : best,
-  byPredicted[0]);
-  bestHue.badges.push('Best hue');
+  updated[0]);
+  bestHue.badges.push('Best hue path');
 
-  const bestValue = byPredicted.reduce((best, current) =>
+  const bestValue = updated.reduce((best, current) =>
     current.scoreBreakdown.valueDifference < best.scoreBreakdown.valueDifference ? current : best,
-  byPredicted[0]);
-  bestValue.badges.push('Best value');
+  updated[0]);
+  bestValue.badges.push('Best value setup');
 
-  byPredicted.forEach((recipe) => {
+  updated.forEach((recipe) => {
+    if (recipe.scoreBreakdown.naturalMixBonus > 0) {
+      recipe.badges.push('Muted naturally');
+    }
+    if (recipe.scoreBreakdown.chromaticPathBonus > 0) {
+      recipe.badges.push('Chromatic build');
+    }
     if (recipe.components.length === 1 && recipe.scoreBreakdown.singlePaintPenalty === 0) {
       recipe.badges.push('Single-paint shortcut');
     }
     recipe.badges = [...new Set(recipe.badges)] as RecipeBadge[];
   });
 
-  return byPredicted;
+  return updated;
 };

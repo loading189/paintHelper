@@ -17,9 +17,9 @@ const rankingModeLabels: Record<UserSettings['rankingMode'], string> = {
 };
 
 const rankingModeDescriptions: Record<UserSettings['rankingMode'], string> = {
-  'strict-closest-color': 'Strict Closest Color ranks by closest numeric color distance only.',
-  'painter-friendly-balanced': 'Painter-Friendly Balanced stays deterministic while layering painter heuristics on top of numeric color distance.',
-  'simpler-recipes-preferred': 'Simpler Recipes Preferred keeps the painter heuristics but leans harder toward fewer paints.',
+  'strict-closest-color': 'Strict Closest Color ranks by the raw spectral color match with minimal painter heuristics.',
+  'painter-friendly-balanced': 'Painter-Friendly Balanced keeps spectral matching first, then favors believable painterly construction paths.',
+  'simpler-recipes-preferred': 'Simpler Recipes Preferred still uses the spectral engine, but leans harder toward mixes you can set up quickly.',
 };
 
 type MixerPageProps = {
@@ -307,7 +307,7 @@ export const MixerPage = ({
 
       <div className="space-y-4">
         <div>
-          <SectionTitle>Painter-first recipe suggestions</SectionTitle>
+          <SectionTitle>Spectral recipe suggestions</SectionTitle>
           <p className="mt-1 text-sm text-slate-600">{rankingModeDescriptions[settings.rankingMode]}</p>
         </div>
 
@@ -346,7 +346,7 @@ export const MixerPage = ({
                 ? 'No enabled paints are available for recipe generation.'
                 : generatedAnalysis
                   ? 'No deterministic mixes matched this target with the current settings.'
-                  : 'Generate recipes to see deterministic, painter-friendly starting mixes.'}
+                  : 'Generate recipes to see deterministic spectral predictions and painter-first starting mixes.'}
             </p>
           </Card>
         )}

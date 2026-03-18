@@ -5,100 +5,60 @@ import type {
   SaturationClassification,
   ValueClassification,
 } from '../../types/models';
-import { hexToRgb, normalizeHex, srgbRgbToLinearRgb } from './colorMath';
+import { getSpectralColorForHex } from './spectralMixing';
+import { hexToRgb, normalizeHex } from './colorMath';
 
 const clamp = (value: number, min = 0, max = 1): number => Math.min(max, Math.max(min, value));
 
 export const computeValue = (hex: string): number => {
-  const rgb = hexToRgb(hex);
-  if (!rgb) {
-    return 0;
-  }
-
-  const linear = srgbRgbToLinearRgb(rgb);
-  return clamp(0.2126 * linear.r + 0.7152 * linear.g + 0.0722 * linear.b);
+  const spectral = getSpectralColorForHex(hex);
+  return clamp(spectral.OKLab[0]);
 };
 
 export const classifyValue = (value: number): ValueClassification => {
-  if (value < 0.12) {
+  if (value < 0.22) {
     return 'very dark';
   }
-  if (value < 0.3) {
+  if (value < 0.42) {
     return 'dark';
   }
-  if (value < 0.62) {
+  if (value < 0.7) {
     return 'mid';
   }
-  if (value < 0.84) {
+  if (value < 0.88) {
     return 'light';
   }
   return 'very light';
 };
 
 export const computeChroma = (hex: string): number => {
-  const rgb = hexToRgb(hex);
-  if (!rgb) {
-    return 0;
-  }
-
-  const channels = [rgb.r, rgb.g, rgb.b].map((channel) => channel / 255);
-  return Math.max(...channels) - Math.min(...channels);
+  const spectral = getSpectralColorForHex(hex);
+  return spectral.OKLCh[1];
 };
 
 export const computeHue = (hex: string): number | null => {
-  const rgb = hexToRgb(hex);
-  if (!rgb) {
+  const chroma = computeChroma(hex);
+  if (chroma < 0.015) {
     return null;
   }
 
-  const [r, g, b] = [rgb.r, rgb.g, rgb.b].map((channel) => channel / 255);
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-
-  if (delta < 0.04) {
-    return null;
-  }
-
-  let hue = 0;
-  if (max === r) {
-    hue = ((g - b) / delta) % 6;
-  } else if (max === g) {
-    hue = (b - r) / delta + 2;
-  } else {
-    hue = (r - g) / delta + 4;
-  }
-
-  return (hue * 60 + 360) % 360;
+  return getSpectralColorForHex(hex).OKLCh[2];
 };
 
 export const computeSaturation = (hex: string): number => {
-  const rgb = hexToRgb(hex);
-  if (!rgb) {
-    return 0;
-  }
-
-  const [r, g, b] = [rgb.r, rgb.g, rgb.b].map((channel) => channel / 255);
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const lightness = (max + min) / 2;
-  const delta = max - min;
-
-  if (delta === 0) {
-    return 0;
-  }
-
-  return delta / (1 - Math.abs(2 * lightness - 1));
+  const chroma = computeChroma(hex);
+  const lightness = computeValue(hex);
+  return clamp(chroma / Math.max(0.12, 0.37 - Math.abs(lightness - 0.5) * 0.32));
 };
 
 export const classifySaturation = (saturation: number, chroma: number): SaturationClassification => {
-  if (chroma < 0.05 || saturation < 0.08) {
+  if (chroma < 0.018 || saturation < 0.09) {
     return 'neutral';
   }
-  if (saturation < 0.28 || chroma < 0.18) {
+  if (chroma < 0.055 || saturation < 0.28) {
     return 'muted';
   }
-  if (saturation < 0.62) {
+  if (chroma < 0.12 || saturation < 0.62) {
     return 'moderate';
   }
   return 'vivid';
@@ -108,19 +68,19 @@ export const classifyHueFamily = (hue: number | null, saturationClassification: 
   if (hue === null || saturationClassification === 'neutral') {
     return 'neutral';
   }
-  if (hue < 20 || hue >= 340) {
+  if (hue < 25 || hue >= 345) {
     return 'red';
   }
-  if (hue < 45) {
+  if (hue < 60) {
     return 'orange';
   }
-  if (hue < 70) {
+  if (hue < 110) {
     return 'yellow';
   }
-  if (hue < 170) {
+  if (hue < 175) {
     return 'green';
   }
-  if (hue < 260) {
+  if (hue < 285) {
     return 'blue';
   }
   return 'violet';
@@ -133,11 +93,12 @@ export const analyzeColor = (hex: string): ColorAnalysis | null => {
     return null;
   }
 
-  const value = computeValue(normalizedHex);
-  const chroma = computeChroma(normalizedHex);
+  const spectral = getSpectralColorForHex(normalizedHex);
+  const value = clamp(spectral.OKLab[0]);
+  const chroma = spectral.OKLCh[1];
+  const hue = chroma < 0.015 ? null : spectral.OKLCh[2];
   const saturation = computeSaturation(normalizedHex);
   const saturationClassification = classifySaturation(saturation, chroma);
-  const hue = computeHue(normalizedHex);
 
   return {
     normalizedHex,
@@ -149,6 +110,8 @@ export const analyzeColor = (hex: string): ColorAnalysis | null => {
     saturation,
     saturationClassification,
     chroma,
+    oklab: [...spectral.OKLab] as [number, number, number],
+    oklch: [...spectral.OKLCh] as [number, number, number],
   };
 };
 
@@ -161,45 +124,42 @@ export const hueDifference = (leftHue: number | null, rightHue: number | null): 
   return Math.min(difference, 360 - difference) / 180;
 };
 
+const findEnabledPaints = (paints: Paint[]): Paint[] => paints.filter((paint) => paint.isEnabled);
+
 export const generateTargetPaletteInsights = (target: ColorAnalysis, paints: Paint[]): string[] => {
-  const enabledPaints = paints.filter((paint) => paint.isEnabled);
+  const enabledPaints = findEnabledPaints(paints);
   if (enabledPaints.length === 0) {
     return [];
   }
 
-  const paintAnalyses = enabledPaints
-    .map((paint) => ({ paint, analysis: analyzeColor(paint.hex) }))
-    .filter((entry): entry is { paint: Paint; analysis: ColorAnalysis } => entry.analysis !== null);
-
   const insights: string[] = [];
-  const chromaticValues = paintAnalyses
-    .filter(({ paint }) => !paint.isBlack && !paint.isWhite)
-    .map(({ analysis }) => analysis.value)
-    .sort((left, right) => left - right);
-
-  if (chromaticValues.length > 0 && target.value < chromaticValues[0]) {
-    insights.push('This target is darker than most chromatic paints in your palette.');
-  }
-
-  if (target.hueFamily === 'green' && (target.valueClassification === 'dark' || target.valueClassification === 'very dark')) {
-    insights.push('A dark green mix will likely need umber, black, or both for support.');
-  }
 
   if (target.hueFamily === 'green' && target.saturationClassification === 'vivid') {
-    insights.push('Build vivid green from yellow + blue first, then mute or darken only after the green is established.');
+    insights.push('For vivid green, build yellow + blue first. Only mute or darken after the green is clearly established.');
   }
 
-  if (target.saturationClassification === 'muted' || target.saturationClassification === 'neutral') {
-    insights.push('This target is muted; earth colors or complements should help control chroma.');
+  if (target.hueFamily === 'green' && target.saturationClassification !== 'vivid') {
+    insights.push('Olive and natural greens usually start yellow + blue, then get pushed down with umber, black, or both.');
   }
 
-  if (target.valueClassification === 'very light' || target.valueClassification === 'light') {
-    insights.push('This target is light enough that Titanium White or Unbleached Titanium will likely be involved.');
+  if (target.hueFamily === 'orange') {
+    insights.push('Warm oranges read better when red and yellow establish hue before white or earth colors are added.');
   }
 
-  const hasEarth = paintAnalyses.some(({ paint }) => paint.heuristics?.naturalBias === 'earth');
-  if (hasEarth && target.saturationClassification !== 'vivid') {
-    insights.push('Your palette has earth colors available, so a natural neutral is often easier than brute-force complement mixing.');
+  if (target.hueFamily === 'violet') {
+    insights.push('Expect violet mixes to favor Alizarin Crimson + Ultramarine or Phthalo, with white used only after hue is close.');
+  }
+
+  if (target.saturationClassification === 'neutral' || target.saturationClassification === 'muted') {
+    insights.push('This target is muted enough that earth colors should help more than brute-force complement cancellation.');
+  }
+
+  if (target.valueClassification === 'light' || target.valueClassification === 'very light') {
+    insights.push('Plan value lifts late. Titanium White gives the strongest lift; Unbleached Titanium keeps light passages warmer.');
+  }
+
+  if (target.valueClassification === 'very dark' && target.hueFamily !== 'neutral') {
+    insights.push('This is a dark chromatic target, so keep the hue family visible before leaning on Mars Black.');
   }
 
   return [...new Set(insights)].slice(0, 4);
