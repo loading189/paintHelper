@@ -41,6 +41,9 @@ const balancedSettings: UserSettings = {
   maxPaintsPerRecipe: 2,
 };
 
+const findRecipeIndexByPaintIds = (recipes: ReturnType<typeof rankRecipes>, paintIds: string[]) =>
+  recipes.findIndex((recipe) => paintIds.every((paintId) => recipe.components.some((component) => component.paintId === paintId)));
+
 describe('mixEngine', () => {
   it('generates discrete weight combinations', () => {
     expect(generateWeightCombinations(2, 25)).toEqual([
@@ -143,6 +146,61 @@ describe('mixEngine', () => {
     expect(strict[0]?.recipeText).not.toBe(painterly[0]?.recipeText);
   });
 
+
+
+  it('keeps dark olive greens in the green family for painter-friendly balanced mode', () => {
+    const ranked = rankRecipes('#545F27', starterPaints, {
+      ...defaultSettings,
+      weightStep: 25,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 12);
+
+    expect(ranked[0]?.scoreBreakdown.staysInTargetHueFamily).toBe(true);
+    expect(ranked[0]?.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium')).toBe(true);
+    expect(ranked[0]?.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue')).toBe(true);
+    expect(ranked.some((recipe) => recipe.badges.includes('Best overall') && recipe.scoreBreakdown.staysInTargetHueFamily)).toBe(true);
+  });
+
+  it('ranks a valid green-family olive mix above black and unbleached titanium for dark olive targets', () => {
+    const ranked = rankRecipes('#545F27', starterPaints, {
+      ...defaultSettings,
+      weightStep: 25,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 40);
+
+    const greenFamilyIndex = ranked.findIndex((recipe) => recipe.scoreBreakdown.staysInTargetHueFamily);
+    const blackTitaniumIndex = findRecipeIndexByPaintIds(ranked, ['paint-mars-black', 'paint-unbleached-titanium']);
+
+    expect(greenFamilyIndex).toBeGreaterThanOrEqual(0);
+    expect(blackTitaniumIndex).toBeGreaterThanOrEqual(0);
+    expect(greenFamilyIndex).toBeLessThan(blackTitaniumIndex);
+  });
+
+  it('rewards a yellow and blue olive path over black-heavy brownish mixes when scores are close', () => {
+    const ranked = rankRecipes('#545F27', starterPaints, {
+      ...defaultSettings,
+      weightStep: 25,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 120);
+
+    const yellowBlueRecipe = ranked.find((recipe) =>
+      recipe.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium') &&
+      recipe.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue'),
+    );
+    const blackHeavyRecipe = ranked.find((recipe) =>
+      recipe.components.some((component) => component.paintId === 'paint-mars-black' && component.percentage >= 75) &&
+      !recipe.scoreBreakdown.staysInTargetHueFamily,
+    );
+
+    expect(yellowBlueRecipe).toBeTruthy();
+    expect(yellowBlueRecipe?.scoreBreakdown.chromaticPathBonus).toBeGreaterThan(0);
+    expect(blackHeavyRecipe).toBeTruthy();
+    expect((yellowBlueRecipe?.distanceScore ?? Infinity)).toBeLessThan(blackHeavyRecipe?.distanceScore ?? -Infinity);
+  });
+
   it('exposes score components for black and white penalties', () => {
     const darkTarget = analyzeColor('#1D2A1F');
     const blackPredicted = analyzeColor('#1D1A19');
@@ -177,6 +235,8 @@ describe('mixEngine', () => {
     );
 
     expect(blackBreakdown.blackPenalty).toBeGreaterThan(0);
+    expect(blackBreakdown.blackDominancePenalty).toBeGreaterThan(0);
+    expect(blackBreakdown.hueFamilyPenalty).toBeGreaterThan(0);
     expect(whiteBreakdown.whitePenalty).toBeGreaterThan(0);
   });
 });

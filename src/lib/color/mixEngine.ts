@@ -1,5 +1,6 @@
 import type {
   ColorAnalysis,
+  HueFamily,
   LinearRgbColor,
   Paint,
   RankedRecipe,
@@ -121,6 +122,118 @@ const buildComponents = (paintIds: string[], weights: number[]): RecipeComponent
     }))
     .sort((left, right) => right.percentage - left.percentage || left.paintId.localeCompare(right.paintId));
 
+const isPainterMode = (settings: UserSettings): boolean => settings.rankingMode !== 'strict-closest-color';
+
+const isChromaticTarget = (targetAnalysis: ColorAnalysis): boolean => targetAnalysis.hueFamily !== 'neutral';
+
+const adjacentHueFamilies: Record<Exclude<HueFamily, 'neutral'>, HueFamily[]> = {
+  red: ['orange', 'violet'],
+  orange: ['red', 'yellow'],
+  yellow: ['orange', 'green'],
+  green: ['yellow', 'blue'],
+  blue: ['green', 'violet'],
+  violet: ['red', 'blue'],
+};
+
+const classifyHueFamilyBand = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): 'same' | 'adjacent' | 'wrong' | 'neutralized' => {
+  if (!isChromaticTarget(targetAnalysis)) {
+    return 'same';
+  }
+
+  if (predictedAnalysis.hueFamily === 'neutral') {
+    return 'neutralized';
+  }
+
+  const hueDelta = hueDifference(targetAnalysis.hue, predictedAnalysis.hue);
+
+  if (predictedAnalysis.hueFamily === targetAnalysis.hueFamily) {
+    return 'same';
+  }
+
+  const adjacentFamilies = adjacentHueFamilies[targetAnalysis.hueFamily as Exclude<HueFamily, 'neutral'>] ?? [];
+  if (adjacentFamilies.includes(predictedAnalysis.hueFamily) && hueDelta <= 0.18) {
+    return 'adjacent';
+  }
+
+  return 'wrong';
+};
+
+const getPaintRoleFamily = (paint: Paint): HueFamily => {
+  const normalizedName = paint.name.toLowerCase();
+  if (paint.isBlack || paint.isWhite) {
+    return 'neutral';
+  }
+  if (normalizedName.includes('yellow')) {
+    return 'yellow';
+  }
+  if (normalizedName.includes('blue')) {
+    return 'blue';
+  }
+  if (normalizedName.includes('violet') || normalizedName.includes('purple')) {
+    return 'violet';
+  }
+  if (normalizedName.includes('green')) {
+    return 'green';
+  }
+  if (normalizedName.includes('orange')) {
+    return 'orange';
+  }
+  if (normalizedName.includes('red') || normalizedName.includes('crimson') || normalizedName.includes('magenta')) {
+    return 'red';
+  }
+
+  return analyzeColor(paint.hex)?.hueFamily ?? 'neutral';
+};
+
+const getPaintHueFamilies = (paints: Paint[], components: RecipeComponent[]): HueFamily[] => {
+  const families = components
+    .map((component) => paints.find((paint) => paint.id === component.paintId))
+    .filter((paint): paint is Paint => Boolean(paint))
+    .map((paint) => getPaintRoleFamily(paint));
+
+  return [...new Set(families)];
+};
+
+const hasChromaticPathForTarget = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): boolean => {
+  const chromaticFamilies = getPaintHueFamilies(paints, components);
+  const componentPaints = components
+    .map((component) => paints.find((paint) => paint.id === component.paintId))
+    .filter((paint): paint is Paint => Boolean(paint));
+  const hasChromaticPaint = componentPaints.some((paint) => paint.heuristics?.naturalBias === 'chromatic');
+
+  if (!hasChromaticPaint) {
+    return false;
+  }
+
+  if (targetAnalysis.hueFamily === 'green') {
+    return chromaticFamilies.includes('yellow') && chromaticFamilies.includes('blue');
+  }
+
+  if (targetAnalysis.hueFamily === 'orange') {
+    return chromaticFamilies.includes('red') && chromaticFamilies.includes('yellow');
+  }
+
+  if (targetAnalysis.hueFamily === 'violet') {
+    return chromaticFamilies.includes('red') && chromaticFamilies.includes('blue');
+  }
+
+  return false;
+};
+
+const staysInBroadHueFamily = (
+  paints: Paint[],
+  components: RecipeComponent[],
+  targetAnalysis: ColorAnalysis,
+  predictedAnalysis: ColorAnalysis,
+): boolean => {
+  const band = classifyHueFamilyBand(targetAnalysis, predictedAnalysis);
+  if (band === 'same' || band === 'adjacent') {
+    return true;
+  }
+
+  return hasChromaticPathForTarget(paints, components, targetAnalysis);
+};
+
 const getComplexityPenalty = (settings: UserSettings, paints: Paint[], components: RecipeComponent[]): number => {
   if (settings.rankingMode === 'strict-closest-color') {
     return 0;
@@ -216,6 +329,92 @@ const getEarthToneBonus = (paints: Paint[], components: RecipeComponent[], targe
   return 0;
 };
 
+const getHueFamilyPenalty = (
+  settings: UserSettings,
+  paints: Paint[],
+  components: RecipeComponent[],
+  targetAnalysis: ColorAnalysis,
+  predictedAnalysis: ColorAnalysis,
+): number => {
+  if (!isPainterMode(settings) || !isChromaticTarget(targetAnalysis)) {
+    return 0;
+  }
+
+  if (staysInBroadHueFamily(paints, components, targetAnalysis, predictedAnalysis)) {
+    return 0;
+  }
+
+  const hueBand = classifyHueFamilyBand(targetAnalysis, predictedAnalysis);
+  if (hueBand === 'adjacent') {
+    return 0.05;
+  }
+
+  if (hueBand === 'neutralized') {
+    return 0.32;
+  }
+
+  return 0.28;
+};
+
+const getBlackDominancePenalty = (
+  settings: UserSettings,
+  paints: Paint[],
+  components: RecipeComponent[],
+  targetAnalysis: ColorAnalysis,
+  predictedAnalysis: ColorAnalysis,
+): number => {
+  if (!isPainterMode(settings) || !isChromaticTarget(targetAnalysis)) {
+    return 0;
+  }
+
+  const blackShare = components.reduce((sum, component) => {
+    const paint = paints.find((item) => item.id === component.paintId);
+    return paint?.isBlack ? sum + component.percentage : sum;
+  }, 0);
+
+  if (blackShare < 70) {
+    return 0;
+  }
+
+  const preservesHueFamily = staysInBroadHueFamily(paints, components, targetAnalysis, predictedAnalysis);
+  const scaledShare = Math.min(1, (blackShare - 70) / 30);
+  return preservesHueFamily ? 0.03 + scaledShare * 0.05 : 0.16 + scaledShare * 0.1;
+};
+
+const getChromaticPathBonus = (
+  settings: UserSettings,
+  paints: Paint[],
+  components: RecipeComponent[],
+  targetAnalysis: ColorAnalysis,
+): number => {
+  if (!isPainterMode(settings) || !isChromaticTarget(targetAnalysis)) {
+    return 0;
+  }
+
+  const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
+  const componentPaints = components
+    .map((component) => paintMap.get(component.paintId))
+    .filter((paint): paint is Paint => Boolean(paint));
+  const hasEarthSupport = componentPaints.some((paint) => paint.heuristics?.naturalBias === 'earth');
+  const hasBlackSupport = componentPaints.some((paint) => paint.isBlack);
+
+  if (!hasChromaticPathForTarget(paints, components, targetAnalysis)) {
+    return 0;
+  }
+
+  if (targetAnalysis.hueFamily === 'green') {
+    return targetAnalysis.valueClassification === 'dark' || targetAnalysis.valueClassification === 'very dark'
+      ? 0.18 + (hasEarthSupport || hasBlackSupport ? 0.03 : 0)
+      : 0.12;
+  }
+
+  if (targetAnalysis.hueFamily === 'orange' || targetAnalysis.hueFamily === 'violet') {
+    return 0.1;
+  }
+
+  return 0;
+};
+
 export const scoreRecipe = (
   settings: UserSettings,
   paints: Paint[],
@@ -242,6 +441,10 @@ export const scoreRecipe = (
       whitePenalty: 0,
       singlePaintPenalty: 0,
       earthToneBonus: 0,
+      hueFamilyPenalty: 0,
+      blackDominancePenalty: 0,
+      chromaticPathBonus: 0,
+      staysInTargetHueFamily: staysInBroadHueFamily(paints, components, targetAnalysis, predictedAnalysis),
       finalScore: baseDistance,
     };
   }
@@ -251,18 +454,25 @@ export const scoreRecipe = (
   const whitePenalty = getWhitePenalty(settings, paints, components, targetAnalysis);
   const singlePaintPenalty = getSinglePaintPenalty(settings, paints, components, targetAnalysis, predictedAnalysis);
   const earthToneBonus = getEarthToneBonus(paints, components, targetAnalysis);
+  const hueFamilyPenalty = getHueFamilyPenalty(settings, paints, components, targetAnalysis, predictedAnalysis);
+  const blackDominancePenalty = getBlackDominancePenalty(settings, paints, components, targetAnalysis, predictedAnalysis);
+  const chromaticPathBonus = getChromaticPathBonus(settings, paints, components, targetAnalysis);
   const modeMultiplier = settings.rankingMode === 'simpler-recipes-preferred' ? 1.6 : 1;
+  const staysInTargetHueFamily = staysInBroadHueFamily(paints, components, targetAnalysis, predictedAnalysis);
 
   const finalScore =
-    baseDistance * 0.62 +
-    valueDifference * 0.22 +
-    hueDelta * 0.12 +
-    saturationDifference * 0.08 +
+    baseDistance * 0.54 +
+    valueDifference * 0.18 +
+    hueDelta * 0.18 +
+    saturationDifference * 0.1 +
     complexityPenalty * modeMultiplier +
     blackPenalty +
     whitePenalty +
-    singlePaintPenalty -
-    earthToneBonus;
+    singlePaintPenalty +
+    hueFamilyPenalty +
+    blackDominancePenalty -
+    earthToneBonus -
+    chromaticPathBonus;
 
   return {
     mode: settings.rankingMode,
@@ -275,6 +485,10 @@ export const scoreRecipe = (
     whitePenalty,
     singlePaintPenalty,
     earthToneBonus,
+    hueFamilyPenalty,
+    blackDominancePenalty,
+    chromaticPathBonus,
+    staysInTargetHueFamily,
     finalScore,
   };
 };

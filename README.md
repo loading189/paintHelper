@@ -86,16 +86,16 @@ The result is a **deterministic ballpark mixing assistant** that aims to be more
 Best general-purpose mode.
 
 - Balances color distance with value, hue, and saturation differences.
-- Penalizes black-only and white-only shortcut answers when they are not very painter-useful.
+- Adds painter heuristics such as hue-family consistency, black-dominance control, and chromatic path rewards.
 - Slightly favors practical mixtures and natural neutral handling.
 
 ### 2. Strict Closest Color
 
-This is the original-style behavior.
+This is the plain numeric mode.
 
 - Uses the raw base color distance as the ranking driver.
 - Useful when you want the mathematically closest digital match.
-- Less painter-aware, especially near blacks, whites, and muted targets.
+- Does not apply painter heuristics.
 
 ### 3. Simpler Recipes Preferred
 
@@ -118,6 +118,9 @@ Each ranked recipe carries a deterministic score model with:
 - `whitePenalty`
 - `singlePaintPenalty`
 - `earthToneBonus`
+- `hueFamilyPenalty`
+- `blackDominancePenalty`
+- `chromaticPathBonus`
 - `finalScore`
 
 Lower final score is better.

@@ -12,7 +12,7 @@ export type RecipeQualityLabel =
   | 'Strong starting point'
   | 'Usable starting point'
   | 'Rough direction only';
-export type RecipeBadge = 'Best overall' | 'Simplest' | 'Best hue' | 'Best value' | 'Single-paint shortcut';
+export type RecipeBadge = 'Best overall' | 'Best value block-in' | 'Simplest' | 'Best hue' | 'Best value' | 'Single-paint shortcut';
 
 export type PaintHeuristics = {
   tintStrength?: TintStrength;
@@ -64,6 +64,10 @@ export type RecipeScoreBreakdown = {
   whitePenalty: number;
   singlePaintPenalty: number;
   earthToneBonus: number;
+  hueFamilyPenalty: number;
+  blackDominancePenalty: number;
+  chromaticPathBonus: number;
+  staysInTargetHueFamily: boolean;
   finalScore: number;
 };
 
