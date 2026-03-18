@@ -225,7 +225,19 @@ const staysInBroadHueFamily = (
   predictedAnalysis: ColorAnalysis,
 ): boolean => {
   const band = classifyHueFamilyBand(targetAnalysis, predictedAnalysis);
-  return band === 'same' || band === 'adjacent';
+
+  // 🔴 VIVID TARGETS → STRICT MATCH ONLY
+  if (targetAnalysis.saturationClassification === 'vivid') {
+    return band === 'same';
+  }
+
+  // 🟡 MODERATE → allow adjacent
+  if (targetAnalysis.saturationClassification === 'moderate') {
+    return band === 'same' || band === 'adjacent';
+  }
+
+  // 🟤 MUTED / NEUTRAL → more forgiving
+  return band !== 'wrong';
 };
 
 const getComplexityPenalty = (settings: UserSettings, paints: Paint[], components: RecipeComponent[]): number => {
@@ -470,6 +482,15 @@ const getVividTargetSanityPenalty = (
     targetAnalysis.saturationClassification !== 'vivid'
   ) {
     return 0;
+  }
+
+    // extra punishment if hue is drifting toward yellow for green targets
+  if (
+    targetAnalysis.hueFamily === 'green' &&
+    predictedAnalysis.hue !== null &&
+    predictedAnalysis.hue < 90 // drifting toward yellow
+  ) {
+    return 0.25;
   }
 
   const hueBand = classifyHueFamilyBand(targetAnalysis, predictedAnalysis);
