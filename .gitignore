@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# build outputs
+dist/
+build/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# env files
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# test coverage
+coverage/
+
+# vite
+.vite/
+
+# misc
+*.local
