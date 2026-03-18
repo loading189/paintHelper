@@ -30,6 +30,7 @@ const breakdownRows: Array<{ key: keyof RankedRecipe['scoreBreakdown']; label: s
 
 export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRatios, onSave }: RecipeCardProps) => {
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
+  const practicalDiffers = recipe.practicalRatioText !== recipe.exactRatioText;
 
   return (
     <Card>
@@ -63,15 +64,30 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
             {recipe.components.map((component, index) => (
               <li key={component.paintId} className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-3 py-2">
                 <span>{paintMap.get(component.paintId)?.name ?? component.paintId}</span>
-                <span className="text-slate-500">
-                  {showPercentages ? `${component.percentage}%` : null}
-                  {showPercentages && showPartsRatios ? ' · ' : null}
-                  {showPartsRatios ? `${recipe.parts[index]} parts` : null}
+                <span className="text-right text-slate-500">
+                  {showPercentages ? <span className="block">{component.percentage}%</span> : null}
+                  {showPartsRatios ? <span className="block">{recipe.practicalParts[index]} part{recipe.practicalParts[index] === 1 ? '' : 's'}</span> : null}
                 </span>
               </li>
             ))}
           </ul>
-          {showPartsRatios ? <p className="text-sm text-slate-600">Ratio: {recipe.ratioText}</p> : null}
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {showPercentages ? (
+              <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Percentages</p>
+                <p className="mt-1">{recipe.components.map((component) => `${component.percentage}%`).join(' · ')}</p>
+              </div>
+            ) : null}
+            {showPartsRatios ? (
+              <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Practical mix</p>
+                <p className="mt-1 font-semibold text-slate-900">{recipe.practicalRatioText}</p>
+                {practicalDiffers ? <p className="mt-1 text-xs text-slate-500">Rounded from exact {recipe.exactRatioText} for easier pile sizes.</p> : null}
+              </div>
+            ) : null}
+          </div>
+
           <div className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">
             <p className="font-semibold">Mix advice</p>
             <ul className="mt-2 space-y-1">
@@ -101,6 +117,18 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
               {recipe.targetAnalysis.normalizedHex} · {recipe.targetAnalysis.valueClassification} · {recipe.targetAnalysis.hueFamily} ·{' '}
               {recipe.targetAnalysis.saturationClassification}
             </p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <p className="font-semibold text-slate-900">Percentages</p>
+              <p className="mt-2">{recipe.components.map((component) => `${paintMap.get(component.paintId)?.name ?? component.paintId} ${component.percentage}%`).join(' · ')}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">Ratio details</p>
+              <p className="mt-2">Practical mix: {recipe.practicalRatioText}</p>
+              <p className="text-slate-500">Exact simplified ratio: {recipe.exactRatioText}</p>
+            </div>
           </div>
 
           <div>

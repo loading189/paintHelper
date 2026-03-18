@@ -3,9 +3,10 @@ import { Card } from '../../components/Card';
 import { SectionTitle } from '../../components/SectionTitle';
 import { analyzeColor, generateTargetPaletteInsights } from '../../lib/color/colorAnalysis';
 import { normalizeHex } from '../../lib/color/colorMath';
-import { rankRecipes } from '../../lib/color/mixEngine';
 import type { Paint, RankedRecipe, UserSettings } from '../../types/models';
+import { PaintMixerLoading } from './PaintMixerLoading';
 import { RecipeCard } from './RecipeCard';
+import { canGenerateRecipes, createMixerDraftState, generateRecipesFromDraft, hasStaleResults, shouldShowInvalidHexMessage } from './mixerState';
 
 const DEFAULT_TARGET = '#7A8FB3';
 
@@ -40,31 +41,58 @@ export const MixerPage = ({
   onSaveRecipe,
   onLoadTargetHex,
 }: MixerPageProps) => {
-  const [targetInput, setTargetInput] = useState(onLoadTargetHex ?? DEFAULT_TARGET);
-  const [touched, setTouched] = useState(false);
+  const [mixerState, setMixerState] = useState(() => createMixerDraftState(onLoadTargetHex ?? DEFAULT_TARGET));
 
-  const normalizedHex = normalizeHex(targetInput);
-  const targetAnalysis = normalizedHex ? analyzeColor(normalizedHex) : null;
+  const draftNormalizedHex = normalizeHex(mixerState.draftHex);
+  const previewAnalysis = draftNormalizedHex ? analyzeColor(draftNormalizedHex) : null;
   const enabledPaints = paints.filter((paint) => paint.isEnabled);
+  const generatedHex = mixerState.generatedHex;
+  const generatedAnalysis = generatedHex ? analyzeColor(generatedHex) : null;
+  const recipes = mixerState.recipes;
+  const topRecipe = recipes[0] ?? null;
+  const resultsAreStale = hasStaleResults(mixerState.draftHex, mixerState.generatedHex);
+  const showInvalidHexMessage = shouldShowInvalidHexMessage(mixerState.draftHex, mixerState.touched);
+  const generateDisabled = !canGenerateRecipes(mixerState.draftHex, enabledPaints.length, mixerState.isGenerating);
 
   useEffect(() => {
     if (onLoadTargetHex) {
-      setTargetInput(onLoadTargetHex);
+      setMixerState((current) => ({ ...current, draftHex: onLoadTargetHex, touched: true }));
     }
   }, [onLoadTargetHex]);
 
-  const recipes = useMemo(() => (normalizedHex ? rankRecipes(normalizedHex, paints, settings, 4) : []), [normalizedHex, paints, settings]);
   const targetInsights = useMemo(
-    () => (targetAnalysis ? generateTargetPaletteInsights(targetAnalysis, paints) : []),
-    [targetAnalysis, paints],
+    () => (previewAnalysis ? generateTargetPaletteInsights(previewAnalysis, paints) : []),
+    [previewAnalysis, paints],
   );
-  const topRecipe = recipes[0] ?? null;
 
-  const applyTarget = (value: string) => {
-    setTargetInput(value);
-    const normalized = normalizeHex(value);
-    if (normalized) {
-      onRecentColor(normalized);
+  const handleDraftChange = (value: string) => {
+    setMixerState((current) => ({ ...current, draftHex: value, touched: true }));
+  };
+
+  const handleGenerate = async () => {
+    setMixerState((current) => ({ ...current, touched: true }));
+    if (!draftNormalizedHex || enabledPaints.length === 0 || mixerState.isGenerating) {
+      return;
+    }
+
+    setMixerState((current) => ({ ...current, isGenerating: true }));
+    const generated = await generateRecipesFromDraft(draftNormalizedHex, paints, settings);
+
+    setMixerState((current) => {
+      if (!generated) {
+        return { ...current, isGenerating: false };
+      }
+
+      return {
+        ...current,
+        generatedHex: generated.generatedHex,
+        recipes: generated.recipes,
+        isGenerating: false,
+      };
+    });
+
+    if (generated?.generatedHex) {
+      onRecentColor(generated.generatedHex);
     }
   };
 
@@ -77,11 +105,8 @@ export const MixerPage = ({
             Target hex
             <input
               className="w-full rounded-xl border border-slate-300 px-3 py-2"
-              value={targetInput}
-              onChange={(event) => {
-                setTouched(true);
-                setTargetInput(event.target.value);
-              }}
+              value={mixerState.draftHex}
+              onChange={(event) => handleDraftChange(event.target.value)}
               placeholder="#7A8FB3"
             />
           </label>
@@ -90,24 +115,28 @@ export const MixerPage = ({
             <input
               type="color"
               className="h-12 w-full rounded-xl border border-slate-300 p-1"
-              value={normalizedHex ?? '#000000'}
-              onChange={(event) => applyTarget(event.target.value)}
+              value={draftNormalizedHex ?? '#000000'}
+              onChange={(event) => handleDraftChange(event.target.value)}
             />
           </label>
           <button
-            className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            className={`w-full rounded-xl px-4 py-2 text-sm font-semibold text-white ${generateDisabled ? 'bg-slate-400' : 'bg-slate-900'}`}
             type="button"
+            disabled={generateDisabled}
             onClick={() => {
-              setTouched(true);
-              if (normalizedHex) {
-                applyTarget(normalizedHex);
-              }
+              void handleGenerate();
             }}
           >
-            Generate recipes
+            {mixerState.isGenerating ? 'Mixing...' : 'Generate Recipes'}
           </button>
-          {!normalizedHex && touched ? <p className="text-sm text-rose-600">Enter a valid 6-digit hex color.</p> : null}
+          {showInvalidHexMessage ? <p className="text-sm text-rose-600">Enter a valid 6-digit hex color.</p> : null}
           {enabledPaints.length === 0 ? <p className="text-sm text-amber-700">Enable at least one paint in My Paints to generate mixes.</p> : null}
+          {resultsAreStale && generatedHex ? (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Draft target changed. Visible recipes are still for {generatedHex}. Click Generate Recipes to remix.
+            </p>
+          ) : null}
+          {mixerState.isGenerating ? <PaintMixerLoading /> : null}
         </div>
 
         <div className="mt-6 space-y-4">
@@ -226,29 +255,30 @@ export const MixerPage = ({
       <Card>
         <SectionTitle>Target analysis</SectionTitle>
         <div className="mt-4 space-y-4">
-          <div className="h-56 rounded-3xl border border-slate-200" style={{ backgroundColor: normalizedHex ?? '#CBD5E1' }} />
+          <div className="h-56 rounded-3xl border border-slate-200" style={{ backgroundColor: draftNormalizedHex ?? '#CBD5E1' }} />
           <div>
-            <p className="text-sm text-slate-500">Normalized hex</p>
-            <p className="text-xl font-semibold text-slate-900">{normalizedHex ?? 'Invalid hex'}</p>
+            <p className="text-sm text-slate-500">Draft hex</p>
+            <p className="text-xl font-semibold text-slate-900">{draftNormalizedHex ?? 'Invalid hex'}</p>
+            {generatedHex ? <p className="mt-1 text-xs text-slate-500">Last generated target: {generatedHex}</p> : null}
           </div>
           <div>
             <p className="text-sm text-slate-500">RGB</p>
             <p className="text-base text-slate-800">
-              {targetAnalysis ? `${targetAnalysis.rgb.r}, ${targetAnalysis.rgb.g}, ${targetAnalysis.rgb.b}` : '—'}
+              {previewAnalysis ? `${previewAnalysis.rgb.r}, ${previewAnalysis.rgb.g}, ${previewAnalysis.rgb.b}` : '—'}
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl bg-slate-50 p-3">
               <p className="text-xs uppercase tracking-wide text-slate-500">Value</p>
-              <p className="mt-1 font-semibold text-slate-900">{targetAnalysis?.valueClassification ?? '—'}</p>
+              <p className="mt-1 font-semibold text-slate-900">{previewAnalysis?.valueClassification ?? '—'}</p>
             </div>
             <div className="rounded-2xl bg-slate-50 p-3">
               <p className="text-xs uppercase tracking-wide text-slate-500">Hue family</p>
-              <p className="mt-1 font-semibold text-slate-900">{targetAnalysis?.hueFamily ?? '—'}</p>
+              <p className="mt-1 font-semibold text-slate-900">{previewAnalysis?.hueFamily ?? '—'}</p>
             </div>
             <div className="rounded-2xl bg-slate-50 p-3">
               <p className="text-xs uppercase tracking-wide text-slate-500">Saturation</p>
-              <p className="mt-1 font-semibold text-slate-900">{targetAnalysis?.saturationClassification ?? '—'}</p>
+              <p className="mt-1 font-semibold text-slate-900">{previewAnalysis?.saturationClassification ?? '—'}</p>
             </div>
           </div>
           <div>
@@ -267,7 +297,7 @@ export const MixerPage = ({
                   type="button"
                   style={{ backgroundColor: color }}
                   title={color}
-                  onClick={() => applyTarget(color)}
+                  onClick={() => handleDraftChange(color)}
                 />
               ))}
             </div>
@@ -278,15 +308,17 @@ export const MixerPage = ({
       <div className="space-y-4">
         <div>
           <SectionTitle>Painter-first recipe suggestions</SectionTitle>
-          <p className="mt-1 text-sm text-slate-600">
-            {rankingModeDescriptions[settings.rankingMode]}
-          </p>
+          <p className="mt-1 text-sm text-slate-600">{rankingModeDescriptions[settings.rankingMode]}</p>
         </div>
 
         {topRecipe ? (
           <Card>
             <SectionTitle>Mix strategy for the top result</SectionTitle>
             <p className="mt-1 text-sm font-semibold text-slate-900">{topRecipe.recipeText}</p>
+            <p className="mt-1 text-sm text-slate-600">Practical mix: {topRecipe.practicalRatioText}</p>
+            {topRecipe.practicalRatioText !== topRecipe.exactRatioText ? (
+              <p className="mt-1 text-xs text-slate-500">Exact simplified ratio: {topRecipe.exactRatioText}</p>
+            ) : null}
             <ul className="mt-3 space-y-2 text-sm text-slate-700">
               {topRecipe.mixStrategy.map((line) => (
                 <li key={line}>• {line}</li>
@@ -295,7 +327,7 @@ export const MixerPage = ({
           </Card>
         ) : null}
 
-        {normalizedHex && enabledPaints.length > 0 && recipes.length > 0 ? (
+        {generatedHex && enabledPaints.length > 0 && recipes.length > 0 ? (
           recipes.map((recipe, index) => (
             <RecipeCard
               key={`${recipe.predictedHex}-${index}`}
@@ -304,7 +336,7 @@ export const MixerPage = ({
               paints={paints}
               showPercentages={settings.showPercentages}
               showPartsRatios={settings.showPartsRatios}
-              onSave={(rankedRecipe) => onSaveRecipe(rankedRecipe, normalizedHex)}
+              onSave={(rankedRecipe) => onSaveRecipe(rankedRecipe, generatedHex)}
             />
           ))
         ) : (
@@ -312,7 +344,9 @@ export const MixerPage = ({
             <p className="text-sm text-slate-600">
               {enabledPaints.length === 0
                 ? 'No enabled paints are available for recipe generation.'
-                : 'Generate recipes to see deterministic, painter-friendly starting mixes.'}
+                : generatedAnalysis
+                  ? 'No deterministic mixes matched this target with the current settings.'
+                  : 'Generate recipes to see deterministic, painter-friendly starting mixes.'}
             </p>
           </Card>
         )}

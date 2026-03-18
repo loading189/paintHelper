@@ -58,6 +58,11 @@ const App = () => {
       qualityLabel: recipe.qualityLabel,
       guidanceText: recipe.guidanceText,
       scoreBreakdown: recipe.scoreBreakdown,
+      exactParts: recipe.exactParts,
+      exactRatioText: recipe.exactRatioText,
+      practicalParts: recipe.practicalParts,
+      practicalRatioText: recipe.practicalRatioText,
+      recipeText: recipe.recipeText,
     };
 
     setState((current) => ({ ...current, recipes: [saved, ...current.recipes] }));
