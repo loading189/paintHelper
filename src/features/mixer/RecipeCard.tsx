@@ -12,21 +12,23 @@ type RecipeCardProps = {
 };
 
 const breakdownRows: Array<{ key: keyof RankedRecipe['scoreBreakdown']; label: string }> = [
-  { key: 'baseDistance', label: 'Base color distance' },
+  { key: 'spectralDistance', label: 'Spectral distance' },
   { key: 'valueDifference', label: 'Value difference' },
   { key: 'hueDifference', label: 'Hue difference' },
   { key: 'saturationDifference', label: 'Saturation difference' },
+  { key: 'chromaDifference', label: 'Chroma difference' },
   { key: 'complexityPenalty', label: 'Complexity penalty' },
-  { key: 'blackPenalty', label: 'Black-only penalty' },
-  { key: 'whitePenalty', label: 'White-only penalty' },
-  { key: 'singlePaintPenalty', label: 'Single-paint penalty' },
-  { key: 'earthToneBonus', label: 'Earth-tone bonus' },
   { key: 'hueFamilyPenalty', label: 'Hue-family penalty' },
-  { key: 'requiredHueConstructionPenalty', label: 'Hue-construction penalty' },
-  { key: 'painterFamilyConstructionBonus', label: 'Family-construction bonus' },
-  { key: 'blackDominancePenalty', label: 'Black-dominance penalty' },
+  { key: 'constructionPenalty', label: 'Construction penalty' },
+  { key: 'supportPenalty', label: 'Support penalty' },
+  { key: 'dominancePenalty', label: 'Dominance penalty' },
+  { key: 'neutralizerPenalty', label: 'Neutralizer penalty' },
+  { key: 'blackPenalty', label: 'Black penalty' },
+  { key: 'whitePenalty', label: 'White penalty' },
+  { key: 'singlePaintPenalty', label: 'Single-paint penalty' },
+  { key: 'naturalMixBonus', label: 'Natural mix bonus' },
   { key: 'chromaticPathBonus', label: 'Chromatic path bonus' },
-  { key: 'vividTargetSanityPenalty', label: 'Vivid-target sanity penalty' },
+  { key: 'vividTargetPenalty', label: 'Vivid-target penalty' },
 ];
 
 export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRatios, onSave }: RecipeCardProps) => {
@@ -53,18 +55,46 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
         </button>
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-[96px,1fr]">
+      <div className="mt-5 grid gap-4 xl:grid-cols-[110px,110px,1fr]">
         <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Target</p>
+          <div className="h-24 rounded-2xl border border-slate-200" style={{ backgroundColor: recipe.targetAnalysis.normalizedHex }} />
+          <p className="mt-2 text-xs text-slate-600">{recipe.targetAnalysis.normalizedHex}</p>
+        </div>
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Predicted</p>
           <div className="h-24 rounded-2xl border border-slate-200" style={{ backgroundColor: recipe.predictedHex }} />
           <p className="mt-2 text-sm font-medium text-slate-800">{recipe.predictedHex}</p>
-          <p className="text-xs text-slate-500">Painter score {formatDistance(recipe.scoreBreakdown.finalScore)}</p>
-          <p className="text-xs text-slate-500">Base distance {formatDistance(recipe.scoreBreakdown.baseDistance)}</p>
+          <p className="text-xs text-slate-500">Score {formatDistance(recipe.scoreBreakdown.finalScore)}</p>
         </div>
-        <div className="space-y-3">
+
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Target family</p>
+              <p className="mt-1 font-semibold text-slate-900">{recipe.targetAnalysis.hueFamily}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Predicted family</p>
+              <p className="mt-1 font-semibold text-slate-900">{recipe.predictedAnalysis.hueFamily}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Value fit</p>
+              <p className="mt-1 font-semibold text-slate-900">{formatDistance(recipe.scoreBreakdown.valueDifference)}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Chroma fit</p>
+              <p className="mt-1 font-semibold text-slate-900">{formatDistance(recipe.scoreBreakdown.chromaDifference)}</p>
+            </div>
+          </div>
+
           <ul className="space-y-2 text-sm text-slate-700">
             {recipe.components.map((component, index) => (
               <li key={component.paintId} className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-3 py-2">
-                <span>{paintMap.get(component.paintId)?.name ?? component.paintId}</span>
+                <span>
+                  <span className="font-medium text-slate-900">{paintMap.get(component.paintId)?.name ?? component.paintId}</span>
+                  <span className="ml-2 text-xs text-slate-500">{paintMap.get(component.paintId)?.heuristics?.preferredRole ?? 'paint'}</span>
+                </span>
                 <span className="text-right text-slate-500">
                   {showPercentages ? <span className="block">{component.percentage}%</span> : null}
                   {showPartsRatios ? <span className="block">{recipe.practicalParts[index]} part{recipe.practicalParts[index] === 1 ? '' : 's'}</span> : null}
@@ -76,26 +106,36 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
           <div className="grid gap-3 md:grid-cols-2">
             {showPercentages ? (
               <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Percentages</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Exact percentages</p>
                 <p className="mt-1">{recipe.components.map((component) => `${component.percentage}%`).join(' · ')}</p>
               </div>
             ) : null}
             {showPartsRatios ? (
               <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Practical mix</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Practical mixing ratio</p>
                 <p className="mt-1 font-semibold text-slate-900">{recipe.practicalRatioText}</p>
-                {practicalDiffers ? <p className="mt-1 text-xs text-slate-500">Rounded from exact {recipe.exactRatioText} for easier pile sizes.</p> : null}
+                {practicalDiffers ? <p className="mt-1 text-xs text-slate-500">Rounded from exact {recipe.exactRatioText} for easier physical mixing.</p> : null}
               </div>
             ) : null}
           </div>
 
-          <div className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">
-            <p className="font-semibold">Mix advice</p>
-            <ul className="mt-2 space-y-1">
-              {recipe.guidanceText.map((line) => (
-                <li key={line}>• {line}</li>
-              ))}
-            </ul>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-950">
+              <p className="font-semibold">Mix guidance</p>
+              <ul className="mt-2 space-y-1">
+                {recipe.guidanceText.map((line) => (
+                  <li key={line}>• {line}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-2xl bg-sky-50 p-3 text-sm text-sky-950">
+              <p className="font-semibold">Palette strategy</p>
+              <ul className="mt-2 space-y-1">
+                {recipe.mixStrategy.map((line) => (
+                  <li key={line}>• {line}</li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -112,23 +152,14 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
             </ul>
           </div>
 
-          <div>
-            <p className="font-semibold text-slate-900">Target analysis</p>
-            <p className="mt-2">
-              {recipe.targetAnalysis.normalizedHex} · {recipe.targetAnalysis.valueClassification} · {recipe.targetAnalysis.hueFamily} ·{' '}
-              {recipe.targetAnalysis.saturationClassification}
-            </p>
-          </div>
-
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <p className="font-semibold text-slate-900">Percentages</p>
-              <p className="mt-2">{recipe.components.map((component) => `${paintMap.get(component.paintId)?.name ?? component.paintId} ${component.percentage}%`).join(' · ')}</p>
+              <p className="font-semibold text-slate-900">Target analysis</p>
+              <p className="mt-2">{recipe.targetAnalysis.normalizedHex} · {recipe.targetAnalysis.valueClassification} · {recipe.targetAnalysis.hueFamily} · {recipe.targetAnalysis.saturationClassification}</p>
             </div>
             <div>
-              <p className="font-semibold text-slate-900">Ratio details</p>
-              <p className="mt-2">Practical mix: {recipe.practicalRatioText}</p>
-              <p className="text-slate-500">Exact simplified ratio: {recipe.exactRatioText}</p>
+              <p className="font-semibold text-slate-900">Predicted analysis</p>
+              <p className="mt-2">{recipe.predictedAnalysis.normalizedHex} · {recipe.predictedAnalysis.valueClassification} · {recipe.predictedAnalysis.hueFamily} · {recipe.predictedAnalysis.saturationClassification}</p>
             </div>
           </div>
 

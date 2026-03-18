@@ -2,23 +2,41 @@ export type Opacity = 'transparent' | 'semi-transparent' | 'semi-opaque' | 'opaq
 export type TemperatureBias = 'warm' | 'cool' | 'neutral';
 export type TintStrength = 'low' | 'medium' | 'high' | 'very-high';
 export type NaturalBias = 'earth' | 'chromatic' | 'neutral';
-export type CommonUse = 'shadow' | 'neutralizing' | 'tinting' | 'warming' | 'cooling';
+export type CommonUse = 'shadow' | 'neutralizing' | 'tinting' | 'warming' | 'cooling' | 'block-in' | 'glazing';
 export type ValueClassification = 'very dark' | 'dark' | 'mid' | 'light' | 'very light';
 export type HueFamily = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'violet' | 'neutral';
 export type SaturationClassification = 'neutral' | 'muted' | 'moderate' | 'vivid';
 export type RankingMode = 'strict-closest-color' | 'painter-friendly-balanced' | 'simpler-recipes-preferred';
+export type PreferredRole = 'base' | 'hue-builder' | 'support' | 'neutralizer' | 'lightener';
 export type RecipeQualityLabel =
-  | 'Excellent starting point'
-  | 'Strong starting point'
-  | 'Usable starting point'
-  | 'Rough direction only';
-export type RecipeBadge = 'Best overall' | 'Best value block-in' | 'Simplest' | 'Best hue' | 'Best value' | 'Single-paint shortcut';
+  | 'Excellent spectral starting point'
+  | 'Strong spectral starting point'
+  | 'Usable spectral starting point'
+  | 'Needs hand-tuning';
+export type RecipeBadge =
+  | 'Best overall'
+  | 'Best hue path'
+  | 'Simplest'
+  | 'Best value setup'
+  | 'Muted naturally'
+  | 'Chromatic build'
+  | 'Single-paint shortcut';
 
 export type PaintHeuristics = {
   tintStrength?: TintStrength;
   naturalBias?: NaturalBias;
   commonUse?: CommonUse[];
   dominancePenalty?: number;
+  darkeningStrength?: number;
+  mutingStrength?: number;
+  chromaRetention?: number;
+  recommendedMaxShare?: number;
+  preferredRole?: PreferredRole;
+};
+
+export type PaintSpectralProfile = {
+  baseHex?: string;
+  tintingStrength?: number;
 };
 
 export type Paint = {
@@ -33,12 +51,32 @@ export type Paint = {
   opacity?: Opacity;
   temperatureBias?: TemperatureBias;
   heuristics?: PaintHeuristics;
+  spectral?: PaintSpectralProfile;
 };
 
 export type RecipeComponent = {
   paintId: string;
   weight: number;
   percentage: number;
+};
+
+export type RgbColor = {
+  r: number;
+  g: number;
+  b: number;
+};
+
+export type LinearRgbColor = {
+  r: number;
+  g: number;
+  b: number;
+};
+
+export type SpectralMixResult = {
+  hex: string;
+  rgb: RgbColor;
+  oklab: [number, number, number];
+  oklch: [number, number, number];
 };
 
 export type ColorAnalysis = {
@@ -51,25 +89,29 @@ export type ColorAnalysis = {
   saturation: number;
   saturationClassification: SaturationClassification;
   chroma: number;
+  oklab?: [number, number, number];
+  oklch?: [number, number, number];
 };
 
 export type RecipeScoreBreakdown = {
   mode: RankingMode;
-  baseDistance: number;
+  spectralDistance: number;
   valueDifference: number;
   hueDifference: number;
   saturationDifference: number;
+  chromaDifference: number;
   complexityPenalty: number;
+  hueFamilyPenalty: number;
+  constructionPenalty: number;
+  supportPenalty: number;
+  dominancePenalty: number;
+  neutralizerPenalty: number;
   blackPenalty: number;
   whitePenalty: number;
   singlePaintPenalty: number;
-  earthToneBonus: number;
-  hueFamilyPenalty: number;
-  requiredHueConstructionPenalty: number;
-  painterFamilyConstructionBonus: number;
-  blackDominancePenalty: number;
+  naturalMixBonus: number;
   chromaticPathBonus: number;
-  vividTargetSanityPenalty: number;
+  vividTargetPenalty: number;
   hasRequiredHueConstructionPath: boolean;
   staysInTargetHueFamily: boolean;
   finalScore: number;
@@ -120,18 +162,6 @@ export type AppState = {
   recipes: MixRecipe[];
   recentTargetColors: RecentColor[];
   settings: UserSettings;
-};
-
-export type RgbColor = {
-  r: number;
-  g: number;
-  b: number;
-};
-
-export type LinearRgbColor = {
-  r: number;
-  g: number;
-  b: number;
 };
 
 export type RankedRecipe = {

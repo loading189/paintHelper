@@ -24,28 +24,30 @@ const recipe: RankedRecipe = {
   recipeText: '6 parts Cadmium Yellow Medium + 1 part Ultramarine Blue',
   scoreBreakdown: {
     mode: 'painter-friendly-balanced',
-    baseDistance: 0.1,
+    spectralDistance: 0.1,
     valueDifference: 0.03,
     hueDifference: 0.02,
     saturationDifference: 0.02,
+    chromaDifference: 0.01,
     complexityPenalty: 0.01,
+    hueFamilyPenalty: 0,
+    constructionPenalty: 0,
+    supportPenalty: 0,
+    dominancePenalty: 0,
+    neutralizerPenalty: 0,
     blackPenalty: 0,
     whitePenalty: 0,
     singlePaintPenalty: 0,
-    earthToneBonus: 0,
-    hueFamilyPenalty: 0,
-    requiredHueConstructionPenalty: 0,
-    painterFamilyConstructionBonus: 0,
-    blackDominancePenalty: 0,
-    chromaticPathBonus: 0,
-    vividTargetSanityPenalty: 0,
+    naturalMixBonus: 0,
+    chromaticPathBonus: 0.05,
+    vividTargetPenalty: 0,
     hasRequiredHueConstructionPath: true,
     staysInTargetHueFamily: true,
     finalScore: 0.12,
   },
-  qualityLabel: 'Excellent starting point',
+  qualityLabel: 'Excellent spectral starting point',
   badges: ['Best overall'],
-  guidanceText: ['Start with a practical 6:1 mix, then fine-tune by eye.'],
+  guidanceText: ['Start with the practical 6:1 ratio, then adjust in small pile-size increments.'],
   targetAnalysis: {
     normalizedHex: '#80916A',
     rgb: { r: 128, g: 145, b: 106 },
@@ -68,8 +70,8 @@ const recipe: RankedRecipe = {
     saturationClassification: 'muted',
     chroma: 0.2,
   },
-  whyThisRanked: ['Balanced score across color distance, value, hue, and practical mixing complexity.'],
-  mixStrategy: ['Use the practical 6:1 ratio as your first pile size guide.'],
+  whyThisRanked: ['Spectral prediction lands very close overall, not just in flat RGB.'],
+  mixStrategy: ['Use 6:1 as the first palette pile guide.'],
 };
 
 describe('RecipeCard', () => {
@@ -78,9 +80,10 @@ describe('RecipeCard', () => {
       <RecipeCard rank={1} recipe={recipe} paints={paints} showPercentages showPartsRatios onSave={() => undefined} />,
     );
 
-    expect(markup).toContain('Practical mix');
+    expect(markup).toContain('Practical mixing ratio');
     expect(markup).toContain('6:1');
     expect(markup).toContain('Rounded from exact 17:3');
-    expect(markup).not.toContain('Ratio: 17:3');
+    expect(markup).toContain('Target family');
+    expect(markup).toContain('Predicted family');
   });
 });

@@ -48,6 +48,21 @@ describe('localState', () => {
     });
   });
 
+
+
+  it('sanitizes older saved data without crashing when newer spectral fields are missing', () => {
+    const storage = createStorage(JSON.stringify({
+      paints: [{ id: 'old-paint', name: 'Old Paint', hex: '#123456', isEnabled: true, isWhite: false, isBlack: false }],
+      recipes: [{ id: 'recipe-1', targetHex: '#112233', predictedHex: '#445566', components: [] }],
+      settings: { rankingMode: 'painter-friendly-balanced' },
+    }));
+
+    const loaded = loadAppState(storage);
+    expect(loaded.paints[0]?.spectral).toBeUndefined();
+    expect(loaded.recipes[0]?.predictedHex).toBe('#445566');
+    expect(loaded.settings.rankingMode).toBe('painter-friendly-balanced');
+  });
+
   it('uses the expected storage key', () => {
     expect(storageKey).toBe('paint-mix-matcher-state');
   });

@@ -1,140 +1,37 @@
 # Paint Mix Matcher
 
-Paint Mix Matcher is a **local-only, deterministic painter's assistant** for planning mixtures with the paints you already own.
+Paint Mix Matcher is a **local-only, deterministic painter’s assistant** for planning mixtures with the nine paints you actually have on hand.
 
-It is designed to get you into the ballpark with recipes that make **painterly sense**, not to pretend it can perfectly simulate real pigment physics.
+This branch is the app’s **Spectral.js engine refactor**. The predicted swatches are no longer based on weighted RGB or linear-RGB averaging. They now come from a **Spectral.js-style Kubelka-Munk pigment mixing core**, wrapped behind an internal adapter so the rest of the app stays maintainable.
 
-## What the app does
+## What changed in this branch
 
-- Manages a local paint inventory with enable/disable controls, metadata, search, and JSON import/export.
-- Accepts a target hex color through text input or the native color picker.
-- Analyzes the target into painter-friendly descriptors:
-  - normalized hex
-  - RGB
-  - value classification
-  - hue family
-  - saturation classification
-- Generates deterministic 1-paint, 2-paint, and 3-paint candidate mixes from the enabled inventory only.
-- Scores recipes with a painter-friendly heuristic model that balances:
-  - base color distance
-  - value difference
-  - hue difference
-  - saturation difference
-  - complexity
-  - black-only / white-only shortcut penalties
-  - earth-tone bonuses for muted targets
-- Shows recipe badges, quality labels, guidance text, and a “Why this ranked” breakdown.
-- Stores paints, settings, recent target colors, and saved recipes in `localStorage` only.
+The app now optimizes for:
+
+1. **Believable pigment-style mixture prediction**.
+2. **Painter-usable recipe suggestions**.
+3. **Coherent target analysis, ranking, and guidance**.
+4. **Maintainable architecture with a dedicated spectral adapter layer**.
+
+This is still **not a scientific guarantee**. The seed paints are **approximations**, not lab-measured spectral scans of your exact tubes. The goal is a **physically informed painter’s assistant**, not a claims-heavy color science product.
 
 ## Product boundaries
 
-This app intentionally remains simple and local:
+The app intentionally remains:
 
-- No backend
-- No authentication
-- No server logic
-- No cloud sync
-- No AI/LLM features
-- No required external API for core functionality
-- No true spectral or laboratory-grade pigment simulation in this pass
+- local-only
+- deterministic
+- browser-based
+- backend-free
+- auth-free
+- cloud-sync-free
+- external-API-free for core functionality
 
-## Setup
+All inventory, settings, recent targets, and saved recipes stay in **`localStorage` only**.
 
-```bash
-npm install
-npm run dev
-```
+## Default on-hand palette
 
-Open the local Vite URL shown in your terminal.
-
-## Testing
-
-```bash
-npm test
-```
-
-## Build
-
-```bash
-npm run build
-```
-
-## Painter-friendly deterministic engine
-
-Paint Mix Matcher does **not** attempt Kubelka-Munk, spectral reflectance, or true subtractive pigment physics.
-
-Instead, it uses a deterministic heuristic workflow:
-
-1. Parse the target and enabled paint colors from hex to sRGB.
-2. Convert them to linear RGB for blending.
-3. Generate discrete candidate recipes using the enabled paint inventory only.
-4. Predict each candidate mix with a weighted linear RGB average.
-5. Analyze both target and candidate for:
-   - value
-   - hue proxy / hue family
-   - saturation / chroma
-6. Build a structured score breakdown for every candidate.
-7. Rank recipes using the selected ranking mode.
-8. Suppress redundant results, preferring simpler recipes when the predicted colors are nearly the same.
-
-The result is a **deterministic ballpark mixing assistant** that aims to be more useful to painters than pure linear-RGB distance alone.
-
-## Ranking modes
-
-### 1. Painter-Friendly Balanced (default)
-
-Best general-purpose mode.
-
-- Balances color distance with value, hue, and saturation differences.
-- Adds painter heuristics such as hue-family consistency, black-dominance control, and chromatic path rewards.
-- Slightly favors practical mixtures and natural neutral handling.
-
-### 2. Strict Closest Color
-
-This is the plain numeric mode.
-
-- Uses the raw base color distance as the ranking driver.
-- Useful when you want the mathematically closest digital match.
-- Does not apply painter heuristics.
-
-### 3. Simpler Recipes Preferred
-
-Useful when you want easier palette execution.
-
-- Still considers value, hue, and saturation.
-- Applies a stronger complexity penalty.
-- Helps bubble up mixtures that are easier to mix and repeat.
-
-## Score breakdown
-
-Each ranked recipe carries a deterministic score model with:
-
-- `baseDistance`
-- `valueDifference`
-- `hueDifference`
-- `saturationDifference`
-- `complexityPenalty`
-- `blackPenalty`
-- `whitePenalty`
-- `singlePaintPenalty`
-- `earthToneBonus`
-- `hueFamilyPenalty`
-- `blackDominancePenalty`
-- `chromaticPathBonus`
-- `finalScore`
-
-Lower final score is better.
-
-### How to interpret the score in practice
-
-- **Excellent starting point**: already very close; begin here and fine-tune by eye.
-- **Strong starting point**: solid route with manageable visual adjustment.
-- **Usable starting point**: directionally helpful but may need meaningful tweaking.
-- **Rough direction only**: useful for planning, not likely the final mix.
-
-## Seed palette
-
-The default starter palette is tuned to the current intended inventory:
+The default seed palette remains limited to the actual on-hand set:
 
 - Mars Black
 - Cadmium Yellow Medium
@@ -146,27 +43,237 @@ The default starter palette is tuned to the current intended inventory:
 - Unbleached Titanium
 - Titanium White
 
-Each seed paint can carry heuristic metadata such as tint strength, natural bias, common use, and dominance penalty to support painter-friendly ranking and deterministic guidance.
+The branch deliberately does **not** add a giant catalog. The engine is tuned around this real palette first.
+
+## Spectral integration
+
+### Internal architecture
+
+The refactor introduces a dedicated adapter layer:
+
+- `src/lib/vendor/spectral.ts`
+  - local vendored Spectral.js-derived Kubelka-Munk core
+  - `SpectralColor`
+  - spectral mixing and OKLab distance helpers
+- `src/lib/color/spectralMixing.ts`
+  - the app-facing adapter
+  - converts paint definitions into spectral inputs
+  - applies tinting-strength metadata
+  - accepts weighted recipes
+  - returns deterministic predicted hex, RGB, OKLab, and OKLCh output
+
+The rest of the app calls the adapter, **not Spectral internals directly**.
+
+### Why vendor the core locally?
+
+This app must remain fully local-only and deterministic. Keeping the spectral engine code in-repo makes the mixing model:
+
+- available offline
+- version-stable for this branch
+- testable in the same codebase
+- insulated from registry/network issues
+
+## How the engine works now
+
+1. Parse the target color.
+2. Analyze the target in a perceptual, painter-friendly way using spectral-derived OKLab / OKLCh data.
+3. Generate deterministic 1-paint, 2-paint, and 3-paint candidate recipes from the enabled palette.
+4. Prune obviously implausible candidates using paint heuristics such as:
+   - tint strength
+   - dominance penalty
+   - recommended maximum share
+   - preferred role
+5. Predict every candidate using the spectral adapter.
+6. Score recipes according to the selected ranking mode.
+7. Build deterministic badges, explanations, and practical mixing guidance.
+8. Simplify internal ratios into physically mixable display ratios.
+
+## Paint model and heuristics
+
+Each seed paint can now carry lightweight heuristic metadata such as:
+
+- `tintStrength`
+- `naturalBias`
+- `commonUse`
+- `dominancePenalty`
+- `darkeningStrength`
+- `mutingStrength`
+- `chromaRetention`
+- `recommendedMaxShare`
+- `preferredRole`
+- `spectral.tintingStrength`
+
+These fields support:
+
+- candidate pruning
+- painter-friendly ranking
+- support-paint penalties
+- chromatic build bonuses
+- guidance text
+- deterministic mix strategy output
+
+## Ranking modes
+
+### 1. Painter-Friendly Balanced
+
+Default mode.
+
+Priorities:
+
+1. spectral plausibility
+2. hue-family correctness
+3. believable painterly construction path
+4. value fit
+5. saturation / chroma fit
+6. usability / simplicity
+
+### 2. Strict Closest Color
+
+This mode stays deterministic and comparatively literal.
+
+- minimizes the raw spectral color difference
+- applies minimal painter heuristics
+- useful when you want the closest numeric spectral result first
+
+### 3. Simpler Recipes Preferred
+
+This mode still uses the spectral engine, but leans harder toward recipe usability.
+
+- stronger complexity pressure
+- still respects hue-family plausibility
+- useful when you want practical palette setup speed
+
+## Score breakdown
+
+Each ranked recipe exposes a deterministic score breakdown with fields such as:
+
+- `spectralDistance`
+- `valueDifference`
+- `hueDifference`
+- `saturationDifference`
+- `chromaDifference`
+- `complexityPenalty`
+- `hueFamilyPenalty`
+- `constructionPenalty`
+- `supportPenalty`
+- `dominancePenalty`
+- `neutralizerPenalty`
+- `blackPenalty`
+- `whitePenalty`
+- `singlePaintPenalty`
+- `naturalMixBonus`
+- `chromaticPathBonus`
+- `vividTargetPenalty`
+- `finalScore`
+
+Lower final score is better.
+
+## Practical ratios
+
+The engine keeps exact percentages internally, but recipe cards prefer readable, physical mixing ratios.
+
+Examples:
+
+- an exact internal split may simplify to `17:3`
+- the practical displayed ratio may become `6:1`
+
+This helps recipes stay:
+
+- easier to mix by hand
+- easier to remember
+- easier to repeat
+- less cluttered for 3-color suggestions
+
+## Target analysis and guidance
+
+The app still provides target analysis, but it is now tuned around the spectral engine:
+
+- value classification
+- hue family
+- saturation classification
+- palette-aware guidance
+
+Examples of the intended behavior:
+
+- vivid greens are encouraged to start with yellow + blue first
+- olive greens are encouraged to build hue first, then mute or darken with support paint
+- muted neutrals are steered toward earth colors when appropriate
+- black-heavy shortcuts are penalized when they erase the intended hue family
+
+## UI / UX preserved in the refactor
+
+This branch keeps the current UX shell intact:
+
+- explicit **Generate Recipes** button
+- no auto-generation while typing
+- loading state
+- stale-results warning
+- saved recipes
+- paint inventory management
+- local persistence
+
+The recipe cards were updated to better surface spectral-era information such as:
+
+- target vs predicted swatches
+- hue-family comparison
+- value/chroma fit
+- practical ratio output
+- mix guidance and palette strategy
+- richer score breakdown labels
+
+## Setup
+
+```bash
+npm install
+npm run dev
+```
+
+## Testing
+
+```bash
+npm test
+```
+
+The test suite covers:
+
+- spectral adapter determinism and sanity
+- engine ranking behavior
+- practical ratio determinism
+- generate-on-click / stale-results / loading state logic
+- recipe card rendering
+- storage sanitization and old-data safety
+
+## Build
+
+```bash
+npm run build
+```
 
 ## Suggested workflow
 
-1. Review the starter inventory and disable any tubes you do not actually have on hand.
-2. Enter the target color.
-3. Read the target analysis first so you understand the value, hue family, and saturation direction.
-4. Compare the top recipes by score, badges, and “Why this ranked”.
-5. Use the mix strategy panel to decide what paint to start with and which additions should be made cautiously.
-6. Mix physically and adjust by eye.
+1. Verify the enabled paints match what you physically have on hand.
+2. Enter or pick the target color.
+3. Read the target analysis before mixing.
+4. Generate recipes.
+5. Start with the top result’s practical ratio.
+6. Follow the strategy notes: establish hue first when needed, then correct value and chroma.
+7. Save any recipe that becomes a reliable physical starting point.
 
 ## Important expectations
 
-Paint Mix Matcher is meant to help with:
+This app is designed to help with:
 
 - palette planning
-- mise en place
-- practical first-pass recipes
-- understanding value / hue / chroma tradeoffs
+- believable starting mixes
+- hue/value/chroma tradeoff awareness
+- practical ratio setup
+- painterly decision-making
 
-It is **not** meant to guarantee a perfect wet-paint match from screen color alone.
+It does **not** promise:
+
+- exact wet-paint matches from screen color alone
+- manufacturer-grade spectral profiling
+- lab-grade color matching certainty
 
 ## Project structure
 
@@ -182,12 +289,13 @@ src/
     color/
     storage/
     utils/
+    vendor/
   test/
   types/
 ```
 
 ## Notes
 
-- All persistence is local to the current browser/profile because storage uses `localStorage`.
-- For the same inventory, target, and settings, the engine produces the same ranked output every time.
-- The architecture keeps analysis and scoring logic in pure functions so the engine stays fast, readable, and testable.
+- For the same enabled palette, target, and settings, the engine produces the same results every time.
+- The spectral core is wrapped so paint modeling, scoring, and UI logic remain maintainable.
+- Seed paint definitions can continue to be iterated over time as better real-world tuning is discovered.
