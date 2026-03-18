@@ -1,12 +1,26 @@
-import type { LinearRgbColor, Paint, RankedRecipe, RecipeComponent } from '../../types/models';
-import { colorDistance, hexToRgb, linearRgbToSrgbRgb, rgbToHex, srgbRgbToLinearRgb } from './colorMath';
+import type {
+  ColorAnalysis,
+  LinearRgbColor,
+  Paint,
+  RankedRecipe,
+  RecipeComponent,
+  RecipeScoreBreakdown,
+  UserSettings,
+} from '../../types/models';
 import { simplifyRatio } from '../utils/ratio';
+import { analyzeColor, hueDifference } from './colorAnalysis';
+import { colorDistance, hexToRgb, linearRgbToSrgbRgb, rgbToHex, srgbRgbToLinearRgb } from './colorMath';
+import { assignRecipeBadges, buildMixStrategy, buildRecipeGuidance, buildRecipeWhyThisRanked, determineRecipeQuality } from './guidance';
 
 export type WeightCombination = number[];
 
 export type CandidateMix = {
   paintIds: string[];
   weights: number[];
+};
+
+type RankedRecipeCandidate = RankedRecipe & {
+  predictedLinear: LinearRgbColor;
 };
 
 const mixLinearColors = (colors: LinearRgbColor[], weights: number[]): LinearRgbColor => {
@@ -23,7 +37,6 @@ const mixLinearColors = (colors: LinearRgbColor[], weights: number[]): LinearRgb
 };
 
 export const generateWeightCombinations = (count: number, step: number): WeightCombination[] => {
-  // Generate integer partitions of 100% so the engine stays deterministic and easy to reason about.
   const totalUnits = Math.round(100 / step);
   const combinations: WeightCombination[] = [];
 
@@ -89,23 +102,227 @@ const buildRecipeText = (paintNames: string[], parts: number[]): string =>
   paintNames.map((name, index) => `${parts[index]} part${parts[index] === 1 ? '' : 's'} ${name}`).join(' + ');
 
 const recipeSignature = (components: RecipeComponent[]): string =>
-  components.map((component) => `${component.paintId}:${component.percentage}`).join('|');
+  [...components]
+    .sort((left, right) => left.paintId.localeCompare(right.paintId))
+    .map((component) => `${component.paintId}:${component.percentage}`)
+    .join('|');
 
-const sharesEnoughComponentOverlap = (left: RecipeComponent[], right: RecipeComponent[]): boolean => {
+const componentOverlap = (left: RecipeComponent[], right: RecipeComponent[]): number => {
   const leftIds = new Set(left.map((component) => component.paintId));
-  const overlap = right.filter((component) => leftIds.has(component.paintId)).length;
-  return overlap === Math.min(left.length, right.length);
+  return right.filter((component) => leftIds.has(component.paintId)).length;
+};
+
+const buildComponents = (paintIds: string[], weights: number[]): RecipeComponent[] =>
+  paintIds
+    .map((paintId, index) => ({
+      paintId,
+      weight: weights[index],
+      percentage: weights[index],
+    }))
+    .sort((left, right) => right.percentage - left.percentage || left.paintId.localeCompare(right.paintId));
+
+const getComplexityPenalty = (settings: UserSettings, paints: Paint[], components: RecipeComponent[]): number => {
+  if (settings.rankingMode === 'strict-closest-color') {
+    return 0;
+  }
+
+  const recipeComplexity = components.length - 1;
+  const dominancePenalty = components.reduce((sum, component) => {
+    const paint = paints.find((item) => item.id === component.paintId);
+    return sum + (paint?.heuristics?.dominancePenalty ?? 0) * (component.percentage / 100);
+  }, 0);
+  const modeWeight = settings.rankingMode === 'simpler-recipes-preferred' ? 0.07 : 0.022;
+
+  return recipeComplexity * modeWeight + dominancePenalty * 0.015;
+};
+
+const getBlackPenalty = (
+  settings: UserSettings,
+  paints: Paint[],
+  components: RecipeComponent[],
+  targetAnalysis: ColorAnalysis,
+): number => {
+  if (!settings.singlePaintPenaltySettings.discourageBlackOnlyMatches || components.length !== 1) {
+    return 0;
+  }
+
+  const paint = paints.find((item) => item.id === components[0]?.paintId);
+  if (!paint?.isBlack) {
+    return 0;
+  }
+
+  const hueWeight = targetAnalysis.hueFamily === 'neutral' ? 0.02 : 0.11;
+  const saturationWeight = targetAnalysis.saturationClassification === 'neutral' ? 0.02 : 0.05;
+  return hueWeight + saturationWeight;
+};
+
+const getWhitePenalty = (
+  settings: UserSettings,
+  paints: Paint[],
+  components: RecipeComponent[],
+  targetAnalysis: ColorAnalysis,
+): number => {
+  if (!settings.singlePaintPenaltySettings.discourageWhiteOnlyMatches || components.length !== 1) {
+    return 0;
+  }
+
+  const paint = paints.find((item) => item.id === components[0]?.paintId);
+  if (!paint?.isWhite) {
+    return 0;
+  }
+
+  if (targetAnalysis.valueClassification === 'very light' && targetAnalysis.saturationClassification === 'neutral') {
+    return 0.01;
+  }
+
+  return targetAnalysis.valueClassification === 'very light' ? 0.06 : 0.14;
+};
+
+const getSinglePaintPenalty = (
+  settings: UserSettings,
+  paints: Paint[],
+  components: RecipeComponent[],
+  targetAnalysis: ColorAnalysis,
+  predictedAnalysis: ColorAnalysis,
+): number => {
+  if (!settings.singlePaintPenaltySettings.favorMultiPaintMixesWhenClose || components.length !== 1) {
+    return 0;
+  }
+
+  const paint = paints.find((item) => item.id === components[0]?.paintId);
+  if (!paint || paint.isBlack || paint.isWhite) {
+    return 0;
+  }
+
+  const mutedMismatch = targetAnalysis.saturationClassification !== predictedAnalysis.saturationClassification ? 0.03 : 0;
+  const neutralPreference = targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'neutral' ? 0.02 : 0;
+  return mutedMismatch + neutralPreference;
+};
+
+const getEarthToneBonus = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): number => {
+  const hasEarthPaint = components.some((component) => paints.find((paint) => paint.id === component.paintId)?.heuristics?.naturalBias === 'earth');
+  if (!hasEarthPaint) {
+    return 0;
+  }
+
+  if (targetAnalysis.saturationClassification === 'neutral') {
+    return 0.05;
+  }
+
+  if (targetAnalysis.saturationClassification === 'muted') {
+    return 0.035;
+  }
+
+  return 0;
+};
+
+export const scoreRecipe = (
+  settings: UserSettings,
+  paints: Paint[],
+  targetAnalysis: ColorAnalysis,
+  targetLinear: LinearRgbColor,
+  predictedAnalysis: ColorAnalysis,
+  predictedLinear: LinearRgbColor,
+  components: RecipeComponent[],
+): RecipeScoreBreakdown => {
+  const baseDistance = colorDistance(targetLinear, predictedLinear);
+  const valueDifference = Math.abs(targetAnalysis.value - predictedAnalysis.value);
+  const hueDelta = hueDifference(targetAnalysis.hue, predictedAnalysis.hue);
+  const saturationDifference = Math.abs(targetAnalysis.saturation - predictedAnalysis.saturation);
+
+  if (settings.rankingMode === 'strict-closest-color') {
+    return {
+      mode: settings.rankingMode,
+      baseDistance,
+      valueDifference,
+      hueDifference: hueDelta,
+      saturationDifference,
+      complexityPenalty: 0,
+      blackPenalty: 0,
+      whitePenalty: 0,
+      singlePaintPenalty: 0,
+      earthToneBonus: 0,
+      finalScore: baseDistance,
+    };
+  }
+
+  const complexityPenalty = getComplexityPenalty(settings, paints, components);
+  const blackPenalty = getBlackPenalty(settings, paints, components, targetAnalysis);
+  const whitePenalty = getWhitePenalty(settings, paints, components, targetAnalysis);
+  const singlePaintPenalty = getSinglePaintPenalty(settings, paints, components, targetAnalysis, predictedAnalysis);
+  const earthToneBonus = getEarthToneBonus(paints, components, targetAnalysis);
+  const modeMultiplier = settings.rankingMode === 'simpler-recipes-preferred' ? 1.6 : 1;
+
+  const finalScore =
+    baseDistance * 0.62 +
+    valueDifference * 0.22 +
+    hueDelta * 0.12 +
+    saturationDifference * 0.08 +
+    complexityPenalty * modeMultiplier +
+    blackPenalty +
+    whitePenalty +
+    singlePaintPenalty -
+    earthToneBonus;
+
+  return {
+    mode: settings.rankingMode,
+    baseDistance,
+    valueDifference,
+    hueDifference: hueDelta,
+    saturationDifference,
+    complexityPenalty,
+    blackPenalty,
+    whitePenalty,
+    singlePaintPenalty,
+    earthToneBonus,
+    finalScore,
+  };
+};
+
+const shouldReplaceDuplicate = (existing: RankedRecipeCandidate, candidate: RankedRecipeCandidate): boolean => {
+  const existingOverlap = componentOverlap(existing.components, candidate.components);
+  const nearColor = colorDistance(existing.predictedLinear, candidate.predictedLinear) < 0.03;
+  const overlappingSets = existingOverlap >= Math.min(existing.components.length, candidate.components.length) - 1;
+
+  if (!nearColor || !overlappingSets) {
+    return false;
+  }
+
+  if (candidate.components.length < existing.components.length && candidate.scoreBreakdown.finalScore <= existing.scoreBreakdown.finalScore + 0.03) {
+    return true;
+  }
+
+  return candidate.scoreBreakdown.finalScore < existing.scoreBreakdown.finalScore;
+};
+
+const dedupeRankedRecipes = (recipes: RankedRecipeCandidate[], limit: number): RankedRecipe[] => {
+  const diverse: RankedRecipeCandidate[] = [];
+
+  recipes.forEach((recipe) => {
+    const duplicateIndex = diverse.findIndex((existing) => shouldReplaceDuplicate(existing, recipe) || shouldReplaceDuplicate(recipe, existing));
+
+    if (duplicateIndex === -1) {
+      diverse.push(recipe);
+      return;
+    }
+
+    if (shouldReplaceDuplicate(diverse[duplicateIndex], recipe)) {
+      diverse[duplicateIndex] = recipe;
+    }
+  });
+
+  return diverse.slice(0, limit).map(({ predictedLinear: _predictedLinear, ...recipe }) => recipe);
 };
 
 export const rankRecipes = (
   targetHex: string,
   paints: Paint[],
-  maxPaintsPerRecipe: number,
-  step: number,
-  limit = 3,
+  settings: UserSettings,
+  limit = 4,
 ): RankedRecipe[] => {
   const targetRgb = hexToRgb(targetHex);
-  if (!targetRgb) {
+  const targetAnalysis = analyzeColor(targetHex);
+  if (!targetRgb || !targetAnalysis) {
     return [];
   }
 
@@ -116,8 +333,9 @@ export const rankRecipes = (
       return [paint.id, rgb ? srgbRgbToLinearRgb(rgb) : null] as const;
     }),
   );
+  const paintNameMap = new Map(paints.map((paint) => [paint.id, paint.name]));
 
-  const ranked = generateCandidateMixes(paints, maxPaintsPerRecipe, step)
+  const ranked = generateCandidateMixes(paints, settings.maxPaintsPerRecipe, settings.weightStep)
     .map((candidate) => {
       const colors = candidate.paintIds.map((paintId) => paintMap.get(paintId));
       if (colors.some((color) => !color)) {
@@ -126,50 +344,59 @@ export const rankRecipes = (
 
       const mixedLinear = mixLinearColors(colors as LinearRgbColor[], candidate.weights);
       const predictedHex = rgbToHex(linearRgbToSrgbRgb(mixedLinear));
-      const distanceScore = colorDistance(targetLinear, mixedLinear);
-      const ratio = simplifyRatio(candidate.weights);
-      const components = candidate.paintIds.map((paintId, index) => ({
-        paintId,
-        weight: candidate.weights[index],
-        percentage: candidate.weights[index],
-      }));
-      const paintNames = candidate.paintIds.map((paintId) => paints.find((paint) => paint.id === paintId)?.name ?? paintId);
-
-      return {
-        predictedHex,
-        distanceScore,
-        components,
-        parts: ratio,
-        ratioText: ratio.join(':'),
-        recipeText: buildRecipeText(paintNames, ratio),
-      } satisfies RankedRecipe;
-    })
-    .filter((candidate): candidate is RankedRecipe => candidate !== null)
-    .sort((left, right) => {
-      if (left.distanceScore !== right.distanceScore) {
-        return left.distanceScore - right.distanceScore;
+      const predictedAnalysis = analyzeColor(predictedHex);
+      if (!predictedAnalysis) {
+        return null;
       }
 
+      const components = buildComponents(candidate.paintIds, candidate.weights);
+      const scoreBreakdown = scoreRecipe(
+        settings,
+        paints,
+        targetAnalysis,
+        targetLinear,
+        predictedAnalysis,
+        mixedLinear,
+        components,
+      );
+      const orderedPaintNames = components.map((component) => paintNameMap.get(component.paintId) ?? component.paintId);
+      const orderedWeights = components.map((component) => component.weight);
+      const parts = simplifyRatio(orderedWeights);
+
+      const recipe = {
+        predictedHex,
+        distanceScore: scoreBreakdown.finalScore,
+        components,
+        parts,
+        ratioText: parts.join(':'),
+        recipeText: buildRecipeText(orderedPaintNames, parts),
+        scoreBreakdown,
+        qualityLabel: determineRecipeQuality(scoreBreakdown.finalScore),
+        badges: [],
+        guidanceText: [],
+        targetAnalysis,
+        predictedAnalysis,
+        whyThisRanked: [],
+        mixStrategy: [],
+        predictedLinear: mixedLinear,
+      } satisfies RankedRecipeCandidate;
+
+      recipe.guidanceText = buildRecipeGuidance(scoreBreakdown, targetAnalysis, predictedAnalysis, paints, components.map((component) => component.paintId));
+      recipe.whyThisRanked = buildRecipeWhyThisRanked(scoreBreakdown, targetAnalysis, predictedAnalysis, paints, components.map((component) => component.paintId));
+      recipe.mixStrategy = buildMixStrategy(paints, recipe.components, targetAnalysis);
+
+      return recipe;
+    })
+    .filter((candidate): candidate is RankedRecipeCandidate => candidate !== null)
+    .sort((left, right) => {
+      if (left.scoreBreakdown.finalScore !== right.scoreBreakdown.finalScore) {
+        return left.scoreBreakdown.finalScore - right.scoreBreakdown.finalScore;
+      }
+      if (left.scoreBreakdown.baseDistance !== right.scoreBreakdown.baseDistance) {
+        return left.scoreBreakdown.baseDistance - right.scoreBreakdown.baseDistance;
+      }
       return recipeSignature(left.components).localeCompare(recipeSignature(right.components));
     });
 
-  const diverse: RankedRecipe[] = [];
-  // Keep the strongest results, but skip recipes that land on the same predicted color using nearly identical paint sets.
-  for (const recipe of ranked) {
-    const nearDuplicate = diverse.some(
-      (existing) =>
-        existing.predictedHex === recipe.predictedHex &&
-        sharesEnoughComponentOverlap(existing.components, recipe.components),
-    );
-
-    if (!nearDuplicate) {
-      diverse.push(recipe);
-    }
-
-    if (diverse.length === limit) {
-      break;
-    }
-  }
-
-  return diverse;
+  return assignRecipeBadges(dedupeRankedRecipes(ranked, limit));
 };

@@ -1,8 +1,21 @@
-import { defaultSettings, starterPaints } from './seedData';
-import type { AppState, MixRecipe, Paint, RecentColor, UserSettings } from '../../types/models';
+import type {
+  AppState,
+  MixRecipe,
+  Paint,
+  PaintHeuristics,
+  RankingMode,
+  RecentColor,
+  UserSettings,
+} from '../../types/models';
 import { normalizeHex } from '../color/colorMath';
+import { defaultSettings, starterPaints } from './seedData';
 
 const STORAGE_KEY = 'paint-mix-matcher-state';
+const rankingModes: RankingMode[] = [
+  'strict-closest-color',
+  'painter-friendly-balanced',
+  'simpler-recipes-preferred',
+];
 
 const isPaint = (value: unknown): value is Paint => {
   if (!value || typeof value !== 'object') {
@@ -36,12 +49,26 @@ const isRecentColor = (value: unknown): value is RecentColor => {
   return typeof candidate.hex === 'string' && typeof candidate.usedAt === 'string';
 };
 
+const sanitizeHeuristics = (heuristics: PaintHeuristics | undefined): PaintHeuristics | undefined => {
+  if (!heuristics) {
+    return undefined;
+  }
+
+  return {
+    tintStrength: heuristics.tintStrength,
+    naturalBias: heuristics.naturalBias,
+    commonUse: Array.isArray(heuristics.commonUse) ? heuristics.commonUse : undefined,
+    dominancePenalty: typeof heuristics.dominancePenalty === 'number' ? heuristics.dominancePenalty : undefined,
+  };
+};
+
 const sanitizePaint = (paint: Paint): Paint => ({
   ...paint,
   hex: normalizeHex(paint.hex) ?? '#000000',
+  heuristics: sanitizeHeuristics(paint.heuristics),
 });
 
-const sanitizeSettings = (settings: Partial<UserSettings> | undefined): UserSettings => ({
+export const sanitizeSettings = (settings: Partial<UserSettings> | undefined): UserSettings => ({
   weightStep: settings?.weightStep === 5 ? 5 : 10,
   maxPaintsPerRecipe:
     settings?.maxPaintsPerRecipe === 1 || settings?.maxPaintsPerRecipe === 2 || settings?.maxPaintsPerRecipe === 3
@@ -49,6 +76,20 @@ const sanitizeSettings = (settings: Partial<UserSettings> | undefined): UserSett
       : defaultSettings.maxPaintsPerRecipe,
   showPercentages: settings?.showPercentages ?? defaultSettings.showPercentages,
   showPartsRatios: settings?.showPartsRatios ?? defaultSettings.showPartsRatios,
+  rankingMode: rankingModes.includes(settings?.rankingMode as RankingMode)
+    ? (settings?.rankingMode as RankingMode)
+    : defaultSettings.rankingMode,
+  singlePaintPenaltySettings: {
+    discourageBlackOnlyMatches:
+      settings?.singlePaintPenaltySettings?.discourageBlackOnlyMatches ??
+      defaultSettings.singlePaintPenaltySettings.discourageBlackOnlyMatches,
+    discourageWhiteOnlyMatches:
+      settings?.singlePaintPenaltySettings?.discourageWhiteOnlyMatches ??
+      defaultSettings.singlePaintPenaltySettings.discourageWhiteOnlyMatches,
+    favorMultiPaintMixesWhenClose:
+      settings?.singlePaintPenaltySettings?.favorMultiPaintMixesWhenClose ??
+      defaultSettings.singlePaintPenaltySettings.favorMultiPaintMixesWhenClose,
+  },
 });
 
 export const getInitialState = (): AppState => ({
