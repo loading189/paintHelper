@@ -53,4 +53,17 @@ describe('colorAnalysis', () => {
       'Your palette has earth colors available, so a natural neutral is often easier than brute-force complement mixing.',
     ]);
   });
+
+  it('keeps dark-green support advice off mid greens and adds vivid-green construction guidance', () => {
+    const midGreen = analyzeColor('#66BA5C');
+    const vividGreen = analyzeColor('#18E254');
+    expect(midGreen && vividGreen).toBeTruthy();
+
+    expect(generateTargetPaletteInsights(midGreen!, starterPaints)).not.toContain(
+      'A dark green mix will likely need umber, black, or both for support.',
+    );
+    expect(generateTargetPaletteInsights(vividGreen!, starterPaints)).toContain(
+      'Build vivid green from yellow + blue first, then mute or darken only after the green is established.',
+    );
+  });
 });

@@ -221,17 +221,11 @@ const hasRequiredHueConstructionPath = (paints: Paint[], components: RecipeCompo
 };
 
 const staysInBroadHueFamily = (
-  paints: Paint[],
-  components: RecipeComponent[],
   targetAnalysis: ColorAnalysis,
   predictedAnalysis: ColorAnalysis,
 ): boolean => {
   const band = classifyHueFamilyBand(targetAnalysis, predictedAnalysis);
-  if (band === 'same' || band === 'adjacent') {
-    return true;
-  }
-
-  return hasRequiredHueConstructionPath(paints, components, targetAnalysis);
+  return band === 'same' || band === 'adjacent';
 };
 
 const getComplexityPenalty = (settings: UserSettings, paints: Paint[], components: RecipeComponent[]): number => {
@@ -340,20 +334,20 @@ const getHueFamilyPenalty = (
     return 0;
   }
 
-  if (staysInBroadHueFamily(paints, components, targetAnalysis, predictedAnalysis)) {
+  if (staysInBroadHueFamily(targetAnalysis, predictedAnalysis)) {
     return 0;
   }
 
   const hueBand = classifyHueFamilyBand(targetAnalysis, predictedAnalysis);
   if (hueBand === 'adjacent') {
-    return 0.05;
+    return 0.08;
   }
 
   if (hueBand === 'neutralized') {
-    return 0.32;
+    return 0.38;
   }
 
-  return 0.28;
+  return 0.32;
 };
 
 const getRequiredHueConstructionPenalty = (
@@ -372,10 +366,10 @@ const getRequiredHueConstructionPenalty = (
   }
 
   if (targetAnalysis.hueFamily === 'green') {
-    return 0.3;
+    return 0.24;
   }
 
-  return 0.2;
+  return 0.16;
 };
 
 const getPainterFamilyConstructionBonus = (
@@ -394,10 +388,10 @@ const getPainterFamilyConstructionBonus = (
   }
 
   if (targetAnalysis.hueFamily === 'green') {
-    return 0.12;
+    return 0.04;
   }
 
-  return 0.08;
+  return 0.03;
 };
 
 const getBlackDominancePenalty = (
@@ -420,7 +414,7 @@ const getBlackDominancePenalty = (
     return 0;
   }
 
-  const preservesHueFamily = staysInBroadHueFamily(paints, components, targetAnalysis, predictedAnalysis);
+  const preservesHueFamily = staysInBroadHueFamily(targetAnalysis, predictedAnalysis);
   const hasConstructionPath = hasRequiredHueConstructionPath(paints, components, targetAnalysis);
   const qualifiesForException = preservesHueFamily && hasConstructionPath;
 
@@ -454,15 +448,44 @@ const getChromaticPathBonus = (
 
   if (targetAnalysis.hueFamily === 'green') {
     return targetAnalysis.valueClassification === 'dark' || targetAnalysis.valueClassification === 'very dark'
-      ? 0.06 + (hasEarthSupport || hasBlackSupport ? 0.02 : 0)
-      : 0.05;
+      ? 0.03 + (hasEarthSupport || hasBlackSupport ? 0.01 : 0)
+      : 0.025;
   }
 
   if (targetAnalysis.hueFamily === 'orange' || targetAnalysis.hueFamily === 'violet') {
-    return 0.04;
+    return 0.02;
   }
 
   return 0;
+};
+
+const getVividTargetSanityPenalty = (
+  settings: UserSettings,
+  targetAnalysis: ColorAnalysis,
+  predictedAnalysis: ColorAnalysis,
+): number => {
+  if (
+    !isPainterMode(settings) ||
+    !isChromaticTarget(targetAnalysis) ||
+    targetAnalysis.saturationClassification !== 'vivid'
+  ) {
+    return 0;
+  }
+
+  const hueBand = classifyHueFamilyBand(targetAnalysis, predictedAnalysis);
+  if (hueBand === 'same') {
+    return 0;
+  }
+
+  if (hueBand === 'adjacent') {
+    return 0.14;
+  }
+
+  if (hueBand === 'neutralized') {
+    return 0.42;
+  }
+
+  return 0.34;
 };
 
 export const scoreRecipe = (
@@ -496,8 +519,9 @@ export const scoreRecipe = (
       painterFamilyConstructionBonus: 0,
       blackDominancePenalty: 0,
       chromaticPathBonus: 0,
+      vividTargetSanityPenalty: 0,
       hasRequiredHueConstructionPath: hasRequiredHueConstructionPath(paints, components, targetAnalysis),
-      staysInTargetHueFamily: staysInBroadHueFamily(paints, components, targetAnalysis, predictedAnalysis),
+      staysInTargetHueFamily: staysInBroadHueFamily(targetAnalysis, predictedAnalysis),
       finalScore: baseDistance,
     };
   }
@@ -512,15 +536,16 @@ export const scoreRecipe = (
   const painterFamilyConstructionBonus = getPainterFamilyConstructionBonus(settings, paints, components, targetAnalysis);
   const blackDominancePenalty = getBlackDominancePenalty(settings, paints, components, targetAnalysis, predictedAnalysis);
   const chromaticPathBonus = getChromaticPathBonus(settings, paints, components, targetAnalysis);
+  const vividTargetSanityPenalty = getVividTargetSanityPenalty(settings, targetAnalysis, predictedAnalysis);
   const modeMultiplier = settings.rankingMode === 'simpler-recipes-preferred' ? 1.6 : 1;
-  const staysInTargetHueFamily = staysInBroadHueFamily(paints, components, targetAnalysis, predictedAnalysis);
+  const staysInTargetHueFamily = staysInBroadHueFamily(targetAnalysis, predictedAnalysis);
   const hasConstructionPath = hasRequiredHueConstructionPath(paints, components, targetAnalysis);
 
   const finalScore =
-    baseDistance * 0.18 +
-    valueDifference * 0.22 +
-    hueDelta * 0.14 +
-    saturationDifference * 0.1 +
+    baseDistance * 0.33 +
+    valueDifference * 0.2 +
+    hueDelta * 0.24 +
+    saturationDifference * 0.16 +
     complexityPenalty * modeMultiplier +
     blackPenalty +
     whitePenalty +
@@ -530,7 +555,8 @@ export const scoreRecipe = (
     blackDominancePenalty -
     earthToneBonus -
     painterFamilyConstructionBonus -
-    chromaticPathBonus;
+    chromaticPathBonus +
+    vividTargetSanityPenalty;
 
   return {
     mode: settings.rankingMode,
@@ -548,6 +574,7 @@ export const scoreRecipe = (
     painterFamilyConstructionBonus,
     blackDominancePenalty,
     chromaticPathBonus,
+    vividTargetSanityPenalty,
     hasRequiredHueConstructionPath: hasConstructionPath,
     staysInTargetHueFamily,
     finalScore,

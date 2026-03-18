@@ -181,8 +181,12 @@ export const generateTargetPaletteInsights = (target: ColorAnalysis, paints: Pai
     insights.push('This target is darker than most chromatic paints in your palette.');
   }
 
-  if (target.hueFamily === 'green' && target.valueClassification !== 'light' && target.valueClassification !== 'very light') {
+  if (target.hueFamily === 'green' && (target.valueClassification === 'dark' || target.valueClassification === 'very dark')) {
     insights.push('A dark green mix will likely need umber, black, or both for support.');
+  }
+
+  if (target.hueFamily === 'green' && target.saturationClassification === 'vivid') {
+    insights.push('Build vivid green from yellow + blue first, then mute or darken only after the green is established.');
   }
 
   if (target.saturationClassification === 'muted' || target.saturationClassification === 'neutral') {

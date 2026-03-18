@@ -69,6 +69,7 @@ export type RecipeScoreBreakdown = {
   painterFamilyConstructionBonus: number;
   blackDominancePenalty: number;
   chromaticPathBonus: number;
+  vividTargetSanityPenalty: number;
   hasRequiredHueConstructionPath: boolean;
   staysInTargetHueFamily: boolean;
   finalScore: number;

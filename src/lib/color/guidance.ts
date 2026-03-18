@@ -74,6 +74,10 @@ export const buildRecipeWhyThisRanked = (
     reasons.push('Penalized for leaving the target hue family in a painter-oriented mode.');
   }
 
+  if (scoreBreakdown.vividTargetSanityPenalty > 0) {
+    reasons.push('Penalized extra because a vivid target needs a visibly convincing hue family match.');
+  }
+
   if (scoreBreakdown.requiredHueConstructionPenalty > 0) {
     reasons.push('Penalized because the recipe skips the expected color-building paints for this hue family.');
   }
@@ -220,10 +224,17 @@ export const assignRecipeBadges = (recipes: RankedRecipe[]): RankedRecipe[] => {
 
   const byPredicted = recipes.map((recipe) => ({ ...recipe, badges: [...recipe.badges] }));
   const targetIsNeutral = byPredicted[0].targetAnalysis.hueFamily === 'neutral';
-  const firstHueAligned = byPredicted.find((recipe) =>
-    recipe.scoreBreakdown.staysInTargetHueFamily &&
-    (targetIsNeutral || recipe.scoreBreakdown.hasRequiredHueConstructionPath),
-  );
+  const firstHueAligned = byPredicted.find((recipe) => {
+    if (targetIsNeutral) {
+      return true;
+    }
+
+    if (!recipe.scoreBreakdown.staysInTargetHueFamily) {
+      return false;
+    }
+
+    return recipe.scoreBreakdown.hasRequiredHueConstructionPath;
+  });
   const topRecipe = byPredicted[0];
 
   if (targetIsNeutral) {
