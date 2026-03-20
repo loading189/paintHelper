@@ -180,7 +180,7 @@ export const MixerPage = ({
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)]/92 p-4 sm:p-5">
+              <div className="studio-panel studio-panel-muted">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="studio-eyebrow">Ranking profile</p>
@@ -309,13 +309,13 @@ export const MixerPage = ({
               ].map((toggle) => (
                 <label
                   key={toggle.label}
-                  className="flex cursor-pointer items-start justify-between gap-4 rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)]/70 px-4 py-4"
+                  className="studio-toggle"
                 >
                   <div>
                     <p className="text-sm font-semibold tracking-[-0.01em] text-[color:var(--text-strong)]">{toggle.label}</p>
                     <p className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">{toggle.description}</p>
                   </div>
-                  <input type="checkbox" checked={toggle.checked} onChange={(event) => toggle.onChange(event.target.checked)} className="mt-1 h-4 w-4" />
+                  <input type="checkbox" checked={toggle.checked} onChange={(event) => toggle.onChange(event.target.checked)} className="mt-1 h-4 w-4 rounded border-[color:var(--border-soft)] text-[color:var(--accent-blue)]" />
                 </label>
               ))}
             </div>
@@ -328,7 +328,7 @@ export const MixerPage = ({
               Target and best-match review
             </SectionTitle>
 
-            <div className="mt-6 grid gap-5 xl:grid-cols-2">
+            <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr),140px,minmax(0,1fr)] xl:items-center">
               <SwatchTile
                 label="Target"
                 hex={draftNormalizedHex ?? '#b5b0aa'}
@@ -337,10 +337,25 @@ export const MixerPage = ({
                 emphasis="hero"
                 testId="target-swatch-panel"
               />
+              <div className="studio-panel studio-panel-strong flex flex-col items-center justify-center gap-3 px-4 py-6 text-center xl:min-h-[300px]">
+                <span className="studio-chip studio-chip-accent">{topRecipe ? `Δ ${formatDistance(topRecipe.scoreBreakdown.finalScore)}` : 'Awaiting mix'}</span>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-subtle)]">Target ↔ predicted</p>
+                <p className="text-sm leading-6 text-[color:var(--text-muted)]">Make the hue family, value, and the practical ratio agree before chasing smaller differences.</p>
+                <div className="grid w-full gap-2">
+                  <div className="rounded-[20px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] px-3 py-3">
+                    <p className="studio-eyebrow">Practical ratio</p>
+                    <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-[color:var(--text-strong)]">{topRecipe?.practicalRatioText ?? 'Pending'}</p>
+                  </div>
+                  <div className="rounded-[20px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] px-3 py-3">
+                    <p className="studio-eyebrow">Target family</p>
+                    <p className="mt-2 text-sm font-semibold capitalize text-[color:var(--text-strong)]">{previewAnalysis?.hueFamily ?? '—'}</p>
+                  </div>
+                </div>
+              </div>
               <SwatchTile
                 label="Best predicted"
                 hex={topRecipe?.predictedHex ?? '#d4cfc7'}
-                helper={topRecipe ? `Δ ${formatDistance(topRecipe.scoreBreakdown.finalScore)}` : 'No recipe yet'}
+                helper={topRecipe ? `${topRecipe.predictedAnalysis.hueFamily} · ${topRecipe.predictedAnalysis.valueClassification}` : 'No recipe yet'}
                 footer={
                   topRecipe
                     ? `Current lead recipe uses ${topRecipe.practicalRatioText} as the physical starting pile.`
@@ -351,12 +366,12 @@ export const MixerPage = ({
               />
             </div>
 
-            <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.15fr),minmax(0,0.85fr)]">
-              <div className="rounded-[28px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)]/80 p-4 sm:p-5">
+            <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.2fr),minmax(0,0.8fr)]">
+              <div className="studio-panel studio-panel-strong">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="studio-eyebrow">Current mix strategy</p>
-                    <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">{topRecipe?.practicalRatioText ?? 'Pending recipe set'}</p>
+                    <p className="mt-2 text-[2rem] font-semibold tracking-[-0.05em] text-[color:var(--text-strong)] sm:text-[2.4rem]">{topRecipe?.practicalRatioText ?? 'Pending recipe set'}</p>
                     <p className="mt-2 text-sm leading-6 text-[color:var(--text-muted)]">
                       {topRecipe
                         ? topRecipe.mixStrategy[0] ?? 'Use the practical ratio first, then fine-tune slowly.'
@@ -391,7 +406,7 @@ export const MixerPage = ({
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-4 sm:p-5">
+              <div className="studio-panel">
                 <p className="studio-eyebrow">Target analysis</p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {targetMetrics.map((metric) => (
@@ -410,7 +425,7 @@ export const MixerPage = ({
               </div>
             </div>
 
-            <div className="mt-5 rounded-[28px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)]/74 p-4 sm:p-5">
+            <div className="studio-panel studio-panel-muted mt-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="studio-eyebrow">Recent targets</p>
@@ -423,7 +438,7 @@ export const MixerPage = ({
                   recentColors.map((color) => (
                     <button
                       key={color}
-                      className="group flex items-center gap-3 rounded-full border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] px-3 py-2 text-sm text-[color:var(--text-body)] hover:border-[color:var(--border-strong)] hover:bg-white"
+                      className="studio-recent-chip"
                       type="button"
                       title={color}
                       onClick={() => handleDraftChange(color)}
