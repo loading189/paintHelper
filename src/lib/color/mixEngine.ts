@@ -7,11 +7,9 @@ import type {
   RecipeScoreBreakdown,
   UserSettings,
 } from '../../types/models';
-import { generateAdjustmentSuggestions, generateNextAdjustments } from './adjustmentEngine';
+import { generateNextAdjustments } from './adjustmentEngine';
 import { analyzeColor, hueDifference } from './colorAnalysis';
-import { assessAchievability } from './achievability';
 import { assignRecipeBadges, buildMixStrategy, buildRecipeGuidance, buildRecipeWhyThisRanked, determineRecipeQuality } from './guidance';
-import { buildLayeringSuggestion, buildMixPath, buildRoleNotes, buildStabilityWarnings } from './mixPathEngine';
 import { predictSpectralMix, spectralDistanceBetweenHexes } from './spectralMixing';
 import { distributePercentages, formatRatio, practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
 
@@ -560,10 +558,7 @@ export const rankRecipes = (targetHex: string, paints: Paint[], settings: UserSe
 
     const scoreBreakdown = scoreRecipe(settings, paints, targetAnalysis, predictedAnalysis, components);
     const paintNames = entries.map((entry) => paintMap.get(entry.paintId)?.name ?? entry.paintId);
-    const signature = recipeSignature(components);
-    const detailedAdjustments = generateAdjustmentSuggestions(targetAnalysis, predictedAnalysis, paints, { components });
     const recipe: RankedRecipeCandidate = {
-      id: `recipe-${targetAnalysis.normalizedHex.slice(1)}-${signature}`,
       predictedHex: mix.hex,
       distanceScore: scoreBreakdown.spectralDistance,
       components,
@@ -580,19 +575,14 @@ export const rankRecipes = (targetHex: string, paints: Paint[], settings: UserSe
       qualityLabel: determineRecipeQuality(scoreBreakdown.finalScore),
       badges: [],
       guidanceText: [],
-      nextAdjustments: detailedAdjustments.map((suggestion) => suggestion.detail),
-      detailedAdjustments,
+      nextAdjustments: [],
       targetAnalysis,
       predictedAnalysis,
       whyThisRanked: [],
       mixStrategy: [],
-      mixPath: buildMixPath({ components, targetAnalysis, predictedAnalysis }, paints),
-      stabilityWarnings: buildStabilityWarnings({ components }, paints),
-      roleNotes: buildRoleNotes({ components }, paints),
-      achievability: assessAchievability({ scoreBreakdown, targetAnalysis, predictedAnalysis }, paints),
-      layeringSuggestion: buildLayeringSuggestion({ targetAnalysis, scoreBreakdown }, paints),
     };
 
+    const signature = recipeSignature(recipe.components);
     if (seenSignatures.has(signature)) {
       return;
     }
@@ -612,13 +602,7 @@ export const rankRecipes = (targetHex: string, paints: Paint[], settings: UserSe
     whyThisRanked: buildRecipeWhyThisRanked(recipe.scoreBreakdown, recipe.targetAnalysis, recipe.predictedAnalysis, paints, recipe.components.map((component) => component.paintId)),
     guidanceText: buildRecipeGuidance(recipe.scoreBreakdown, recipe.targetAnalysis, recipe.predictedAnalysis, paints, recipe.components.map((component) => component.paintId), recipe.practicalRatioText),
     nextAdjustments: generateNextAdjustments(recipe.targetAnalysis, recipe.predictedAnalysis, paints, recipe),
-    detailedAdjustments: generateAdjustmentSuggestions(recipe.targetAnalysis, recipe.predictedAnalysis, paints, recipe),
     mixStrategy: buildMixStrategy(paints, recipe.components, recipe.targetAnalysis, recipe.practicalRatioText),
-    mixPath: buildMixPath(recipe, paints),
-    stabilityWarnings: buildStabilityWarnings(recipe, paints),
-    roleNotes: buildRoleNotes(recipe, paints),
-    achievability: assessAchievability(recipe, paints),
-    layeringSuggestion: buildLayeringSuggestion(recipe, paints),
   }));
 
   return assignRecipeBadges(enriched).slice(0, limit);

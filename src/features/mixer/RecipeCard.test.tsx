@@ -9,7 +9,6 @@ const paints: Paint[] = [
 ];
 
 const recipe: RankedRecipe = {
-  id: 'recipe-1',
   predictedHex: '#80916A',
   distanceScore: 0.12,
   components: [
@@ -54,7 +53,6 @@ const recipe: RankedRecipe = {
   badges: ['Best overall'],
   guidanceText: ['Start with the practical 6:1 pile, then adjust in small knife-tip increments.'],
   nextAdjustments: ['Add a small touch more Ultramarine Blue to cool the green.'],
-  detailedAdjustments: [{ priority: 'primary', kind: 'temperature', label: 'Too warm', detail: 'Add a small touch more Ultramarine Blue to cool the green.' }],
   targetAnalysis: {
     normalizedHex: '#80916A',
     rgb: { r: 128, g: 145, b: 106 },
@@ -79,11 +77,6 @@ const recipe: RankedRecipe = {
   },
   whyThisRanked: ['Spectral prediction lands close overall, not just in flat RGB.'],
   mixStrategy: ['Use 6:1 as the first palette pile guide.'],
-  mixPath: [{ role: 'base', paintId: 'paint-a', paintName: 'Cadmium Yellow Medium', instruction: 'Start with Cadmium Yellow Medium as the base pile.' }],
-  stabilityWarnings: ['Cadmium Yellow Medium is dominant here; tiny additions will shift hue quickly.'],
-  roleNotes: ['Cadmium Yellow Medium is part of the hue-building path.'],
-  achievability: { level: 'strong', headline: 'Strongly achievable with current palette', detail: 'The current on-hand palette can reach this target cleanly enough to use the recipe directly as a working studio start.' },
-  layeringSuggestion: undefined,
 };
 
 describe('RecipeCard', () => {

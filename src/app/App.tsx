@@ -3,41 +3,19 @@ import { MixerPage } from '../features/mixer/MixerPage';
 import { PaintsPage } from '../features/paints/PaintsPage';
 import { SavedRecipesPage } from '../features/recipes/SavedRecipesPage';
 import { loadAppState, saveAppState } from '../lib/storage/localState';
-import type { MixRecipe, MixStatus, Paint, RankedRecipe, SessionStatus, UserSettings } from '../types/models';
+import type { MixRecipe, Paint, RankedRecipe, UserSettings } from '../types/models';
 import { createId } from '../lib/utils/id';
-import { ActivePaintingPage } from '../features/active/ActivePaintingPage';
-import { PaintingPrepPage } from '../features/prep/PaintingPrepPage';
-import { SessionsPage } from '../features/sessions/SessionsPage';
-import {
-  addTargetToSession,
-  createPaintingSession,
-  duplicatePaintingSession,
-  duplicateTargetForRemix,
-  generateRecipesForSessionTarget,
-  moveTargetWithinSession,
-  removeTargetFromSession,
-  selectRecipeForTarget,
-  setTargetMixStatus,
-  toggleActiveTarget,
-  togglePinnedTarget,
-  updateSessionMeta,
-  updateStateSessions,
-  updateTargetInSession,
-} from '../features/sessions/sessionState';
 
-type View = 'mixer' | 'prep' | 'active' | 'paints' | 'recipes' | 'sessions';
+type View = 'mixer' | 'paints' | 'recipes';
 
 const navItems: Array<{ id: View; label: string; blurb: string }> = [
-  { id: 'mixer', label: 'Mixer', blurb: 'Single target recipe generator' },
-  { id: 'prep', label: 'Painting Prep', blurb: 'Session planning board' },
-  { id: 'active', label: 'Active Painting', blurb: 'Live palette dashboard' },
+  { id: 'mixer', label: 'Mixer', blurb: 'Target match workstation' },
   { id: 'paints', label: 'My Paints', blurb: 'Inventory and tube roles' },
   { id: 'recipes', label: 'Saved Recipes', blurb: 'Archived mix references' },
-  { id: 'sessions', label: 'Sessions', blurb: 'Session archive and duplication' },
 ];
 
 const App = () => {
-  const [view, setView] = useState<View>('prep');
+  const [view, setView] = useState<View>('mixer');
   const [state, setState] = useState(loadAppState);
   const [loadedTargetHex, setLoadedTargetHex] = useState<string | null>(null);
 
@@ -50,10 +28,8 @@ const App = () => {
       enabledPaints: state.paints.filter((paint) => paint.isEnabled).length,
       savedRecipes: state.recipes.length,
       recentTargets: state.recentTargetColors.length,
-      sessions: state.sessions.length,
-      activeTargets: state.sessions.find((session) => session.id === state.activeSessionId)?.activeTargetIds.length ?? 0,
     }),
-    [state],
+    [state.paints, state.recipes, state.recentTargetColors],
   );
 
   const upsertPaint = (paint: Paint) => {
@@ -81,7 +57,6 @@ const App = () => {
       qualityLabel: recipe.qualityLabel,
       guidanceText: recipe.guidanceText,
       nextAdjustments: recipe.nextAdjustments,
-      detailedAdjustments: recipe.detailedAdjustments,
       scoreBreakdown: recipe.scoreBreakdown,
       exactParts: recipe.exactParts,
       exactPercentages: recipe.exactPercentages,
@@ -90,11 +65,6 @@ const App = () => {
       practicalPercentages: recipe.practicalPercentages,
       practicalRatioText: recipe.practicalRatioText,
       recipeText: recipe.recipeText,
-      mixPath: recipe.mixPath,
-      stabilityWarnings: recipe.stabilityWarnings,
-      roleNotes: recipe.roleNotes,
-      achievability: recipe.achievability,
-      layeringSuggestion: recipe.layeringSuggestion,
     };
 
     setState((current) => ({ ...current, recipes: [saved, ...current.recipes] }));
@@ -110,17 +80,6 @@ const App = () => {
     }));
   };
 
-  const createSession = (title: string) => {
-    const session = createPaintingSession({ title });
-    setState((current) => ({ ...current, sessions: [session, ...current.sessions], activeSessionId: session.id }));
-    setView('prep');
-  };
-
-  const openSession = (sessionId: string, nextView: View = 'prep') => {
-    setState((current) => ({ ...current, activeSessionId: sessionId }));
-    setView(nextView);
-  };
-
   return (
     <div className="min-h-screen bg-transparent text-[color:var(--text-body)]">
       <header className="border-b border-[color:var(--border-soft)] bg-[rgba(250,246,240,0.76)] backdrop-blur-xl">
@@ -128,22 +87,21 @@ const App = () => {
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr),360px] xl:items-end">
             <div>
               <p className="studio-eyebrow">Paint Mix Matcher</p>
-              <h1 className="mt-3 max-w-5xl text-4xl font-semibold tracking-[-0.04em] text-[color:var(--text-strong)] sm:text-5xl xl:text-[3.7rem]">
-                A local-only studio assistant for painting prep, color mixing, and active realism workflow.
+              <h1 className="mt-3 max-w-4xl text-4xl font-semibold tracking-[-0.04em] text-[color:var(--text-strong)] sm:text-5xl xl:text-[3.7rem]">
+                Spectral paint mixing, presented like a studio-grade color workstation.
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-[color:var(--text-muted)] sm:text-base">
-                Session-based planning, spectral recipe generation, practical palette ratios, and active painting guidance—kept deterministic and fully in-browser.
+                Local-only recipe generation, practical pile ratios, and painterly adjustment cues in a neutral workspace designed for color-critical judgment.
               </p>
             </div>
 
             <div className="rounded-[32px] border border-[color:var(--border-soft)] bg-[rgba(251,248,243,0.86)] p-5 shadow-[var(--shadow-soft)]">
-              <p className="studio-eyebrow">Studio overview</p>
+              <p className="studio-eyebrow">Session overview</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
                 {[
                   { label: 'Enabled paints', value: counts.enabledPaints, note: 'active in recipe search' },
-                  { label: 'Sessions', value: counts.sessions, note: 'preparation + painting workflows' },
                   { label: 'Saved recipes', value: counts.savedRecipes, note: 'stored locally in browser' },
-                  { label: 'Active board', value: counts.activeTargets, note: 'targets currently in painting mode' },
+                  { label: 'Recent targets', value: counts.recentTargets, note: 'quick return palette checks' },
                 ].map((item) => (
                   <div key={item.label} className="studio-metric">
                     <p className="studio-eyebrow">{item.label}</p>
@@ -153,12 +111,12 @@ const App = () => {
                 ))}
               </div>
               <div className="mt-4 rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] px-4 py-3 text-sm text-[color:var(--text-muted)]">
-                Deterministic engine, no cloud sync, no auth, no backend, no hidden state.
+                Deterministic engine, no cloud sync, no auth, no backend.
               </div>
             </div>
           </div>
 
-          <nav className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <nav className="mt-8 grid gap-3 sm:grid-cols-3">
             {navItems.map((item) => {
               const isActive = view === item.id;
               return (
@@ -177,7 +135,7 @@ const App = () => {
                       <p className={`text-lg font-semibold tracking-[-0.02em] ${isActive ? 'text-stone-50' : 'text-[color:var(--text-strong)]'}`}>{item.label}</p>
                       <p className={`mt-1 text-sm ${isActive ? 'text-stone-300' : 'text-[color:var(--text-muted)]'}`}>{item.blurb}</p>
                     </div>
-                    <span className={`studio-chip ${isActive ? 'studio-chip-accent border-white/10 bg-white/10 text-stone-100' : ''}`}>{item.id === 'mixer' ? 'Tool' : item.id === 'active' ? 'Live' : 'Workflow'}</span>
+                    <span className={`studio-chip ${isActive ? 'studio-chip-accent border-white/10 bg-white/10 text-stone-100' : ''}`}>{item.id === 'mixer' ? 'Primary' : 'Library'}</span>
                   </div>
                 </button>
               );
@@ -196,43 +154,6 @@ const App = () => {
             onRecentColor={addRecentColor}
             onSaveRecipe={saveRecipe}
             onLoadTargetHex={loadedTargetHex}
-          />
-        ) : null}
-
-        {view === 'prep' ? (
-          <PaintingPrepPage
-            sessions={state.sessions}
-            activeSessionId={state.activeSessionId}
-            paints={state.paints}
-            settings={state.settings}
-            onCreateSession={createSession}
-            onOpenSession={(sessionId) => openSession(sessionId, 'sessions')}
-            onSessionMetaChange={(sessionId, patch) => setState((current) => updateStateSessions(current, sessionId, (session) => updateSessionMeta(session, patch)))}
-            onAddTarget={(sessionId, draft) => setState((current) => updateStateSessions(current, sessionId, (session) => addTargetToSession(session, draft)))}
-            onUpdateTarget={(sessionId, targetId, patch) => setState((current) => updateStateSessions(current, sessionId, (session) => updateTargetInSession(session, targetId, patch)))}
-            onRemoveTarget={(sessionId, targetId) => setState((current) => updateStateSessions(current, sessionId, (session) => removeTargetFromSession(session, targetId)))}
-            onGenerateRecipes={(sessionId, targetId) => setState((current) => updateStateSessions(current, sessionId, (session) => generateRecipesForSessionTarget(session, targetId, current.paints, current.settings)))}
-            onSelectRecipe={(sessionId, targetId, recipeId, lock) => setState((current) => updateStateSessions(current, sessionId, (session) => selectRecipeForTarget(session, targetId, recipeId, lock)))}
-            onMoveTarget={(sessionId, targetId, direction) => setState((current) => updateStateSessions(current, sessionId, (session) => moveTargetWithinSession(session, targetId, direction)))}
-            onToggleActiveTarget={(sessionId, targetId) => setState((current) => updateStateSessions(current, sessionId, (session) => toggleActiveTarget(session, targetId)))}
-            onAddGeneratedTargets={(sessionId, drafts) =>
-              setState((current) =>
-                updateStateSessions(current, sessionId, (session) => drafts.reduce((nextSession, draft) => addTargetToSession(nextSession, draft), session)),
-              )
-            }
-          />
-        ) : null}
-
-        {view === 'active' ? (
-          <ActivePaintingPage
-            sessions={state.sessions}
-            activeSessionId={state.activeSessionId}
-            onOpenSession={(sessionId) => openSession(sessionId, 'prep')}
-            onStatusChange={(sessionId, status) => setState((current) => updateStateSessions(current, sessionId, (session) => updateSessionMeta(session, { status } as { status: SessionStatus })))}
-            onMixStatusChange={(sessionId, targetId, status: MixStatus) => setState((current) => updateStateSessions(current, sessionId, (session) => setTargetMixStatus(session, targetId, status)))}
-            onTogglePin={(sessionId, targetId) => setState((current) => updateStateSessions(current, sessionId, (session) => togglePinnedTarget(session, targetId)))}
-            onDuplicateForRemix={(sessionId, targetId) => setState((current) => updateStateSessions(current, sessionId, (session) => duplicateTargetForRemix(session, targetId)))}
-            onOpenInPrep={(sessionId) => openSession(sessionId, 'prep')}
           />
         ) : null}
 
@@ -269,33 +190,6 @@ const App = () => {
                 ...current,
                 recipes: current.recipes.map((item) => (item.id === recipe.id ? recipe : item)),
               }))
-            }
-          />
-        ) : null}
-
-        {view === 'sessions' ? (
-          <SessionsPage
-            sessions={state.sessions}
-            activeSessionId={state.activeSessionId}
-            onCreate={createSession}
-            onOpenInPrep={(sessionId) => openSession(sessionId, 'prep')}
-            onOpenInActive={(sessionId) => openSession(sessionId, 'active')}
-            onStatusChange={(sessionId, status) => setState((current) => updateStateSessions(current, sessionId, (session) => updateSessionMeta(session, { status } as { status: SessionStatus })))}
-            onDuplicate={(sessionId) =>
-              setState((current) => {
-                const source = current.sessions.find((session) => session.id === sessionId);
-                if (!source) {
-                  return current;
-                }
-                const duplicate = duplicatePaintingSession(source);
-                return { ...current, sessions: [duplicate, ...current.sessions], activeSessionId: duplicate.id };
-              })
-            }
-            onDelete={(sessionId) =>
-              setState((current) => {
-                const sessions = current.sessions.filter((session) => session.id !== sessionId);
-                return { ...current, sessions, activeSessionId: current.activeSessionId === sessionId ? sessions[0]?.id ?? null : current.activeSessionId };
-              })
             }
           />
         ) : null}
