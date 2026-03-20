@@ -2,34 +2,48 @@ import { useEffect, useMemo, useState } from 'react';
 import { MixerPage } from '../features/mixer/MixerPage';
 import { PaintsPage } from '../features/paints/PaintsPage';
 import { SavedRecipesPage } from '../features/recipes/SavedRecipesPage';
+import { ReferenceSamplerPage } from '../features/reference/ReferenceSamplerPage';
+import { SessionsPage } from '../features/sessions/SessionsPage';
+import { ActivePaintingBoard } from '../features/workspace/ActivePaintingBoard';
+import { PrepBoard } from '../features/workspace/PrepBoard';
 import { loadAppState, saveAppState } from '../lib/storage/localState';
-import type { MixRecipe, Paint, RankedRecipe, UserSettings } from '../types/models';
+import type { MixRecipe, Paint, PaintingSession, RankedRecipe, UserSettings, WorkspaceView } from '../types/models';
 import { createId } from '../lib/utils/id';
+import { StudioPanel } from '../components/studio/StudioPanel';
 
-type View = 'mixer' | 'paints' | 'recipes';
-
-const navItems: Array<{ id: View; label: string; blurb: string }> = [
-  { id: 'mixer', label: 'Mixer', blurb: 'Target match workstation' },
-  { id: 'paints', label: 'My Paints', blurb: 'Inventory and tube roles' },
-  { id: 'recipes', label: 'Saved Recipes', blurb: 'Archived mix references' },
+const navItems: Array<{ id: WorkspaceView; label: string; blurb: string }> = [
+  { id: 'mixer', label: 'Mixer', blurb: 'Target color exploration' },
+  { id: 'prep', label: 'Painting Prep', blurb: 'Target board and recipe locks' },
+  { id: 'active', label: 'Active Painting', blurb: 'Large live palette dashboard' },
+  { id: 'sampler', label: 'Reference Sampler', blurb: 'Canvas eyedropper and palette extraction' },
+  { id: 'sessions', label: 'Sessions', blurb: 'Project context and switching' },
+  { id: 'paints', label: 'My Paints', blurb: 'Inventory and paint roles' },
+  { id: 'recipes', label: 'Saved Recipes', blurb: 'Local recipe archive' },
 ];
 
 const App = () => {
-  const [view, setView] = useState<View>('mixer');
+  const [view, setView] = useState<WorkspaceView>('prep');
   const [state, setState] = useState(loadAppState);
   const [loadedTargetHex, setLoadedTargetHex] = useState<string | null>(null);
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     saveAppState(state);
   }, [state]);
 
+  const currentSession = useMemo(
+    () => state.sessions.find((session) => session.id === state.currentSessionId) ?? state.sessions[0] ?? null,
+    [state.currentSessionId, state.sessions],
+  );
+
   const counts = useMemo(
     () => ({
       enabledPaints: state.paints.filter((paint) => paint.isEnabled).length,
       savedRecipes: state.recipes.length,
-      recentTargets: state.recentTargetColors.length,
+      sessionTargets: currentSession?.targets.length ?? 0,
+      samples: state.sampler.samples.length,
     }),
-    [state.paints, state.recipes, state.recentTargetColors],
+    [currentSession?.targets.length, state.paints, state.recipes.length, state.sampler.samples.length],
   );
 
   const upsertPaint = (paint: Paint) => {
@@ -80,120 +94,174 @@ const App = () => {
     }));
   };
 
+  const updateCurrentSession = (session: PaintingSession) => {
+    setState((current) => ({
+      ...current,
+      sessions: current.sessions.map((item) => (item.id === session.id ? session : item)),
+    }));
+  };
+
   return (
-    <div className="min-h-screen bg-transparent text-[color:var(--text-body)]">
-      <header className="border-b border-[color:var(--border-soft)] bg-[rgba(250,246,240,0.76)] backdrop-blur-xl">
-        <div className="mx-auto max-w-[1520px] px-5 py-8 sm:px-6 lg:px-10 lg:py-10">
-          <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr),360px] xl:items-end">
-            <div>
-              <p className="studio-eyebrow">Paint Mix Matcher</p>
-              <h1 className="mt-3 max-w-4xl text-4xl font-semibold tracking-[-0.04em] text-[color:var(--text-strong)] sm:text-5xl xl:text-[3.7rem]">
-                Spectral paint mixing, presented like a studio-grade color workstation.
-              </h1>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-[color:var(--text-muted)] sm:text-base">
-                Local-only recipe generation, practical pile ratios, and painterly adjustment cues in a neutral workspace designed for color-critical judgment.
-              </p>
-            </div>
-
-            <div className="rounded-[32px] border border-[color:var(--border-soft)] bg-[rgba(251,248,243,0.86)] p-5 shadow-[var(--shadow-soft)]">
-              <p className="studio-eyebrow">Session overview</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                {[
-                  { label: 'Enabled paints', value: counts.enabledPaints, note: 'active in recipe search' },
-                  { label: 'Saved recipes', value: counts.savedRecipes, note: 'stored locally in browser' },
-                  { label: 'Recent targets', value: counts.recentTargets, note: 'quick return palette checks' },
-                ].map((item) => (
-                  <div key={item.label} className="studio-metric">
-                    <p className="studio-eyebrow">{item.label}</p>
-                    <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">{item.value}</p>
-                    <p className="mt-1 text-sm text-[color:var(--text-muted)]">{item.note}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] px-4 py-3 text-sm text-[color:var(--text-muted)]">
-                Deterministic engine, no cloud sync, no auth, no backend.
-              </div>
-            </div>
-          </div>
-
-          <nav className="mt-8 grid gap-3 sm:grid-cols-3">
-            {navItems.map((item) => {
-              const isActive = view === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`rounded-[28px] border px-5 py-4 text-left ${
-                    isActive
-                      ? 'border-[rgba(38,33,29,0.16)] bg-[linear-gradient(180deg,rgba(40,34,31,0.96),rgba(28,24,21,0.96))] text-stone-50 shadow-[0_18px_28px_rgba(33,29,26,0.18)]'
-                      : 'border-[color:var(--border-soft)] bg-[rgba(251,248,243,0.78)] text-[color:var(--text-body)] hover:border-[color:var(--border-strong)] hover:bg-[rgba(255,252,247,0.92)]'
-                  }`}
-                  onClick={() => setView(item.id)}
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className={`text-lg font-semibold tracking-[-0.02em] ${isActive ? 'text-stone-50' : 'text-[color:var(--text-strong)]'}`}>{item.label}</p>
-                      <p className={`mt-1 text-sm ${isActive ? 'text-stone-300' : 'text-[color:var(--text-muted)]'}`}>{item.blurb}</p>
-                    </div>
-                    <span className={`studio-chip ${isActive ? 'studio-chip-accent border-white/10 bg-white/10 text-stone-100' : ''}`}>{item.id === 'mixer' ? 'Primary' : 'Library'}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </nav>
+    <div className="studio-app-shell">
+      <header className="studio-topbar">
+        <div>
+          <p className="studio-eyebrow">Paint Mix Matcher · Major studio release</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-[color:var(--text-strong)] sm:text-4xl">Spectral painting workstation</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--text-muted)]">A premium, local-only color lab for building sessions, sampling references, extracting palettes, preparing targets, and painting from a live dashboard.</p>
+        </div>
+        <div className="topbar-stats">
+          <div className="studio-mini-stat"><span>Enabled paints</span><strong>{counts.enabledPaints}</strong></div>
+          <div className="studio-mini-stat"><span>Session targets</span><strong>{counts.sessionTargets}</strong></div>
+          <div className="studio-mini-stat"><span>Reference samples</span><strong>{counts.samples}</strong></div>
+          <div className="studio-mini-stat"><span>Saved recipes</span><strong>{counts.savedRecipes}</strong></div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1520px] px-5 pb-14 pt-8 sm:px-6 lg:px-10 lg:pb-20">
-        {view === 'mixer' ? (
-          <MixerPage
-            paints={state.paints}
-            settings={state.settings}
-            recentColors={state.recentTargetColors.map((entry) => entry.hex)}
-            onSettingsChange={setSettings}
-            onRecentColor={addRecentColor}
-            onSaveRecipe={saveRecipe}
-            onLoadTargetHex={loadedTargetHex}
-          />
-        ) : null}
+      <div className="studio-workstation">
+        <aside className="studio-sidebar">
+          <StudioPanel title="Workspaces" description="Move through the painting workflow without leaving the same studio shell.">
+            <nav className="workspace-nav">
+              {navItems.map((item) => (
+                <button key={item.id} type="button" className={`workspace-nav-item ${view === item.id ? 'workspace-nav-item-active' : ''}`} onClick={() => setView(item.id)}>
+                  <span className="block text-sm font-semibold text-[color:var(--text-strong)]">{item.label}</span>
+                  <span className="mt-1 block text-xs leading-5 text-[color:var(--text-muted)]">{item.blurb}</span>
+                </button>
+              ))}
+            </nav>
+          </StudioPanel>
 
-        {view === 'paints' ? (
-          <PaintsPage
-            paints={state.paints}
-            onCreate={upsertPaint}
-            onUpdate={upsertPaint}
-            onDelete={(paintId) =>
-              setState((current) => ({
-                ...current,
-                paints: current.paints.filter((paint) => paint.id !== paintId),
-              }))
-            }
-          />
-        ) : null}
+          <StudioPanel title="Paint inventory" description="Your on-hand palette remains persistent and drives every spectral prediction.">
+            <div className="space-y-3">
+              {state.paints.filter((paint) => paint.isEnabled).map((paint) => (
+                <div key={paint.id} className="sidebar-paint-row">
+                  <span className="sidebar-paint-swatch" style={{ backgroundColor: paint.hex }} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[color:var(--text-strong)]">{paint.name}</p>
+                    <p className="truncate text-xs text-[color:var(--text-muted)]">{paint.hex}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </StudioPanel>
+        </aside>
 
-        {view === 'recipes' ? (
-          <SavedRecipesPage
-            recipes={state.recipes}
-            paints={state.paints}
-            onDelete={(recipeId) =>
-              setState((current) => ({
-                ...current,
-                recipes: current.recipes.filter((recipe) => recipe.id !== recipeId),
-              }))
-            }
-            onLoadIntoMixer={(recipe) => {
-              setLoadedTargetHex(recipe.targetHex);
-              setView('mixer');
-            }}
-            onUpdate={(recipe) =>
-              setState((current) => ({
-                ...current,
-                recipes: current.recipes.map((item) => (item.id === recipe.id ? recipe : item)),
-              }))
-            }
-          />
-        ) : null}
-      </main>
+        <main className="studio-main">
+          {view === 'mixer' ? (
+            <MixerPage
+              paints={state.paints}
+              settings={state.settings}
+              recentColors={state.recentTargetColors.map((entry) => entry.hex)}
+              onSettingsChange={setSettings}
+              onRecentColor={addRecentColor}
+              onSaveRecipe={saveRecipe}
+              onLoadTargetHex={loadedTargetHex}
+            />
+          ) : null}
+
+          {view === 'prep' && currentSession ? (
+            <PrepBoard
+              session={currentSession}
+              paints={state.paints}
+              settings={state.settings}
+              selectedTargetId={selectedTargetId}
+              onSelectTarget={setSelectedTargetId}
+              onSessionChange={updateCurrentSession}
+              onOpenSampler={() => setView('sampler')}
+            />
+          ) : null}
+
+          {view === 'active' && currentSession ? (
+            <ActivePaintingBoard
+              session={currentSession}
+              paints={state.paints}
+              onSessionChange={updateCurrentSession}
+              onOpenPrep={(targetId) => {
+                setSelectedTargetId(targetId);
+                setView('prep');
+              }}
+            />
+          ) : null}
+
+          {view === 'sampler' && currentSession ? (
+            <ReferenceSamplerPage
+              sampler={state.sampler}
+              session={currentSession}
+              onSamplerChange={(sampler) => setState((current) => ({ ...current, sampler }))}
+              onSessionChange={updateCurrentSession}
+            />
+          ) : null}
+
+          {view === 'sessions' ? (
+            <SessionsPage
+              sessions={state.sessions}
+              currentSessionId={state.currentSessionId}
+              onSelect={(id) => {
+                setState((current) => ({ ...current, currentSessionId: id }));
+                setView('prep');
+              }}
+              onCreate={() => {
+                const session: PaintingSession = {
+                  id: createId('session'),
+                  name: `Studio Session ${state.sessions.length + 1}`,
+                  description: 'New local-only painting session.',
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  status: 'planning',
+                  targetSortMode: 'custom',
+                  targets: [],
+                };
+                setState((current) => ({
+                  ...current,
+                  sessions: [session, ...current.sessions],
+                  currentSessionId: session.id,
+                }));
+              }}
+            />
+          ) : null}
+
+          {view === 'paints' ? (
+            <PaintsPage
+              paints={state.paints}
+              onCreate={upsertPaint}
+              onUpdate={upsertPaint}
+              onDelete={(paintId) =>
+                setState((current) => ({
+                  ...current,
+                  paints: current.paints.filter((paint) => paint.id !== paintId),
+                }))
+              }
+            />
+          ) : null}
+
+          {view === 'recipes' ? (
+            <SavedRecipesPage
+              recipes={state.recipes}
+              paints={state.paints}
+              onDelete={(recipeId) =>
+                setState((current) => ({
+                  ...current,
+                  recipes: current.recipes.filter((recipe) => recipe.id !== recipeId),
+                }))
+              }
+              onLoadIntoMixer={(recipe) => {
+                setLoadedTargetHex(recipe.targetHex);
+                setView('mixer');
+              }}
+              onUpdate={(recipe) =>
+                setState((current) => ({
+                  ...current,
+                  recipes: current.recipes.map((item) => (item.id === recipe.id ? recipe : item)),
+                }))
+              }
+            />
+          ) : null}
+        </main>
+      </div>
+
+      <footer className="studio-footer">
+        <span>Local-only · deterministic · Spectral.js-based prediction core · no backend / no auth / no cloud sync.</span>
+        <span>{currentSession ? `Current session: ${currentSession.name}` : 'No session selected'}</span>
+      </footer>
     </div>
   );
 };

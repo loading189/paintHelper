@@ -21,6 +21,11 @@ export type RecipeBadge =
   | 'Muted naturally'
   | 'Chromatic build'
   | 'Single-paint shortcut';
+export type WorkspaceView = 'mixer' | 'prep' | 'active' | 'sampler' | 'sessions' | 'paints' | 'recipes';
+export type MixStatus = 'not-mixed' | 'mixed' | 'adjusted' | 'remix-needed';
+export type TargetRole = 'primary' | 'secondary' | 'optional';
+export type TargetSortMode = 'custom' | 'light-to-dark' | 'family' | 'priority';
+export type SampleMode = 'pixel' | 'average' | 'smart';
 
 export type PaintHeuristics = {
   tintStrength?: TintStrength;
@@ -119,6 +124,22 @@ export type RecipeScoreBreakdown = {
   finalScore: number;
 };
 
+export type MixPathStep = {
+  title: string;
+  detail: string;
+};
+
+export type AchievabilitySignal = {
+  level: 'easy' | 'moderate' | 'challenging';
+  summary: string;
+  detail: string;
+};
+
+export type MixWarning = {
+  level: 'info' | 'warning';
+  text: string;
+};
+
 export type MixRecipe = {
   id: string;
   targetHex: string;
@@ -162,11 +183,75 @@ export type RecentColor = {
   usedAt: string;
 };
 
-export type AppState = {
-  paints: Paint[];
-  recipes: MixRecipe[];
-  recentTargetColors: RecentColor[];
-  settings: UserSettings;
+export type ReferenceImageMeta = {
+  id: string;
+  name: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  objectUrl?: string;
+  dataUrl?: string;
+  addedAt: string;
+};
+
+export type ReferenceSample = {
+  id: string;
+  name: string;
+  hex: string;
+  point: { x: number; y: number };
+  radius: number;
+  mode: SampleMode;
+  note?: string;
+  addedAt: string;
+};
+
+export type ExtractedPaletteColor = {
+  id: string;
+  hex: string;
+  population: number;
+  label: string;
+};
+
+export type ReferenceSamplerState = {
+  image?: ReferenceImageMeta;
+  sampleMode: SampleMode;
+  sampleRadius: number;
+  zoom: number;
+  samples: ReferenceSample[];
+  extractedPalette: ExtractedPaletteColor[];
+  selectedSampleIds: string[];
+};
+
+export type PaintingTarget = {
+  id: string;
+  name: string;
+  hex: string;
+  notes?: string;
+  areaTag?: string;
+  role: TargetRole;
+  priority: number;
+  source: 'manual' | 'reference-sample' | 'palette-extraction' | 'family-generator';
+  addedAt: string;
+  sortIndex: number;
+  recipe?: RankedRecipe;
+  lockedRecipeId?: string;
+  mixStatus: MixStatus;
+  isPinned: boolean;
+  familyGroup?: string;
+  sampleId?: string;
+};
+
+export type PaintingSession = {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  status: 'planning' | 'active';
+  prepNotes?: string;
+  referenceImageId?: string;
+  targetSortMode: TargetSortMode;
+  targets: PaintingTarget[];
 };
 
 export type RankedRecipe = {
@@ -191,4 +276,18 @@ export type RankedRecipe = {
   predictedAnalysis: ColorAnalysis;
   whyThisRanked: string[];
   mixStrategy: string[];
+  mixPath?: MixPathStep[];
+  dominanceWarnings?: MixWarning[];
+  achievability?: AchievabilitySignal;
+  glazingSuggestion?: string;
+};
+
+export type AppState = {
+  paints: Paint[];
+  recipes: MixRecipe[];
+  recentTargetColors: RecentColor[];
+  settings: UserSettings;
+  sessions: PaintingSession[];
+  currentSessionId: string | null;
+  sampler: ReferenceSamplerState;
 };

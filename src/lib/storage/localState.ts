@@ -1,18 +1,44 @@
 import type {
   AppState,
+  ExtractedPaletteColor,
   MixRecipe,
   Paint,
+  PaintingSession,
+  PaintingTarget,
   PaintHeuristics,
   PaintSpectralProfile,
   RankingMode,
   RecentColor,
+  ReferenceSample,
   UserSettings,
 } from '../../types/models';
 import { normalizeHex } from '../color/colorMath';
 import { defaultSettings, starterPaints } from './seedData';
+import { createId } from '../utils/id';
 
 const STORAGE_KEY = 'paint-mix-matcher-state';
 const rankingModes: RankingMode[] = ['strict-closest-color', 'painter-friendly-balanced', 'simpler-recipes-preferred'];
+
+const createStarterSession = (): PaintingSession => ({
+  id: createId('session'),
+  name: 'Studio Session',
+  description: 'Plan your reference colors, build recipes, and move into painting mode.',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  status: 'planning',
+  targetSortMode: 'custom',
+  targets: [],
+});
+
+const defaultSamplerState = () => ({
+  image: undefined,
+  sampleMode: 'average' as const,
+  sampleRadius: 4,
+  zoom: 10,
+  samples: [] as ReferenceSample[],
+  extractedPalette: [] as ExtractedPaletteColor[],
+  selectedSampleIds: [] as string[],
+});
 
 const isPaint = (value: unknown): value is Paint => {
   if (!value || typeof value !== 'object') {
@@ -101,12 +127,44 @@ export const sanitizeSettings = (settings: Partial<UserSettings> | undefined): U
   },
 });
 
-export const getInitialState = (): AppState => ({
-  paints: starterPaints,
-  recipes: [],
-  recentTargetColors: [],
-  settings: defaultSettings,
+const sanitizeTarget = (target: PaintingTarget, index: number): PaintingTarget => ({
+  ...target,
+  id: typeof target.id === 'string' ? target.id : createId('target'),
+  name: typeof target.name === 'string' ? target.name : `Target ${index + 1}`,
+  hex: normalizeHex(target.hex) ?? '#000000',
+  role: target.role ?? 'secondary',
+  priority: typeof target.priority === 'number' ? target.priority : 1,
+  source: target.source ?? 'manual',
+  addedAt: typeof target.addedAt === 'string' ? target.addedAt : new Date().toISOString(),
+  sortIndex: typeof target.sortIndex === 'number' ? target.sortIndex : index,
+  mixStatus: target.mixStatus ?? 'not-mixed',
+  isPinned: Boolean(target.isPinned),
+  recipe: target.recipe,
 });
+
+const sanitizeSession = (session: PaintingSession): PaintingSession => ({
+  ...session,
+  id: typeof session.id === 'string' ? session.id : createId('session'),
+  name: typeof session.name === 'string' ? session.name : 'Studio Session',
+  createdAt: typeof session.createdAt === 'string' ? session.createdAt : new Date().toISOString(),
+  updatedAt: typeof session.updatedAt === 'string' ? session.updatedAt : new Date().toISOString(),
+  status: session.status === 'active' ? 'active' : 'planning',
+  targetSortMode: session.targetSortMode ?? 'custom',
+  targets: Array.isArray(session.targets) ? session.targets.map((target, index) => sanitizeTarget(target, index)) : [],
+});
+
+export const getInitialState = (): AppState => {
+  const starterSession = createStarterSession();
+  return {
+    paints: starterPaints,
+    recipes: [],
+    recentTargetColors: [],
+    settings: defaultSettings,
+    sessions: [starterSession],
+    currentSessionId: starterSession.id,
+    sampler: defaultSamplerState(),
+  };
+};
 
 export const loadAppState = (storage: Pick<Storage, 'getItem'> | undefined = globalThis.localStorage): AppState => {
   const fallback = getInitialState();
@@ -121,11 +179,28 @@ export const loadAppState = (storage: Pick<Storage, 'getItem'> | undefined = glo
     }
 
     const parsed = JSON.parse(raw) as Partial<AppState>;
+    const sessions = Array.isArray(parsed.sessions) && parsed.sessions.length > 0
+      ? parsed.sessions.map((session) => sanitizeSession(session))
+      : fallback.sessions;
+    const currentSessionId = typeof parsed.currentSessionId === 'string' && sessions.some((session) => session.id === parsed.currentSessionId)
+      ? parsed.currentSessionId
+      : sessions[0]?.id ?? null;
+
     return {
       paints: Array.isArray(parsed.paints) ? parsed.paints.filter(isPaint).map(sanitizePaint) : fallback.paints,
       recipes: Array.isArray(parsed.recipes) ? parsed.recipes.filter(isRecipe).map(sanitizeRecipe) : fallback.recipes,
       recentTargetColors: Array.isArray(parsed.recentTargetColors) ? parsed.recentTargetColors.filter(isRecentColor).slice(0, 8) : fallback.recentTargetColors,
       settings: sanitizeSettings(parsed.settings),
+      sessions,
+      currentSessionId,
+      sampler: {
+        ...defaultSamplerState(),
+        ...(parsed.sampler ?? {}),
+        image: parsed.sampler?.image,
+        samples: Array.isArray(parsed.sampler?.samples) ? parsed.sampler?.samples : [],
+        extractedPalette: Array.isArray(parsed.sampler?.extractedPalette) ? parsed.sampler.extractedPalette : [],
+        selectedSampleIds: Array.isArray(parsed.sampler?.selectedSampleIds) ? parsed.sampler.selectedSampleIds.filter((id): id is string => typeof id === 'string') : [],
+      },
     };
   } catch {
     return fallback;
