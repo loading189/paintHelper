@@ -22,6 +22,16 @@ export type RecipeBadge =
   | 'Chromatic build'
   | 'Single-paint shortcut';
 
+export type SessionStatus = 'planning' | 'active' | 'completed' | 'archived';
+export type MixStatus = 'not-mixed' | 'mixed' | 'adjusted' | 'remix-needed';
+export type PrepStatus = 'unreviewed' | 'reviewed' | 'locked';
+export type TargetPriority = 'primary' | 'secondary' | 'optional';
+export type TargetValueRole = 'highlight' | 'light' | 'midtone' | 'shadow' | 'accent';
+export type AdjustmentPriority = 'primary' | 'secondary' | 'optional';
+export type AdjustmentKind = 'value' | 'hue' | 'temperature' | 'chroma' | 'muting' | 'lightness' | 'darkness';
+export type AchievabilityLevel = 'strong' | 'workable' | 'limited';
+export type MixPathStepRole = 'base' | 'hue-build' | 'support' | 'refine';
+
 export type PaintHeuristics = {
   tintStrength?: TintStrength;
   naturalBias?: NaturalBias;
@@ -119,6 +129,26 @@ export type RecipeScoreBreakdown = {
   finalScore: number;
 };
 
+export type AdjustmentSuggestion = {
+  priority: AdjustmentPriority;
+  kind: AdjustmentKind;
+  label: string;
+  detail: string;
+};
+
+export type MixPathStep = {
+  role: MixPathStepRole;
+  paintId?: string;
+  paintName: string;
+  instruction: string;
+};
+
+export type AchievabilityInsight = {
+  level: AchievabilityLevel;
+  headline: string;
+  detail: string;
+};
+
 export type MixRecipe = {
   id: string;
   targetHex: string;
@@ -132,6 +162,7 @@ export type MixRecipe = {
   qualityLabel?: RecipeQualityLabel;
   guidanceText?: string[];
   nextAdjustments?: string[];
+  detailedAdjustments?: AdjustmentSuggestion[];
   scoreBreakdown?: RecipeScoreBreakdown;
   exactParts?: number[];
   exactPercentages?: number[];
@@ -140,6 +171,11 @@ export type MixRecipe = {
   practicalPercentages?: number[];
   practicalRatioText?: string;
   recipeText?: string;
+  mixPath?: MixPathStep[];
+  stabilityWarnings?: string[];
+  roleNotes?: string[];
+  achievability?: AchievabilityInsight;
+  layeringSuggestion?: string;
 };
 
 export type SinglePaintPenaltySettings = {
@@ -162,14 +198,8 @@ export type RecentColor = {
   usedAt: string;
 };
 
-export type AppState = {
-  paints: Paint[];
-  recipes: MixRecipe[];
-  recentTargetColors: RecentColor[];
-  settings: UserSettings;
-};
-
 export type RankedRecipe = {
+  id: string;
   predictedHex: string;
   distanceScore: number;
   components: RecipeComponent[];
@@ -187,8 +217,57 @@ export type RankedRecipe = {
   badges: RecipeBadge[];
   guidanceText: string[];
   nextAdjustments: string[];
+  detailedAdjustments: AdjustmentSuggestion[];
   targetAnalysis: ColorAnalysis;
   predictedAnalysis: ColorAnalysis;
   whyThisRanked: string[];
   mixStrategy: string[];
+  mixPath: MixPathStep[];
+  stabilityWarnings: string[];
+  roleNotes: string[];
+  achievability: AchievabilityInsight;
+  layeringSuggestion?: string;
+};
+
+export type PaintingTarget = {
+  id: string;
+  label: string;
+  targetHex: string;
+  notes?: string;
+  area?: string;
+  family?: string;
+  priority?: TargetPriority;
+  recipeOptions: RankedRecipe[];
+  selectedRecipeId?: string;
+  selectedRecipe?: RankedRecipe;
+  mixStatus: MixStatus;
+  prepStatus: PrepStatus;
+  tags?: string[];
+  valueRole?: TargetValueRole;
+};
+
+export type PaintingSession = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  status: SessionStatus;
+  notes?: string;
+  subject?: string;
+  lightingNotes?: string;
+  moodNotes?: string;
+  canvasNotes?: string;
+  targetOrder: string[];
+  targets: PaintingTarget[];
+  activeTargetIds: string[];
+  pinnedTargetIds: string[];
+};
+
+export type AppState = {
+  paints: Paint[];
+  recipes: MixRecipe[];
+  recentTargetColors: RecentColor[];
+  settings: UserSettings;
+  sessions: PaintingSession[];
+  activeSessionId: string | null;
 };
