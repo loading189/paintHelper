@@ -1,4 +1,6 @@
 import { Card } from '../../components/Card';
+import { MixPathBlock } from '../../components/MixPathBlock';
+import { NextAdjustmentBlock } from '../../components/NextAdjustmentBlock';
 import { SwatchTile } from '../../components/SwatchTile';
 import { formatDistance } from '../../lib/utils/format';
 import type { Paint, RankedRecipe } from '../../types/models';
@@ -223,22 +225,15 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
             </div>
           </section>
 
-          <section className="rounded-[30px] border border-[rgba(84,111,88,0.16)] bg-[rgba(84,111,88,0.08)] p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="studio-eyebrow">Next adjustments</p>
-                <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[color:var(--text-strong)]">Refinement suggestions</p>
-              </div>
-              <span className="studio-chip studio-chip-success">First-class guidance</span>
-            </div>
-            <ul className="mt-4 space-y-2.5 text-sm leading-6 text-[color:var(--text-body)]">
-              {recipe.nextAdjustments.map((line) => (
-                <li key={line} className="rounded-[20px] border border-[rgba(84,111,88,0.14)] bg-[rgba(251,248,243,0.72)] px-4 py-3">
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </section>
+          <div className="space-y-6">
+            <section className="studio-panel studio-panel-muted">
+              <p className="studio-eyebrow">Palette limitation signal</p>
+              <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[color:var(--text-strong)]">{recipe.achievability.headline}</p>
+              <p className="mt-3 text-sm leading-6 text-[color:var(--text-muted)]">{recipe.achievability.detail}</p>
+            </section>
+            <NextAdjustmentBlock adjustments={recipe.detailedAdjustments} />
+            <MixPathBlock steps={recipe.mixPath} warnings={recipe.stabilityWarnings} layeringSuggestion={recipe.layeringSuggestion} />
+          </div>
 
           <details className="studio-disclosure group">
             <summary className="studio-disclosure-summary">
