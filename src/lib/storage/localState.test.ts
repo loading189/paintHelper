@@ -16,7 +16,10 @@ const createStorage = (seed?: string) => {
 describe('localState', () => {
   it('falls back when persisted JSON is corrupted', () => {
     const storage = createStorage('{bad json');
-    expect(loadAppState(storage)).toEqual(getInitialState());
+    const loaded = loadAppState(storage);
+    expect(loaded.paints).toEqual(getInitialState().paints);
+    expect(loaded.recipes).toEqual([]);
+    expect(loaded.sessions).toHaveLength(1);
   });
 
   it('saves and reloads app state', () => {

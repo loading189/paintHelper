@@ -21,6 +21,11 @@ export type RecipeBadge =
   | 'Muted naturally'
   | 'Chromatic build'
   | 'Single-paint shortcut';
+export type WorkspaceView = 'mixer' | 'prep' | 'active' | 'sampler' | 'sessions' | 'paints' | 'recipes';
+export type MixStatus = 'not-mixed' | 'mixed' | 'adjusted' | 'remix-needed';
+export type TargetRole = 'primary' | 'secondary' | 'optional';
+export type TargetSortMode = 'custom' | 'light-to-dark' | 'family' | 'priority';
+export type SampleMode = 'pixel' | 'average' | 'smart';
 
 export type SessionStatus = 'planning' | 'active' | 'completed' | 'archived';
 export type MixStatus = 'not-mixed' | 'mixed' | 'adjusted' | 'remix-needed';
@@ -129,24 +134,20 @@ export type RecipeScoreBreakdown = {
   finalScore: number;
 };
 
-export type AdjustmentSuggestion = {
-  priority: AdjustmentPriority;
-  kind: AdjustmentKind;
-  label: string;
-  detail: string;
-};
-
 export type MixPathStep = {
-  role: MixPathStepRole;
-  paintId?: string;
-  paintName: string;
-  instruction: string;
+  title: string;
+  detail: string;
 };
 
-export type AchievabilityInsight = {
-  level: AchievabilityLevel;
-  headline: string;
+export type AchievabilitySignal = {
+  level: 'easy' | 'moderate' | 'challenging';
+  summary: string;
   detail: string;
+};
+
+export type MixWarning = {
+  level: 'info' | 'warning';
+  text: string;
 };
 
 export type MixRecipe = {
@@ -198,6 +199,77 @@ export type RecentColor = {
   usedAt: string;
 };
 
+export type ReferenceImageMeta = {
+  id: string;
+  name: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  objectUrl?: string;
+  dataUrl?: string;
+  addedAt: string;
+};
+
+export type ReferenceSample = {
+  id: string;
+  name: string;
+  hex: string;
+  point: { x: number; y: number };
+  radius: number;
+  mode: SampleMode;
+  note?: string;
+  addedAt: string;
+};
+
+export type ExtractedPaletteColor = {
+  id: string;
+  hex: string;
+  population: number;
+  label: string;
+};
+
+export type ReferenceSamplerState = {
+  image?: ReferenceImageMeta;
+  sampleMode: SampleMode;
+  sampleRadius: number;
+  zoom: number;
+  samples: ReferenceSample[];
+  extractedPalette: ExtractedPaletteColor[];
+  selectedSampleIds: string[];
+};
+
+export type PaintingTarget = {
+  id: string;
+  name: string;
+  hex: string;
+  notes?: string;
+  areaTag?: string;
+  role: TargetRole;
+  priority: number;
+  source: 'manual' | 'reference-sample' | 'palette-extraction' | 'family-generator';
+  addedAt: string;
+  sortIndex: number;
+  recipe?: RankedRecipe;
+  lockedRecipeId?: string;
+  mixStatus: MixStatus;
+  isPinned: boolean;
+  familyGroup?: string;
+  sampleId?: string;
+};
+
+export type PaintingSession = {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  status: 'planning' | 'active';
+  prepNotes?: string;
+  referenceImageId?: string;
+  targetSortMode: TargetSortMode;
+  targets: PaintingTarget[];
+};
+
 export type RankedRecipe = {
   id: string;
   predictedHex: string;
@@ -222,45 +294,10 @@ export type RankedRecipe = {
   predictedAnalysis: ColorAnalysis;
   whyThisRanked: string[];
   mixStrategy: string[];
-  mixPath: MixPathStep[];
-  stabilityWarnings: string[];
-  roleNotes: string[];
-  achievability: AchievabilityInsight;
-  layeringSuggestion?: string;
-};
-
-export type PaintingTarget = {
-  id: string;
-  label: string;
-  targetHex: string;
-  notes?: string;
-  area?: string;
-  family?: string;
-  priority?: TargetPriority;
-  recipeOptions: RankedRecipe[];
-  selectedRecipeId?: string;
-  selectedRecipe?: RankedRecipe;
-  mixStatus: MixStatus;
-  prepStatus: PrepStatus;
-  tags?: string[];
-  valueRole?: TargetValueRole;
-};
-
-export type PaintingSession = {
-  id: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  status: SessionStatus;
-  notes?: string;
-  subject?: string;
-  lightingNotes?: string;
-  moodNotes?: string;
-  canvasNotes?: string;
-  targetOrder: string[];
-  targets: PaintingTarget[];
-  activeTargetIds: string[];
-  pinnedTargetIds: string[];
+  mixPath?: MixPathStep[];
+  dominanceWarnings?: MixWarning[];
+  achievability?: AchievabilitySignal;
+  glazingSuggestion?: string;
 };
 
 export type AppState = {
@@ -269,5 +306,6 @@ export type AppState = {
   recentTargetColors: RecentColor[];
   settings: UserSettings;
   sessions: PaintingSession[];
-  activeSessionId: string | null;
+  currentSessionId: string | null;
+  sampler: ReferenceSamplerState;
 };

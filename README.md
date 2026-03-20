@@ -1,128 +1,187 @@
 # Paint Mix Matcher
 
-Paint Mix Matcher is a **local-only, deterministic digital studio assistant** for realism-oriented acrylic painting.
+Paint Mix Matcher is now a **local-only, deterministic spectral painting workstation** for artists who want to move from reference analysis to actual palette preparation and live painting without leaving one application.
 
-The app still includes the original single-color spectral mixer, but it now grows into a broader workflow tool:
+This major release keeps the existing **Spectral.js-based paint prediction engine** as the source of truth, then expands the product into a workflow-first studio companion with:
 
-- plan a painting session before you start
-- build and organize target colors for the painting
-- generate deterministic spectral recipe options per target
-- lock the recipes you actually want to use
-- move into an active painting dashboard with only the relevant swatches and guidance
-- keep everything local in browser storage with no backend, auth, or cloud sync
+- a premium dark workstation UI
+- session-based planning and execution
+- a reference image sampler with canvas-based picking
+- averaged and smart sample modes
+- deterministic palette extraction / color clustering
+- expanded painting prep and active painting dashboards
+- practical mix ratios, mix paths, adjustment guidance, and achievability signals
 
-## What changed in this phase
-
-The product is no longer only:
-
-- “find a recipe for one target color”
-
-It is now also:
-
-- “help me prepare for a painting”
-- “help me mix the colors I will need”
-- “help me keep the important mixes visible while painting”
-- “help me understand what to adjust next”
-
-## Core workflow
-
-### 1. Mixer
-
-The original mixer remains available as a focused single-target tool.
-
-It still preserves the existing UX wins:
-
-- **Generate Recipes** only runs on click
-- no auto-generation while typing
-- loading state
-- stale-results notice
-- practical ratio shown before deeper technical detail
-
-Use Mixer when you want a fast isolated color lookup or when you want to reload an old saved recipe target.
-
-### 2. Painting Prep
-
-Painting Prep is the new planning board.
-
-Use it to:
-
-- create or open a painting session
-- describe the subject, lighting, mood, and canvas notes
-- add target colors with labels like `leaf highlight`, `skin midtone`, or `background neutral`
-- generate recipe options for each target using the existing spectral engine
-- choose and lock preferred recipes
-- include targets on the active painting board
-- generate deterministic target families and value ladders
-
-Each target can store:
-
-- target hex
-- label
-- notes
-- area/family grouping
-- value role
-- priority
-- recipe options
-- selected recipe
-- prep status
-- mix status
-
-### 3. Active Painting
-
-Active Painting is the simplified working dashboard for use while painting.
-
-It emphasizes:
-
-- large swatches
-- practical ratio
-- practical percentages
-- selected recipe text
-- mix status controls
-- next-adjustment suggestions
-- mix path / order guidance
-- pinning important colors to the top
-
-This view intentionally shows only session-selected colors so the working board stays glanceable.
-
-### 4. Sessions / Archive
-
-Sessions are now first-class persisted records.
-
-A session connects:
-
-- prep notes
-- target colors
-- stored recipe options
-- locked recipe selections
-- active board inclusion
-- pinning
-- mix status tracking
-
-You can:
-
-- create sessions
-- duplicate sessions
-- change status (`planning`, `active`, `completed`, `archived`)
-- delete sessions
-- reopen them later without losing selected recipes
-
-## Product boundaries
+## Core product principles
 
 The app intentionally remains:
 
-- local-only
-- deterministic
-- browser-based
-- backend-free
-- auth-free
-- cloud-sync-free
-- external-API-free for core functionality
+- **local-only**
+- **deterministic**
+- **browser-based**
+- **backend-free**
+- **auth-free**
+- **cloud-sync-free**
+- **external-API-free** for core functionality
 
-All paints, settings, saved recipes, recent targets, and painting sessions remain in **`localStorage` only**.
+All paints, sessions, sampled colors, saved recipes, and prep state stay in **`localStorage` only**.
+
+## What changed in this major release
+
+The app is no longer just “find a recipe for one color.”
+
+It is now a coherent painting workflow for:
+
+1. building a painting session
+2. sampling and organizing colors from a reference image
+3. extracting a clustered palette automatically
+4. generating deterministic spectral recipes
+5. planning the palette in prep mode
+6. painting from a simplified active dashboard
+7. adjusting intelligently while painting
+
+## Workspaces
+
+The application is organized as a unified workstation shell with these workspaces:
+
+- **Mixer** — direct target matching and recipe exploration
+- **Painting Prep** — target board, recipe locking, value / family generation
+- **Active Painting** — large swatches, practical ratios, live mix status tracking
+- **Reference Sampler** — canvas-based image sampling and palette extraction
+- **Sessions** — project switching and session lifecycle
+- **My Paints** — on-hand inventory management
+- **Saved Recipes** — archived local recipe references
+
+## Spectral engine architecture
+
+The app still uses the in-repo Spectral.js-style Kubelka–Munk stack as the color prediction core.
+
+### Main spectral layers
+
+- `src/lib/vendor/spectral.ts`
+  - vendored spectral core and OKLab helpers
+- `src/lib/color/spectralMixing.ts`
+  - application-facing adapter around the spectral engine
+- `src/lib/color/mixEngine.ts`
+  - deterministic candidate generation, ranking, and recipe enrichment
+- `src/lib/session/workflow.ts`
+  - session-facing spectral helpers such as mix paths, achievability, and family tools
+
+The UI talks to these adapters rather than reaching into Spectral internals directly.
+
+## Reference sampler
+
+The new reference sampler is a first-class workspace.
+
+### Capabilities
+
+- upload a local JPG / PNG / WebP reference
+- render the image into a controlled HTML canvas
+- click to sample a color from the image
+- inspect color transitions with a loupe
+- sample as:
+  - **single pixel**
+  - **averaged radius**
+  - **smart weighted sample**
+- collect manual samples into a sample tray
+- rename sampled colors before sending them into a session
+- extract a deterministic clustered palette in-browser
+- send samples or extracted colors directly into **Painting Prep**
+
+### Why a controlled canvas sampler?
+
+Because it keeps the workflow:
+
+- precise
+- deterministic
+- local-only
+- extensible for future tools such as pan/zoom or masks
+
+The implementation lives in:
+
+- `src/features/reference/ReferenceSamplerCanvas.tsx`
+- `src/features/reference/ReferenceSamplerPage.tsx`
+- `src/lib/color/referenceSampler.ts`
+
+## Palette extraction / clustering
+
+Automatic palette extraction runs entirely in the browser.
+
+### Current approach
+
+- downsample the image deterministically
+- cluster RGB samples with deterministic seeded k-means-style grouping
+- sort by cluster population
+- remove duplicates
+- present grouped palette candidates for session import
+
+### Goals of the clustering system
+
+- deterministic output
+- useful painterly grouping
+- reduced noisy duplicates
+- preservation of broad, relevant color families
+
+This system is intentionally simple, explainable, and local.
+
+## Painting prep board
+
+Painting Prep has been expanded into a real palette planning board.
+
+### Prep workflow
+
+- edit the active session name and description
+- add targets manually or from the reference sampler
+- view targets in a board layout
+- generate a top spectral recipe for a selected target
+- review swatch comparisons
+- inspect mix path, achievability, and adjustment guidance
+- generate deterministic highlight / shadow / muted / accent variations
+- sort targets by:
+  - custom order
+  - light to dark
+  - family
+  - priority
+
+## Active painting dashboard
+
+Active Painting is optimized for actual mixing and brushwork rather than deep analysis.
+
+### Dashboard emphasis
+
+- large swatches
+- practical ratio display
+- quick ingredient list
+- primary next-adjustment cue
+- mix path guidance
+- mix status controls:
+  - not mixed
+  - mixed
+  - adjusted
+  - remix needed
+- pinning and duplication for important colors
+
+The goal is to feel more like a physical palette board translated into software than a developer dashboard.
+
+## Advanced spectral helpers
+
+This release expands the artist-facing guidance layer around the spectral engine.
+
+### Included helpers
+
+- **Practical ratios** for physical mixing
+- **Mix path** instructions that prioritize painterly order
+- **Next adjustments** based on target vs predicted comparison
+- **Dominance warnings** for strong tinting paints, white, black, and earth colors
+- **Achievability signals** for easy / moderate / challenging targets
+- **Value / family generation** for related target sets
+- **Optional glazing suggestion** when a direct mix looks difficult
+
+These tools are deterministic and intentionally restrained.
 
 ## Default on-hand palette
 
-The built-in palette is still intentionally limited to the current on-hand nine paints:
+The built-in starter palette remains the same initial working set:
 
 - Mars Black
 - Cadmium Yellow Medium
@@ -134,203 +193,86 @@ The built-in palette is still intentionally limited to the current on-hand nine 
 - Unbleached Titanium
 - Titanium White
 
-The seed paints are still **approximations**, not measured manufacturer spectral scans.
-
-## Spectral engine architecture
-
-The app continues to use the same local spectral core.
-
-### Core files
-
-- `src/lib/vendor/spectral.ts`
-  - vendored Spectral.js-style Kubelka-Munk core
-- `src/lib/color/spectralMixing.ts`
-  - app-facing spectral adapter
-- `src/lib/color/mixEngine.ts`
-  - deterministic candidate generation + ranking
-- `src/lib/color/adjustmentEngine.ts`
-  - deterministic adjustment suggestions
-- `src/lib/color/mixPathEngine.ts`
-  - painterly mix order / dominance warnings
-- `src/lib/color/achievability.ts`
-  - achievable / limited palette signal
-- `src/lib/color/valueRange.ts`
-  - lighter / darker / muted target generation
-- `src/lib/color/familyGeneration.ts`
-  - prep-friendly target family generation
-
-The rest of the app talks to these modules, not to Spectral internals directly.
-
-## Session model
-
-The new persistence model introduces two core records:
-
-### `PaintingSession`
-
-A session stores:
-
-- metadata (`title`, notes, subject, lighting, mood, canvas)
-- status
-- ordered targets
-- active target ids
-- pinned target ids
-
-### `PaintingTarget`
-
-A target stores:
-
-- labeled target color
-- target notes / area / family
-- priority and value role
-- generated recipe options
-- selected recipe and lock state
-- prep state
-- mix state
-
-## Advanced painter-focused features
-
-### Practical ratios remain primary
-
-Every recipe still stores exact weighting, but the UI keeps the **practical ratio** as the main physical instruction.
-
-### Next-adjustment engine expansion
-
-The app now surfaces richer deterministic adjustments such as:
-
-- too dark / too light
-- too warm / too cool
-- too saturated / too muted
-- hue-specific steering suggestions
-
-These are ordered as:
-
-- primary
-- secondary
-- optional
-
-### Mix path / mix order
-
-Recipes can now include a deterministic mix path such as:
-
-- what to start with as the base pile
-- which paint should enter next to build hue
-- which paint should be reserved for support or muting
-
-### Stability / dominance warnings
-
-Helpful warnings appear when a recipe is especially easy to overshoot, for example with:
-
-- Phthalo Blue
-- Titanium White
-- Burnt Umber acting mainly as a natural mute
-
-### Achievability signal
-
-Recipes can surface a restrained palette-grounded signal such as:
-
-- strongly achievable with current palette
-- workable with refinement
-- closest achievable with current palette
-
-### Value ladder and family generation
-
-From a session target you can generate deterministic related targets such as:
-
-- lighter
-- darker
-- muted
-- highlight / midtone / shadow family variants
-
-These are intended to support realism planning, not endless automatic exploration.
-
-## Ranking modes
-
-### 1. Painter-Friendly Balanced
-
-Default mode.
-
-Priorities:
-
-1. spectral plausibility
-2. hue-family correctness
-3. believable painterly construction path
-4. value fit
-5. support-paint restraint
-6. usability
-
-### 2. Strict Closest Color
-
-Uses the raw closest spectral result with minimal painter heuristics.
-
-### 3. Simpler Recipes Preferred
-
-Still spectral and deterministic, but gives a small edge to simpler close solutions.
+These are still **seed approximations**, not lab-measured scans of specific tube batches.
 
 ## Persistence and migration
 
-The storage layer now safely handles:
+State is stored under a single browser `localStorage` key and now includes:
 
-- older app state without sessions
-- older saved recipes missing newer workflow fields
-- persisted sessions with selected recipes
-- local-only session status / pinning / active target tracking
+- paints
+- saved recipes
+- recent targets
+- user settings
+- painting sessions
+- current session selection
+- reference sampler state
 
-If older data is incomplete, the app sanitizes it instead of crashing.
+The storage loader sanitizes older saved data so legacy states do not crash the app when new fields are missing.
 
-## UI direction
+## How recipe generation still works
 
-The interface keeps the neutral studio-style direction and expands it into a workflow-oriented information architecture:
+1. Normalize the target color.
+2. Analyze it perceptually in OKLab / OKLCh terms.
+3. Generate deterministic one-, two-, and three-paint candidates.
+4. Filter implausible candidates with painter-aware heuristics.
+5. Predict each candidate with the spectral engine.
+6. Rank results according to the selected mode.
+7. Enrich the best results with practical ratios, mix path, and next-adjustment guidance.
 
-- Mixer
-- Painting Prep
-- Active Painting
-- My Paints
-- Saved Recipes
-- Sessions
+## Ranking modes
 
-The design goals remain:
+### Painter-Friendly Balanced
+Default mode focused on believable studio use.
 
-- swatch-heavy presentation
-- restrained neutral surrounds
-- calm spacing and hierarchy
-- painter-first wording instead of technical dashboard language
+### Strict Closest Color
+Prioritizes raw spectral closeness with minimal painter heuristics.
 
-## What the app does not try to be
+### Simpler Recipes Preferred
+Keeps the spectral engine central while nudging close solutions toward setup simplicity.
 
-This is still **not**:
+## Known limitations
 
-- a backend system
-- a cloud product
-- a social tool
-- a giant manufacturer paint catalog
-- a spectral-lab guarantee
+This app is still a **painter’s assistant**, not a lab guarantee.
 
-It is a deterministic local planning and mixing assistant grounded in the current on-hand palette.
+Important limitations remain:
 
-## Setup
+- seed paints are approximations, not measured production tubes
+- the reference sampler currently prioritizes precise picking and clustering over advanced masking workflows
+- palette extraction is deterministic and useful, but intentionally lightweight rather than research-grade segmentation
+- no backend means no cross-device sync or team workflows
+- browser rendering of uploaded references may vary slightly by environment even though the clustering flow is deterministic inside a given browser/runtime
+
+## Development
 
 ```bash
 npm install
 npm run dev
-```
-
-## Testing
-
-```bash
 npm test
 npm run build
 ```
 
-Current coverage includes:
+## Test coverage in this release
 
-- existing spectral recipe flow
-- session creation / persistence
-- target add + recipe lock workflow
-- active dashboard mix status handling
-- family generation and value ladder helpers
-- expanded next-adjustment ordering
-- mix path generation
-- achievability detection
-- storage migration safety
-- prep / active page rendering
-- build and type safety
+The suite covers:
+
+- session persistence and migration
+- prep workflow helpers
+- active workflow spectral enrichment
+- reference sampling logic
+- averaged sampling behavior
+- deterministic palette extraction
+- clustering stability
+- workstation shell rendering
+- existing mixer behavior
+- type-safe production build
+
+## Product direction
+
+Paint Mix Matcher is now designed to feel like:
+
+- a luxury digital color lab
+- a painter’s spectral workstation
+- a studio planning board
+- a serious local creative instrument
+
+without becoming a backend platform, a cloud workflow, or a generic dashboard product.
