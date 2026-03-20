@@ -27,6 +27,16 @@ export type TargetRole = 'primary' | 'secondary' | 'optional';
 export type TargetSortMode = 'custom' | 'light-to-dark' | 'family' | 'priority';
 export type SampleMode = 'pixel' | 'average' | 'smart';
 
+export type SessionStatus = 'planning' | 'active' | 'completed' | 'archived';
+export type MixStatus = 'not-mixed' | 'mixed' | 'adjusted' | 'remix-needed';
+export type PrepStatus = 'unreviewed' | 'reviewed' | 'locked';
+export type TargetPriority = 'primary' | 'secondary' | 'optional';
+export type TargetValueRole = 'highlight' | 'light' | 'midtone' | 'shadow' | 'accent';
+export type AdjustmentPriority = 'primary' | 'secondary' | 'optional';
+export type AdjustmentKind = 'value' | 'hue' | 'temperature' | 'chroma' | 'muting' | 'lightness' | 'darkness';
+export type AchievabilityLevel = 'strong' | 'workable' | 'limited';
+export type MixPathStepRole = 'base' | 'hue-build' | 'support' | 'refine';
+
 export type PaintHeuristics = {
   tintStrength?: TintStrength;
   naturalBias?: NaturalBias;
@@ -153,6 +163,7 @@ export type MixRecipe = {
   qualityLabel?: RecipeQualityLabel;
   guidanceText?: string[];
   nextAdjustments?: string[];
+  detailedAdjustments?: AdjustmentSuggestion[];
   scoreBreakdown?: RecipeScoreBreakdown;
   exactParts?: number[];
   exactPercentages?: number[];
@@ -161,6 +172,11 @@ export type MixRecipe = {
   practicalPercentages?: number[];
   practicalRatioText?: string;
   recipeText?: string;
+  mixPath?: MixPathStep[];
+  stabilityWarnings?: string[];
+  roleNotes?: string[];
+  achievability?: AchievabilityInsight;
+  layeringSuggestion?: string;
 };
 
 export type SinglePaintPenaltySettings = {
@@ -255,6 +271,7 @@ export type PaintingSession = {
 };
 
 export type RankedRecipe = {
+  id: string;
   predictedHex: string;
   distanceScore: number;
   components: RecipeComponent[];
@@ -272,6 +289,7 @@ export type RankedRecipe = {
   badges: RecipeBadge[];
   guidanceText: string[];
   nextAdjustments: string[];
+  detailedAdjustments: AdjustmentSuggestion[];
   targetAnalysis: ColorAnalysis;
   predictedAnalysis: ColorAnalysis;
   whyThisRanked: string[];

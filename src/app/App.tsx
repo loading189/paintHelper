@@ -71,6 +71,7 @@ const App = () => {
       qualityLabel: recipe.qualityLabel,
       guidanceText: recipe.guidanceText,
       nextAdjustments: recipe.nextAdjustments,
+      detailedAdjustments: recipe.detailedAdjustments,
       scoreBreakdown: recipe.scoreBreakdown,
       exactParts: recipe.exactParts,
       exactPercentages: recipe.exactPercentages,
@@ -79,6 +80,11 @@ const App = () => {
       practicalPercentages: recipe.practicalPercentages,
       practicalRatioText: recipe.practicalRatioText,
       recipeText: recipe.recipeText,
+      mixPath: recipe.mixPath,
+      stabilityWarnings: recipe.stabilityWarnings,
+      roleNotes: recipe.roleNotes,
+      achievability: recipe.achievability,
+      layeringSuggestion: recipe.layeringSuggestion,
     };
 
     setState((current) => ({ ...current, recipes: [saved, ...current.recipes] }));
