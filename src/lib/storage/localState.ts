@@ -42,15 +42,18 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 const createStarterSession = (): PaintingSession => ({
   id: createId('session'),
-  title: 'Studio Session',
+  title: 'Untitled painting project',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   status: 'planning',
-  notes: 'Plan your reference colors, build recipes, and move into painting mode.',
+  notes: 'Build a reference-led palette in Prep, then carry it into Paint.',
   subject: undefined,
   lightingNotes: undefined,
   moodNotes: undefined,
   canvasNotes: undefined,
+  referenceImage: undefined,
+  extractedCandidatePalette: [],
+  sampledColors: [],
   targetOrder: [],
   targets: [],
   activeTargetIds: [],
@@ -343,6 +346,24 @@ const sanitizeAchievability = (
   };
 };
 
+
+const sanitizeReferenceImageMeta = (value: unknown) => {
+  if (!isObject(value)) {
+    return undefined;
+  }
+
+  return {
+    id: typeof value.id === 'string' ? value.id : createId('reference-image'),
+    name: typeof value.name === 'string' ? value.name : 'Reference image',
+    mimeType: typeof value.mimeType === 'string' ? value.mimeType : 'image/png',
+    width: typeof value.width === 'number' ? value.width : undefined,
+    height: typeof value.height === 'number' ? value.height : undefined,
+    objectUrl: typeof value.objectUrl === 'string' ? value.objectUrl : undefined,
+    dataUrl: typeof value.dataUrl === 'string' ? value.dataUrl : undefined,
+    addedAt: typeof value.addedAt === 'string' ? value.addedAt : new Date().toISOString(),
+  };
+};
+
 const sanitizeReferenceSample = (
   value: unknown,
 ): ReferenceSample | undefined => {
@@ -607,6 +628,12 @@ const sanitizeSession = (value: unknown): PaintingSession | undefined => {
         .map(sanitizeTarget)
         .filter((target): target is PaintingTarget => Boolean(target))
     : [];
+  const rawExtractedCandidatePalette: unknown[] = Array.isArray((value as Record<string, unknown>).extractedCandidatePalette)
+    ? ((value as Record<string, unknown>).extractedCandidatePalette as unknown[])
+    : [];
+  const rawSampledColors: unknown[] = Array.isArray((value as Record<string, unknown>).sampledColors)
+    ? ((value as Record<string, unknown>).sampledColors as unknown[])
+    : [];
 
   const targetIds = new Set(targets.map((target) => target.id));
 
@@ -645,6 +672,13 @@ const sanitizeSession = (value: unknown): PaintingSession | undefined => {
       typeof value.moodNotes === 'string' ? value.moodNotes : undefined,
     canvasNotes:
       typeof value.canvasNotes === 'string' ? value.canvasNotes : undefined,
+    referenceImage: sanitizeReferenceImageMeta((value as Record<string, unknown>).referenceImage),
+    extractedCandidatePalette: rawExtractedCandidatePalette
+      .map(sanitizeExtractedPaletteColor)
+      .filter((color): color is ExtractedPaletteColor => Boolean(color)),
+    sampledColors: rawSampledColors
+      .map(sanitizeReferenceSample)
+      .filter((sample): sample is ReferenceSample => Boolean(sample)),
     targetOrder:
       targetOrder.length > 0
         ? [...new Set([...targetOrder, ...targets.map((target) => target.id)])]
@@ -731,10 +765,18 @@ export const loadAppState = (
             .filter((session): session is PaintingSession => Boolean(session))
         : fallback.sessions;
 
-    const currentSessionId =
-      typeof parsed.currentSessionId === 'string' &&
-      sessions.some((session) => session.id === parsed.currentSessionId)
+    const legacyActiveSessionId = (parsed as Record<string, unknown>).activeSessionId;
+    const requestedSessionId =
+      typeof parsed.currentSessionId === 'string'
         ? parsed.currentSessionId
+        : typeof legacyActiveSessionId === 'string'
+          ? legacyActiveSessionId
+          : null;
+
+    const currentSessionId =
+      requestedSessionId &&
+      sessions.some((session) => session.id === requestedSessionId)
+        ? requestedSessionId
         : sessions[0]?.id ?? null;
 
     const sampler = isObject(parsed.sampler)
@@ -764,6 +806,25 @@ export const loadAppState = (
         }
       : defaultSamplerState();
 
+    const migratedSessions = sessions.map((session) => {
+      if (session.referenceImage || session.extractedCandidatePalette.length > 0 || session.sampledColors.length > 0) {
+        return session;
+      }
+      if (currentSessionId !== session.id) {
+        return session;
+      }
+      return {
+        ...session,
+        referenceImage: session.referenceImage ?? sampler.image,
+        extractedCandidatePalette:
+          session.extractedCandidatePalette.length > 0
+            ? session.extractedCandidatePalette
+            : sampler.extractedPalette,
+        sampledColors:
+          session.sampledColors.length > 0 ? session.sampledColors : sampler.samples,
+      };
+    });
+
     return {
       paints: Array.isArray(parsed.paints)
         ? parsed.paints.filter(isPaint).map(sanitizePaint)
@@ -775,7 +836,7 @@ export const loadAppState = (
         ? parsed.recentTargetColors.filter(isRecentColor).slice(0, 8)
         : fallback.recentTargetColors,
       settings: sanitizeSettings(parsed.settings),
-      sessions,
+      sessions: migratedSessions,
       currentSessionId,
       sampler,
     };

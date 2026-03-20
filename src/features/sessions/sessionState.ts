@@ -58,7 +58,7 @@ export const createPaintingSession = (draft?: Partial<SessionDraft>): PaintingSe
   const timestamp = nowIso();
   return {
     id: createId('session'),
-    title: draft?.title?.trim() || 'Untitled painting session',
+    title: draft?.title?.trim() || 'Untitled painting project',
     createdAt: timestamp,
     updatedAt: timestamp,
     status: draft?.status ?? 'planning',
@@ -67,6 +67,9 @@ export const createPaintingSession = (draft?: Partial<SessionDraft>): PaintingSe
     lightingNotes: draft?.lightingNotes?.trim() || undefined,
     moodNotes: draft?.moodNotes?.trim() || undefined,
     canvasNotes: draft?.canvasNotes?.trim() || undefined,
+    referenceImage: undefined,
+    extractedCandidatePalette: [],
+    sampledColors: [],
     targetOrder: [],
     targets: [],
     activeTargetIds: [],
@@ -319,6 +322,6 @@ export const createStarterSessionState = (state: AppState, title = 'New painting
   return {
     ...state,
     sessions: [session, ...state.sessions],
-    activeSessionId: session.id,
+    currentSessionId: session.id,
   };
 };

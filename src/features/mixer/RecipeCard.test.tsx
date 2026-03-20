@@ -87,7 +87,7 @@ const recipe: RankedRecipe = {
 };
 
 describe('RecipeCard', () => {
-  it('renders practical percentages that agree with the displayed practical ratio', () => {
+  it('renders practical ratio and percentages as the primary mixer guidance', () => {
     const markup = renderToStaticMarkup(
       <RecipeCard rank={1} recipe={recipe} paints={paints} showPercentages showPartsRatios onSave={() => undefined} />,
     );
@@ -95,20 +95,17 @@ describe('RecipeCard', () => {
     expect(markup).toContain('Practical ratio');
     expect(markup).toContain('6:1');
     expect(markup).toContain('86%');
-    expect(markup).toContain('14%');
-    expect(markup).toContain('Exact percentages: 85% · 15%');
+    expect(markup).toContain('Palette recipe');
   });
 
-  it('renders comparison, adjustment, and reasoning sections for the redesigned card', () => {
+  it('keeps technical breakdown hidden behind optional details', () => {
     const markup = renderToStaticMarkup(
       <RecipeCard rank={1} recipe={recipe} paints={paints} showPercentages showPartsRatios onSave={() => undefined} />,
     );
 
-    expect(markup).toContain('Target versus predicted');
-    expect(markup).toContain('Difference cue');
+    expect(markup).toContain('Technical breakdown');
+    expect(markup).toContain('Optional details');
     expect(markup).toContain('Next adjustments');
-    expect(markup).toContain('Why this ranked');
     expect(markup).toContain('Add a small touch more Ultramarine Blue to cool the green.');
-    expect(markup).toContain('Best overall');
   });
 });

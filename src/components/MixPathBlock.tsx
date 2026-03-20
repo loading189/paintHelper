@@ -9,12 +9,17 @@ export const MixPathBlock = ({ steps, warnings, layeringSuggestion }: { steps: M
     <section className="studio-panel studio-panel-muted">
       <p className="studio-eyebrow">Mix path</p>
       <div className="mt-4 space-y-3">
-        {steps.map((step, index) => (
-          <div key={`${step.paintName}-${index}`} className="rounded-[22px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] px-4 py-3 text-sm">
-            <p className="font-semibold capitalize text-[color:var(--text-strong)]">{step.role.replace('-', ' ')}</p>
-            <p className="mt-1 leading-6 text-[color:var(--text-body)]">{step.instruction}</p>
-          </div>
-        ))}
+        {steps.map((step, index) => {
+          const title = step.role ? step.role.replace('-', ' ') : step.title ?? 'Step';
+          const detail = step.instruction ?? step.detail ?? '';
+          const key = `${step.paintName ?? step.title ?? 'step'}-${index}`;
+          return (
+            <div key={key} className="rounded-[22px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] px-4 py-3 text-sm">
+              <p className="font-semibold capitalize text-[color:var(--text-strong)]">{title}</p>
+              <p className="mt-1 leading-6 text-[color:var(--text-body)]">{detail}</p>
+            </div>
+          );
+        })}
       </div>
       {warnings?.length ? (
         <div className="mt-4 flex flex-wrap gap-2">

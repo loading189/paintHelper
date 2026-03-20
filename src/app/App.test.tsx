@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import App from './App';
 
 describe('App workstation shell', () => {
-  it('renders the redesigned workstation navigation and prep board copy', () => {
+  it('renders the simplified navigation', () => {
     const markup = renderToStaticMarkup(<App />);
-    expect(markup).toContain('Spectral painting workstation');
-    expect(markup).toContain('Painting Prep');
-    expect(markup).toContain('Reference Sampler');
-    expect(markup).toContain('Active Painting');
+    expect(markup).toContain('Artist-native spectral painting workflow');
+    expect(markup).toContain('Prep');
+    expect(markup).toContain('Paint');
+    expect(markup).toContain('Mixer');
+    expect(markup).toContain('Projects');
+    expect(markup).toContain('My Paints');
   });
 });

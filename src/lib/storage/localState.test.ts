@@ -30,6 +30,36 @@ describe('localState', () => {
     expect(loadAppState(storage)).toEqual(state);
   });
 
+
+  it('persists the selected palette inside a saved project', () => {
+    const storage = createStorage();
+    const state = getInitialState();
+    state.sessions[0] = {
+      ...state.sessions[0],
+      title: 'Saved project',
+      targetOrder: ['target-1'],
+      targets: [
+        {
+          id: 'target-1',
+          label: 'Sky blue',
+          targetHex: '#7A8FB3',
+          priority: 'primary',
+          recipeOptions: [],
+          selectedRecipeId: undefined,
+          selectedRecipe: undefined,
+          mixStatus: 'not-mixed',
+          prepStatus: 'reviewed',
+          tags: [],
+        },
+      ],
+    };
+
+    saveAppState(state, storage);
+    const loaded = loadAppState(storage);
+    expect(loaded.sessions[0]?.targets.map((target) => target.label)).toEqual(['Sky blue']);
+    expect(loaded.sessions[0]?.targets[0]?.targetHex).toBe('#7A8FB3');
+  });
+
   it('sanitizes new ranking mode settings deterministically', () => {
     expect(
       sanitizeSettings({
@@ -51,8 +81,6 @@ describe('localState', () => {
     });
   });
 
-
-
   it('sanitizes older saved data without crashing when newer spectral fields are missing', () => {
     const storage = createStorage(JSON.stringify({
       paints: [{ id: 'old-paint', name: 'Old Paint', hex: '#123456', isEnabled: true, isWhite: false, isBlack: false }],
@@ -66,10 +94,14 @@ describe('localState', () => {
     expect(loaded.settings.rankingMode).toBe('painter-friendly-balanced');
   });
 
-
-  it('migrates persisted sessions without crashing and keeps selected recipes stable', () => {
+  it('migrates persisted projects and preserves selected palette, recipes, and legacy active session ids', () => {
     const storage = createStorage(JSON.stringify({
       paints: [{ id: 'old-paint', name: 'Old Paint', hex: '#123456', isEnabled: true, isWhite: false, isBlack: false }],
+      sampler: {
+        image: { id: 'img-1', name: 'ref.png', mimeType: 'image/png', dataUrl: 'data:image/png;base64,abc', addedAt: '2026-03-20T00:00:00.000Z' },
+        samples: [{ id: 'sample-1', name: 'Face midtone', hex: '#D0A280', point: { x: 2, y: 3 }, radius: 4, mode: 'average', addedAt: '2026-03-20T00:00:00.000Z' }],
+        extractedPalette: [{ id: 'palette-1', label: 'orange mid', hex: '#D0A280', population: 24 }],
+      },
       sessions: [
         {
           id: 'session-1',
@@ -104,10 +136,13 @@ describe('localState', () => {
                   badges: [],
                   guidanceText: [],
                   nextAdjustments: [],
+                  detailedAdjustments: [],
                   targetAnalysis: { normalizedHex: '#D0A280', rgb: { r: 208, g: 162, b: 128 }, value: 0.6, valueClassification: 'mid', hue: 50, hueFamily: 'orange', saturation: 0.3, saturationClassification: 'muted', chroma: 0.1 },
                   predictedAnalysis: { normalizedHex: '#CAA27E', rgb: { r: 202, g: 162, b: 126 }, value: 0.6, valueClassification: 'mid', hue: 50, hueFamily: 'orange', saturation: 0.3, saturationClassification: 'muted', chroma: 0.1 },
                   whyThisRanked: [],
                   mixStrategy: [],
+                  mixPath: [],
+                  achievability: { level: 'workable', headline: 'Workable', detail: '' },
                 },
               ],
               selectedRecipeId: 'recipe-1',
@@ -129,13 +164,17 @@ describe('localState', () => {
                 badges: [],
                 guidanceText: [],
                 nextAdjustments: [],
+                detailedAdjustments: [],
                 targetAnalysis: { normalizedHex: '#D0A280', rgb: { r: 208, g: 162, b: 128 }, value: 0.6, valueClassification: 'mid', hue: 50, hueFamily: 'orange', saturation: 0.3, saturationClassification: 'muted', chroma: 0.1 },
                 predictedAnalysis: { normalizedHex: '#CAA27E', rgb: { r: 202, g: 162, b: 126 }, value: 0.6, valueClassification: 'mid', hue: 50, hueFamily: 'orange', saturation: 0.3, saturationClassification: 'muted', chroma: 0.1 },
                 whyThisRanked: [],
                 mixStrategy: [],
+                mixPath: [],
+                achievability: { level: 'workable', headline: 'Workable', detail: '' },
               },
               mixStatus: 'mixed',
               prepStatus: 'locked',
+              tags: [],
             },
           ],
         },
@@ -146,7 +185,10 @@ describe('localState', () => {
     const loaded = loadAppState(storage);
     expect(loaded.sessions[0]?.targets[0]?.selectedRecipeId).toBe('recipe-1');
     expect(loaded.sessions[0]?.targets[0]?.selectedRecipe?.predictedHex).toBe('#CAA27E');
-    expect(loaded.activeSessionId).toBe('session-1');
+    expect(loaded.sessions[0]?.referenceImage?.name).toBe('ref.png');
+    expect(loaded.sessions[0]?.sampledColors).toHaveLength(1);
+    expect(loaded.sessions[0]?.extractedCandidatePalette).toHaveLength(1);
+    expect(loaded.currentSessionId).toBe('session-1');
   });
 
   it('uses the expected storage key', () => {
