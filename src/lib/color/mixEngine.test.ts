@@ -212,6 +212,84 @@ describe('mixEngine', () => {
     expect(phthaloDominant).toEqual([]);
   });
 
+  it('strongly prefers yellow plus lighteners for light yellow painter-friendly targets', () => {
+    const ranked = rankRecipes('#F3E58A', starterPaints, {
+      ...defaultSettings,
+      weightStep: 5,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 8);
+
+    const top = ranked[0];
+    expect(top?.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium')).toBe(true);
+    expect(top?.components.some((component) => ['paint-titanium-white', 'paint-unbleached-titanium'].includes(component.paintId))).toBe(true);
+    expect(top?.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue')).toBe(false);
+  });
+
+  it('demotes blue-family paths for warm light yellows unless the hue really leans green', () => {
+    const ranked = rankRecipes('#F1DE74', starterPaints, {
+      ...defaultSettings,
+      weightStep: 5,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 10);
+
+    expect(ranked.slice(0, 5).every((recipe) =>
+      recipe.components.every((component) => component.paintId !== 'paint-phthalo-blue' && component.paintId !== 'paint-ultramarine-blue'),
+    )).toBe(true);
+  });
+
+  it('keeps pale cream yellows on a warm yellow-lightening path', () => {
+    const ranked = rankRecipes('#F5E9BF', starterPaints, {
+      ...defaultSettings,
+      weightStep: 5,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 6);
+
+    const top = ranked[0];
+    expect(top?.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium')).toBe(true);
+    expect(top?.components.some((component) => component.paintId === 'paint-unbleached-titanium' || component.paintId === 'paint-titanium-white')).toBe(true);
+  });
+
+  it('preserves green and olive behavior after yellow-light safeguards', () => {
+    const olive = rankRecipes('#8A8B4A', starterPaints, {
+      ...defaultSettings,
+      weightStep: 5,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 6);
+    const vivid = rankRecipes('#18E254', starterPaints, {
+      ...defaultSettings,
+      weightStep: 5,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 6);
+
+    expect(olive[0]?.components.some((component) => component.paintId === 'paint-ultramarine-blue' || component.paintId === 'paint-phthalo-blue')).toBe(true);
+    expect(vivid[0]?.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue')).toBe(true);
+  });
+
+  it('covers painter-common warm orange and violet targets with plausible families', () => {
+    const warmOrange = rankRecipes('#F29A3A', starterPaints, {
+      ...defaultSettings,
+      weightStep: 5,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 6);
+    const violet = rankRecipes('#8D68C9', starterPaints, {
+      ...defaultSettings,
+      weightStep: 5,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 6);
+
+    expect(warmOrange[0]?.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium')).toBe(true);
+    expect(warmOrange[0]?.components.some((component) => component.paintId === 'paint-cadmium-red' || component.paintId === 'paint-unbleached-titanium' || component.paintId === 'paint-titanium-white')).toBe(true);
+    expect(violet[0]?.components.some((component) => component.paintId === 'paint-alizarin-crimson' || component.paintId === 'paint-cadmium-red')).toBe(true);
+    expect(violet[0]?.components.some((component) => component.paintId === 'paint-ultramarine-blue' || component.paintId === 'paint-phthalo-blue')).toBe(true);
+  });
+
   it('keeps Mars Black in a support role for chromatic painter scores', () => {
     const target = analyzeColor('#18E254');
     const predicted = analyzeColor('#23482D');

@@ -147,6 +147,49 @@ const staysInBroadHueFamily = (targetAnalysis: ColorAnalysis, predictedAnalysis:
 
 const isChromaticTarget = (targetAnalysis: ColorAnalysis): boolean => targetAnalysis.hueFamily !== 'neutral';
 
+const isLightValueTarget = (targetAnalysis: ColorAnalysis): boolean =>
+  targetAnalysis.valueClassification === 'light' || targetAnalysis.valueClassification === 'very light';
+
+const isNearYellowGreen = (targetAnalysis: ColorAnalysis): boolean =>
+  targetAnalysis.hue !== null && targetAnalysis.hue >= 96;
+
+const isLightYellowFamilyTarget = (targetAnalysis: ColorAnalysis): boolean =>
+  targetAnalysis.hueFamily === 'yellow' && isLightValueTarget(targetAnalysis);
+
+const isLightCreamOrOrangeTarget = (targetAnalysis: ColorAnalysis): boolean =>
+  isLightValueTarget(targetAnalysis) &&
+  (targetAnalysis.hueFamily === 'orange' ||
+    (targetAnalysis.hueFamily === 'yellow' && targetAnalysis.saturationClassification !== 'vivid'));
+
+const isPainterFriendlyYellowLighteningTarget = (targetAnalysis: ColorAnalysis): boolean =>
+  isLightYellowFamilyTarget(targetAnalysis) || isLightCreamOrOrangeTarget(targetAnalysis);
+
+const shouldHeavilyRestrictBlueForTarget = (targetAnalysis: ColorAnalysis): boolean =>
+  isPainterFriendlyYellowLighteningTarget(targetAnalysis) && !isNearYellowGreen(targetAnalysis);
+
+const isOliveLikeTarget = (targetAnalysis: ColorAnalysis): boolean =>
+  targetAnalysis.hue !== null &&
+  targetAnalysis.hue >= 85 &&
+  targetAnalysis.hue <= 140 &&
+  !isLightValueTarget(targetAnalysis) &&
+  (targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'moderate');
+
+const getBlueFamilyRestrictionMax = (paint: Paint, targetAnalysis: ColorAnalysis): number | null => {
+  const name = paint.name.toLowerCase();
+
+  if (name.includes('phthalo blue')) {
+    if (shouldHeavilyRestrictBlueForTarget(targetAnalysis)) return 5;
+    if (isLightYellowFamilyTarget(targetAnalysis) && isNearYellowGreen(targetAnalysis)) return 10;
+  }
+
+  if (name.includes('ultramarine blue')) {
+    if (shouldHeavilyRestrictBlueForTarget(targetAnalysis)) return 0;
+    if (isLightYellowFamilyTarget(targetAnalysis) && isNearYellowGreen(targetAnalysis)) return 10;
+  }
+
+  return null;
+};
+
 const getTargetAwareMaxShare = (paint: Paint, targetAnalysis: ColorAnalysis): number => {
   const baseMaxShare = paint.heuristics?.recommendedMaxShare ?? 100;
   const name = paint.name.toLowerCase();
@@ -155,6 +198,10 @@ const getTargetAwareMaxShare = (paint: Paint, targetAnalysis: ColorAnalysis): nu
   const chromaticTarget = isChromaticTarget(targetAnalysis);
 
   if (name.includes('phthalo blue')) {
+    const restrictedBlueMax = getBlueFamilyRestrictionMax(paint, targetAnalysis);
+    if (restrictedBlueMax !== null) {
+      return Math.min(baseMaxShare, restrictedBlueMax);
+    }
     if (targetAnalysis.hueFamily === 'green' || targetAnalysis.hueFamily === 'blue') {
       if (saturation === 'vivid') return Math.min(baseMaxShare, 35);
       if (saturation === 'moderate') return Math.min(baseMaxShare, 28);
@@ -164,6 +211,13 @@ const getTargetAwareMaxShare = (paint: Paint, targetAnalysis: ColorAnalysis): nu
       return Math.min(baseMaxShare, saturation === 'vivid' ? 26 : 20);
     }
     return Math.min(baseMaxShare, saturation === 'vivid' ? 24 : 16);
+  }
+
+  if (name.includes('ultramarine blue')) {
+    const restrictedBlueMax = getBlueFamilyRestrictionMax(paint, targetAnalysis);
+    if (restrictedBlueMax !== null) {
+      return Math.min(baseMaxShare, restrictedBlueMax);
+    }
   }
 
   if (paint.isBlack) {
@@ -185,9 +239,15 @@ const getTargetAwareMaxShare = (paint: Paint, targetAnalysis: ColorAnalysis): nu
       return Math.min(baseMaxShare, 10);
     }
     if (saturation === 'moderate') {
+      if (isPainterFriendlyYellowLighteningTarget(targetAnalysis)) {
+        return Math.min(baseMaxShare, value === 'very light' ? 46 : 34);
+      }
       if (value === 'very light') return Math.min(baseMaxShare, 40);
       if (value === 'light') return Math.min(baseMaxShare, 24);
       return Math.min(baseMaxShare, 14);
+    }
+    if (isPainterFriendlyYellowLighteningTarget(targetAnalysis)) {
+      return Math.min(baseMaxShare, value === 'very light' ? 52 : 34);
     }
     return Math.min(baseMaxShare, value === 'very light' ? 45 : 22);
   }
@@ -195,6 +255,9 @@ const getTargetAwareMaxShare = (paint: Paint, targetAnalysis: ColorAnalysis): nu
   if (name.includes('unbleached titanium')) {
     if (!chromaticTarget) {
       return Math.min(baseMaxShare, value === 'very light' || value === 'light' ? 60 : 45);
+    }
+    if (isPainterFriendlyYellowLighteningTarget(targetAnalysis)) {
+      return Math.min(baseMaxShare, value === 'very light' ? 45 : 38);
     }
     if (saturation === 'vivid') return Math.min(baseMaxShare, 12);
     if (saturation === 'moderate') return Math.min(baseMaxShare, 18);
@@ -282,6 +345,139 @@ const getNaturalMixBonus = (paints: Paint[], components: RecipeComponent[], targ
   if (!(targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'neutral')) return 0;
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
   return components.some((component) => paintMap.get(component.paintId)?.heuristics?.naturalBias === 'earth') ? 0.05 : 0;
+};
+
+const getPainterPlausibilityPenalty = (
+  paints: Paint[],
+  components: RecipeComponent[],
+  targetAnalysis: ColorAnalysis,
+): number => {
+  const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
+
+  if (targetAnalysis.hueFamily === 'violet') {
+    const yellowShare = components.reduce((sum, component) => {
+      const paint = paintMap.get(component.paintId);
+      return paint && getPaintRoleFamily(paint) === 'yellow' ? sum + component.percentage : sum;
+    }, 0);
+    const blueShare = components.reduce((sum, component) => {
+      const paint = paintMap.get(component.paintId);
+      return paint && getPaintRoleFamily(paint) === 'blue' ? sum + component.percentage : sum;
+    }, 0);
+    const neutralizerShare = components.reduce((sum, component) => {
+      const paint = paintMap.get(component.paintId);
+      return paint && (paint.isBlack || paint.heuristics?.preferredRole === 'neutralizer') ? sum + component.percentage : sum;
+    }, 0);
+
+    let penalty = 0;
+    if (yellowShare > 0) {
+      penalty += 0.14 + yellowShare / 120;
+    }
+    if (blueShare === 0) {
+      penalty += 0.18;
+    }
+    if (neutralizerShare > 0 && targetAnalysis.saturationClassification !== 'muted') {
+      penalty += neutralizerShare / 220;
+    }
+    return penalty;
+  }
+
+  if (targetAnalysis.hueFamily === 'green') {
+    const redShare = components.reduce((sum, component) => {
+      const paint = paintMap.get(component.paintId);
+      return paint && getPaintRoleFamily(paint) === 'red' ? sum + component.percentage : sum;
+    }, 0);
+    const blueShare = components.reduce((sum, component) => {
+      const paint = paintMap.get(component.paintId);
+      return paint && getPaintRoleFamily(paint) === 'blue' ? sum + component.percentage : sum;
+    }, 0);
+    const earthShare = components.reduce((sum, component) => {
+      const paint = paintMap.get(component.paintId);
+      return paint && paint.heuristics?.naturalBias === 'earth' ? sum + component.percentage : sum;
+    }, 0);
+
+    let penalty = 0;
+    if (blueShare === 0) {
+      penalty += 0.2;
+    }
+    if (targetAnalysis.saturationClassification === 'vivid' && redShare > 0) {
+      penalty += 0.18 + redShare / 120;
+    } else if (redShare > 10) {
+      penalty += 0.08 + (redShare - 10) / 180;
+    }
+    if (targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'neutral') {
+      if (earthShare > 0) {
+        penalty -= 0.03;
+      } else {
+        penalty += 0.04;
+      }
+    }
+    return penalty;
+  }
+
+  if (isOliveLikeTarget(targetAnalysis)) {
+    const redShare = components.reduce((sum, component) => {
+      const paint = paintMap.get(component.paintId);
+      return paint && getPaintRoleFamily(paint) === 'red' ? sum + component.percentage : sum;
+    }, 0);
+    const blueShare = components.reduce((sum, component) => {
+      const paint = paintMap.get(component.paintId);
+      return paint && getPaintRoleFamily(paint) === 'blue' ? sum + component.percentage : sum;
+    }, 0);
+    const earthShare = components.reduce((sum, component) => {
+      const paint = paintMap.get(component.paintId);
+      return paint && paint.heuristics?.naturalBias === 'earth' ? sum + component.percentage : sum;
+    }, 0);
+
+    let penalty = 0;
+    if (blueShare === 0) {
+      penalty += 0.2;
+    }
+    if (earthShare === 0) {
+      penalty += 0.05;
+    } else {
+      penalty -= 0.03;
+    }
+    if (redShare > 10) {
+      penalty += 0.08 + (redShare - 10) / 180;
+    }
+    return penalty;
+  }
+
+  if (!isPainterFriendlyYellowLighteningTarget(targetAnalysis)) {
+    return 0;
+  }
+
+  const blueShare = components.reduce((sum, component) => {
+    const paint = paintMap.get(component.paintId);
+    return paint && getPaintRoleFamily(paint) === 'blue' ? sum + component.percentage : sum;
+  }, 0);
+  const yellowShare = components.reduce((sum, component) => {
+    const paint = paintMap.get(component.paintId);
+    return paint && getPaintRoleFamily(paint) === 'yellow' ? sum + component.percentage : sum;
+  }, 0);
+  const lightenerShare = components.reduce((sum, component) => {
+    const paint = paintMap.get(component.paintId);
+    return paint && (paint.isWhite || paint.name.includes('Unbleached Titanium') || paint.heuristics?.preferredRole === 'lightener')
+      ? sum + component.percentage
+      : sum;
+  }, 0);
+
+  let penalty = 0;
+  if (blueShare > 0) {
+    penalty += shouldHeavilyRestrictBlueForTarget(targetAnalysis)
+      ? 0.32 + blueShare / 90
+      : 0.08 + blueShare / 160;
+  }
+  if (yellowShare === 0) {
+    penalty += 0.18;
+  }
+  if (lightenerShare === 0) {
+    penalty += 0.12;
+  } else if (lightenerShare >= 20) {
+    penalty -= 0.03;
+  }
+
+  return penalty;
 };
 
 const getChromaticPathBonus = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): number => {
@@ -401,6 +597,7 @@ export const scoreRecipe = (
   const singlePaintPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getSinglePaintPenalty(settings, paints, components, targetAnalysis);
   const naturalMixBonus = settings.rankingMode === 'strict-closest-color' ? 0 : getNaturalMixBonus(paints, components, targetAnalysis);
   const chromaticPathBonus = settings.rankingMode === 'strict-closest-color' ? 0 : getChromaticPathBonus(paints, components, targetAnalysis);
+  const painterPlausibilityPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getPainterPlausibilityPenalty(paints, components, targetAnalysis);
   const twoPaintUsabilityBonus = getTwoPaintUsabilityBonus(settings, components, spectralDistance);
   const vividTargetPenalty =
     settings.rankingMode === 'strict-closest-color' || targetAnalysis.saturationClassification !== 'vivid' || staysInTargetHueFamily
@@ -420,6 +617,7 @@ export const scoreRecipe = (
     whitePenalty +
     earlyWhitePenalty +
     singlePaintPenalty +
+    painterPlausibilityPenalty +
     vividTargetPenalty -
     naturalMixBonus -
     chromaticPathBonus -
@@ -480,7 +678,14 @@ const isCandidateUsefulForTarget = (paints: Paint[], paintIds: string[], weights
 
   const supportWeights = weights.filter((_, index) => isSupportPaintForTarget(group[index], target));
   const supportShare = supportWeights.reduce((sum, weight) => sum + weight, 0);
+  const blueShare = weights.reduce((sum, weight, index) => (
+    getPaintRoleFamily(group[index]) === 'blue' ? sum + weight : sum
+  ), 0);
   if (isChromaticTarget(target) && supportWeights.length > 1 && supportShare > 35) {
+    return false;
+  }
+
+  if (shouldHeavilyRestrictBlueForTarget(target) && blueShare > 0) {
     return false;
   }
 

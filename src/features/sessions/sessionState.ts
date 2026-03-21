@@ -177,6 +177,60 @@ export const generateRecipesForSessionTarget = (
   });
 };
 
+export const prepareSessionForPainting = (
+  session: PaintingSession,
+  paints: Paint[],
+  settings: UserSettings,
+  limit = 6,
+): PaintingSession => {
+  const nextActiveIds = new Set(session.activeTargetIds);
+
+  const targets: PaintingTarget[] = session.targets.map((target) => {
+    const preservedSelectedRecipe =
+      target.selectedRecipe ??
+      target.recipeOptions.find((recipe) => recipe.id === target.selectedRecipeId);
+
+    if (preservedSelectedRecipe) {
+      nextActiveIds.add(target.id);
+      return {
+        ...target,
+        selectedRecipeId: preservedSelectedRecipe.id,
+        selectedRecipe: preservedSelectedRecipe,
+      };
+    }
+
+    const recipeOptions = target.recipeOptions.length
+      ? target.recipeOptions
+      : rankRecipes(target.targetHex, paints, settings, limit);
+    const selectedRecipe =
+      recipeOptions.find((recipe) => recipe.id === target.selectedRecipeId) ??
+      recipeOptions[0];
+
+    if (!selectedRecipe) {
+      return {
+        ...target,
+        recipeOptions,
+      };
+    }
+
+    nextActiveIds.add(target.id);
+    return {
+      ...target,
+      recipeOptions,
+      selectedRecipeId: selectedRecipe.id,
+      selectedRecipe,
+      prepStatus: target.prepStatus === 'locked' ? 'locked' as const : 'reviewed' as const,
+    };
+  });
+
+  return touchSession({
+    ...session,
+    status: targets.some((target) => target.selectedRecipe) ? 'active' : session.status,
+    targets,
+    activeTargetIds: session.targetOrder.filter((id) => nextActiveIds.has(id)),
+  });
+};
+
 export const selectRecipeForTarget = (session: PaintingSession, targetId: string, recipeId: string, lock = false): PaintingSession =>
   touchSession({
     ...session,
