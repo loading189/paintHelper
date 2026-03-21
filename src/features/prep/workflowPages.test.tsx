@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ActivePaintingPage } from '../active/ActivePaintingPage';
 import { PaintingPrepPage } from './PaintingPrepPage';
 import type { PaintingSession, RankedRecipe } from '../../types/models';
-import { starterPaints } from '../../lib/storage/seedData';
+import { starterPaints, defaultSettings } from '../../lib/storage/seedData';
 import { analyzeColor } from '../../lib/color/colorAnalysis';
 
 const recipe: RankedRecipe = {
@@ -76,6 +76,9 @@ const session: PaintingSession = {
   lightingNotes: 'Warm evening light',
   moodNotes: 'Calm and quiet',
   canvasNotes: 'Mid-tone ground',
+  referenceImage: { id: 'img-1', name: 'landscape.jpg', mimeType: 'image/jpeg', dataUrl: 'data:image/jpeg;base64,abc', addedAt: '2026-03-20T00:00:00.000Z' },
+  extractedCandidatePalette: [{ id: 'candidate-1', label: 'green mid', hex: '#718645', population: 32 }],
+  sampledColors: [{ id: 'sample-1', name: 'Tree shadow sample', hex: '#718645', point: { x: 4, y: 6 }, radius: 4, mode: 'average', addedAt: '2026-03-20T00:00:00.000Z' }],
   targetOrder: ['target-1'],
   activeTargetIds: ['target-1'],
   pinnedTargetIds: ['target-1'],
@@ -95,62 +98,40 @@ const session: PaintingSession = {
       prepStatus: 'locked',
       tags: ['tree', 'shadow'],
       valueRole: 'shadow',
+      source: 'reference-sample',
+      sampleId: 'sample-1',
     },
   ],
 };
 
 describe('workflow pages', () => {
-  it('renders the preparation board with target planning language', () => {
+  it('renders Prep with reference sampling flow and a clear candidate-versus-selected palette split', () => {
     const markup = renderToStaticMarkup(
       <PaintingPrepPage
-        sessions={[session]}
-        activeSessionId={session.id}
+        session={session}
         paints={starterPaints}
-        settings={{
-          weightStep: 10,
-          maxPaintsPerRecipe: 3,
-          showPercentages: true,
-          showPartsRatios: true,
-          rankingMode: 'painter-friendly-balanced',
-          singlePaintPenaltySettings: { discourageBlackOnlyMatches: true, discourageWhiteOnlyMatches: true, favorMultiPaintMixesWhenClose: true },
-        }}
-        onCreateSession={() => undefined}
-        onOpenSession={() => undefined}
-        onSessionMetaChange={() => undefined}
-        onAddTarget={() => undefined}
-        onUpdateTarget={() => undefined}
-        onRemoveTarget={() => undefined}
-        onGenerateRecipes={() => undefined}
-        onSelectRecipe={() => undefined}
-        onMoveTarget={() => undefined}
-        onToggleActiveTarget={() => undefined}
-        onAddGeneratedTargets={() => undefined}
+        settings={defaultSettings}
+        onSessionChange={() => undefined}
+        onCreateProject={() => undefined}
       />,
     );
 
-    expect(markup).toContain('Palette planning board');
-    expect(markup).toContain('Generate family');
-    expect(markup).toContain('Recipe options');
-    expect(markup).toContain('Landscape block-in');
+    expect(markup).toContain('Reference image');
+    expect(markup).toContain('Candidate colors');
+    expect(markup).toContain('Selected painting palette');
+    expect(markup).toContain('Extract palette');
+    expect(markup).toContain('Generate recipe');
   });
 
-  it('renders the active painting dashboard with large recipe guidance', () => {
+  it('renders Paint mode with the image and saved recipe guidance, not primary technical stats', () => {
     const markup = renderToStaticMarkup(
-      <ActivePaintingPage
-        sessions={[session]}
-        activeSessionId={session.id}
-        onOpenSession={() => undefined}
-        onStatusChange={() => undefined}
-        onMixStatusChange={() => undefined}
-        onTogglePin={() => undefined}
-        onDuplicateForRemix={() => undefined}
-        onOpenInPrep={() => undefined}
-      />,
+      <ActivePaintingPage session={session} onSessionChange={() => undefined} />,
     );
 
-    expect(markup).toContain('Board targets');
+    expect(markup).toContain('Painting image');
     expect(markup).toContain('Practical ratio');
-    expect(markup).toContain('Duplicate for remix');
     expect(markup).toContain('Tree shadow');
+    expect(markup).not.toContain('Spectral distance');
+    expect(markup).not.toContain('Score breakdown');
   });
 });

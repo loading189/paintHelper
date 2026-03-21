@@ -1,339 +1,350 @@
 import { useMemo, useState } from 'react';
 import { Card } from '../../components/Card';
 import { MixPathBlock } from '../../components/MixPathBlock';
-import { MixStatusChip } from '../../components/MixStatusChip';
 import { NextAdjustmentBlock } from '../../components/NextAdjustmentBlock';
-import { SessionHeader } from '../../components/SessionHeader';
 import { SectionTitle } from '../../components/SectionTitle';
 import { SwatchComparisonPanel } from '../../components/SwatchComparisonPanel';
-import type { Paint, PaintingSession, PaintingTarget, SessionStatus, TargetPriority, TargetValueRole, UserSettings } from '../../types/models';
-import { generateColorFamily } from '../../lib/color/familyGeneration';
-import { generateValueLadder } from '../../lib/color/valueRange';
-import { sortTargetsForView, summarizeSession } from '../sessions/sessionState';
+import { ReferenceSamplerCanvas } from '../reference/ReferenceSamplerCanvas';
+import { extractPalette } from '../../lib/color/referenceSampler';
+import { rankRecipes } from '../../lib/color/mixEngine';
+import { createId } from '../../lib/utils/id';
+import type { ExtractedPaletteColor, Paint, PaintingSession, PaintingTarget, ReferenceSample, UserSettings } from '../../types/models';
+
+const createTarget = (hex: string, label: string, source: PaintingTarget['source'], sampleId?: string): PaintingTarget => ({
+  id: createId('target'),
+  label,
+  targetHex: hex,
+  priority: 'primary',
+  recipeOptions: [],
+  selectedRecipeId: undefined,
+  selectedRecipe: undefined,
+  mixStatus: 'not-mixed',
+  prepStatus: 'unreviewed',
+  tags: [],
+  source,
+  sampleId,
+});
 
 type PaintingPrepPageProps = {
-  sessions: PaintingSession[];
-  activeSessionId: string | null;
+  session: PaintingSession | null;
   paints: Paint[];
   settings: UserSettings;
-  onCreateSession: (title: string) => void;
-  onOpenSession: (sessionId: string) => void;
-  onSessionMetaChange: (sessionId: string, patch: { title?: string; notes?: string; subject?: string; lightingNotes?: string; moodNotes?: string; canvasNotes?: string; status?: SessionStatus }) => void;
-  onAddTarget: (sessionId: string, draft: { label: string; targetHex: string; notes?: string; area?: string; family?: string; priority?: TargetPriority; valueRole?: TargetValueRole; tags?: string[] }) => void;
-  onUpdateTarget: (sessionId: string, targetId: string, patch: { label?: string; targetHex?: string; notes?: string; area?: string; family?: string; priority?: TargetPriority; valueRole?: TargetValueRole; tags?: string[] }) => void;
-  onRemoveTarget: (sessionId: string, targetId: string) => void;
-  onGenerateRecipes: (sessionId: string, targetId: string) => void;
-  onSelectRecipe: (sessionId: string, targetId: string, recipeId: string, lock?: boolean) => void;
-  onMoveTarget: (sessionId: string, targetId: string, direction: 'up' | 'down') => void;
-  onToggleActiveTarget: (sessionId: string, targetId: string) => void;
-  onAddGeneratedTargets: (sessionId: string, drafts: Array<{ label: string; targetHex: string; notes?: string; family?: string; priority?: TargetPriority; valueRole?: TargetValueRole }>) => void;
+  onSessionChange: (session: PaintingSession) => void;
+  onCreateProject: () => void;
 };
 
-const priorityOptions: TargetPriority[] = ['primary', 'secondary', 'optional'];
-const valueRoleOptions: TargetValueRole[] = ['highlight', 'light', 'midtone', 'shadow', 'accent'];
+export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, onCreateProject }: PaintingPrepPageProps) => {
+  const [hoverHex, setHoverHex] = useState<string | null>(null);
+  const [paletteSize, setPaletteSize] = useState(8);
+  const [sampleMode, setSampleMode] = useState<'pixel' | 'average' | 'smart'>('average');
+  const [sampleRadius, setSampleRadius] = useState(4);
+  const [zoom, setZoom] = useState(10);
+  const [saveNotice, setSaveNotice] = useState('');
 
-export const PaintingPrepPage = ({
-  sessions,
-  activeSessionId,
-  paints,
-  settings,
-  onCreateSession,
-  onOpenSession,
-  onSessionMetaChange,
-  onAddTarget,
-  onUpdateTarget,
-  onRemoveTarget,
-  onGenerateRecipes,
-  onSelectRecipe,
-  onMoveTarget,
-  onToggleActiveTarget,
-  onAddGeneratedTargets,
-}: PaintingPrepPageProps) => {
-  const session = sessions.find((item) => item.id === activeSessionId) ?? sessions[0] ?? null;
-  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
-  const [sortMode, setSortMode] = useState<'custom' | 'light-to-dark' | 'warm-to-cool' | 'primary-first'>('custom');
-  const [targetDraft, setTargetDraft] = useState({ label: '', targetHex: '#7A8FB3', notes: '', area: '', family: '', priority: 'primary' as TargetPriority, valueRole: 'midtone' as TargetValueRole });
+  const selectedPalette = session?.targetOrder.map((id) => session.targets.find((target) => target.id === id)).filter((target): target is PaintingTarget => Boolean(target)) ?? [];
+  const sampledCandidates = session?.sampledColors ?? [];
+  const extractedCandidates = session?.extractedCandidatePalette ?? [];
+  const enabledPaints = paints.filter((paint) => paint.isEnabled);
 
-  const orderedTargets = useMemo(() => (session ? sortTargetsForView(session, sortMode) : []), [session, sortMode]);
-  const selectedTarget = orderedTargets.find((target) => target.id === (selectedTargetId ?? orderedTargets[0]?.id)) ?? orderedTargets[0] ?? null;
-  const summary = session ? summarizeSession(session) : null;
+  const selectedCount = selectedPalette.length;
+  const lockedCount = selectedPalette.filter((target) => target.selectedRecipe).length;
 
-  if (!session || !summary) {
+  const allCandidateHexes = useMemo(() => new Set(selectedPalette.map((target) => target.targetHex)), [selectedPalette]);
+
+  if (!session) {
     return (
-      <div className="space-y-6 lg:space-y-8">
-        <Card className="p-6 sm:p-7">
-          <SectionTitle eyebrow="Preparation mode" description="Build a session first so target colors, chosen recipes, and active painting cues stay connected.">
-            Painting preparation board
-          </SectionTitle>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button className="studio-button studio-button-primary" type="button" onClick={() => onCreateSession('New painting session')}>
-              Create first session
-            </button>
-          </div>
-        </Card>
-      </div>
+      <Card className="p-6 sm:p-7">
+        <SectionTitle eyebrow="Prep" description="Create a painting project to start building a palette from a reference image.">
+          No painting project yet
+        </SectionTitle>
+        <div className="mt-5">
+          <button className="studio-button studio-button-primary" type="button" onClick={onCreateProject}>Create project</button>
+        </div>
+      </Card>
     );
   }
+
+  const updateSession = (patch: Partial<PaintingSession>) => {
+    onSessionChange({ ...session, ...patch, updatedAt: new Date().toISOString() });
+  };
+
+  const addCandidateToPalette = (candidate: ReferenceSample | ExtractedPaletteColor, source: PaintingTarget['source']) => {
+    if (selectedPalette.some((target) => target.targetHex === candidate.hex)) {
+      return;
+    }
+    const label = 'point' in candidate ? candidate.name : candidate.label;
+    const nextTarget = createTarget(candidate.hex, label, source, 'point' in candidate ? candidate.id : undefined);
+    updateSession({
+      targets: [...session.targets, nextTarget],
+      targetOrder: [...session.targetOrder, nextTarget.id],
+    });
+  };
+
+  const removePaletteColor = (targetId: string) => {
+    updateSession({
+      targets: session.targets.filter((target) => target.id !== targetId),
+      targetOrder: session.targetOrder.filter((id) => id !== targetId),
+      activeTargetIds: session.activeTargetIds.filter((id) => id !== targetId),
+      pinnedTargetIds: session.pinnedTargetIds.filter((id) => id !== targetId),
+    });
+  };
+
+  const generateRecipe = (targetId: string) => {
+    const target = session.targets.find((item) => item.id === targetId);
+    if (!target) {
+      return;
+    }
+    const recipes = rankRecipes(target.targetHex, paints, settings, 4);
+    updateSession({
+      targets: session.targets.map((item) => item.id === targetId ? {
+        ...item,
+        recipeOptions: recipes,
+        selectedRecipeId: recipes[0]?.id,
+        selectedRecipe: recipes[0],
+        prepStatus: recipes.length ? 'locked' : item.prepStatus,
+      } : item),
+      activeTargetIds: recipes.length && !session.activeTargetIds.includes(targetId) ? [...session.activeTargetIds, targetId] : session.activeTargetIds,
+    });
+  };
+
+  const saveProject = () => {
+    updateSession({ status: session.targets.some((target) => target.selectedRecipe) ? 'active' : session.status });
+    setSaveNotice('Project saved locally. Reference image, candidate colors, selected palette, and recipes are preserved on this device.');
+  };
+
+  const handleUpload = async (file: File | undefined) => {
+    if (!file) return;
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+    updateSession({
+      referenceImage: {
+        id: createId('reference-image'),
+        name: file.name,
+        mimeType: file.type,
+        dataUrl,
+        addedAt: new Date().toISOString(),
+      },
+    });
+  };
+
+  const runExtraction = () => {
+    if (!session.referenceImage?.dataUrl || typeof document === 'undefined') {
+      return;
+    }
+    const image = new Image();
+    image.src = session.referenceImage.dataUrl;
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      context.drawImage(image, 0, 0);
+      const data = context.getImageData(0, 0, canvas.width, canvas.height);
+      updateSession({
+        extractedCandidatePalette: extractPalette({ width: canvas.width, height: canvas.height, data: data.data }, paletteSize),
+      });
+    };
+  };
 
   return (
     <div className="space-y-6 lg:space-y-8">
       <Card className="p-5 sm:p-7">
-        <SessionHeader
-          session={session}
-          summary={[
-            { label: 'Targets', value: summary.targetCount, note: 'planned color notes in this session' },
-            { label: 'Locked recipes', value: summary.lockedCount, note: 'targets ready for painting' },
-            { label: 'Active targets', value: summary.activeCount, note: 'currently included on the active board' },
-          ]}
-          actions={
-            <div className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] px-4 py-3 text-sm text-[color:var(--text-muted)]">
-              Deterministic planning board. Recipes only generate when you ask for them.
-            </div>
-          }
-        />
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px] xl:items-end">
+          <SectionTitle eyebrow="Prep" description="Build the painting palette from the reference image. Sampling and extraction live here instead of in a separate product area.">
+            Painting Prep
+          </SectionTitle>
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            <div className="studio-metric"><p className="studio-eyebrow">Candidate colors</p><p className="mt-2 text-2xl font-semibold text-[color:var(--text-strong)]">{sampledCandidates.length + extractedCandidates.length}</p><p className="mt-1 text-sm text-[color:var(--text-muted)]">Manual samples and extracted options.</p></div>
+            <div className="studio-metric"><p className="studio-eyebrow">Selected palette</p><p className="mt-2 text-2xl font-semibold text-[color:var(--text-strong)]">{selectedCount}</p><p className="mt-1 text-sm text-[color:var(--text-muted)]">Colors chosen for the painting.</p></div>
+            <div className="studio-metric"><p className="studio-eyebrow">Saved recipes</p><p className="mt-2 text-2xl font-semibold text-[color:var(--text-strong)]">{lockedCount}</p><p className="mt-1 text-sm text-[color:var(--text-muted)]">Ready to carry into Paint mode.</p></div>
+          </div>
+        </div>
       </Card>
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.15fr),420px]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.1fr),420px]">
         <div className="space-y-6">
           <Card className="p-5 sm:p-7">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-              <SectionTitle eyebrow="Session notes" description="Keep the planning context nearby so prep decisions stay tied to subject, lighting, and mood.">
-                Session direction
-              </SectionTitle>
-              <div className="flex flex-wrap gap-3">
-                <select className="studio-select max-w-[180px]" value={session.status} onChange={(event) => onSessionMetaChange(session.id, { status: event.target.value as SessionStatus })}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label>
+                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Project title</span>
+                <input className="studio-input" value={session.title} onChange={(event) => updateSession({ title: event.target.value })} />
+              </label>
+              <label>
+                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Status</span>
+                <select className="studio-select" value={session.status} onChange={(event) => updateSession({ status: event.target.value as PaintingSession['status'] })}>
                   <option value="planning">Planning</option>
                   <option value="active">Active</option>
                   <option value="completed">Completed</option>
                   <option value="archived">Archived</option>
                 </select>
-                <select className="studio-select max-w-[200px]" value={sortMode} onChange={(event) => setSortMode(event.target.value as typeof sortMode)}>
-                  <option value="custom">Custom order</option>
-                  <option value="light-to-dark">Light to dark</option>
-                  <option value="warm-to-cool">Warm to cool</option>
-                  <option value="primary-first">Primary first</option>
-                </select>
+              </label>
+              <label className="md:col-span-2">
+                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Project notes</span>
+                <textarea className="studio-textarea min-h-24" value={session.notes ?? ''} onChange={(event) => updateSession({ notes: event.target.value })} placeholder="What matters most while painting this image?" />
+              </label>
+            </div>
+          </Card>
+
+          <Card className="p-5 sm:p-7">
+            <SectionTitle eyebrow="Reference image" description="Upload a reference, sample it manually, and extract a candidate palette.">
+              Image-led workflow
+            </SectionTitle>
+            <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr),220px]">
+              <div>
+                <label className="studio-upload block">
+                  <span className="studio-eyebrow">Reference image</span>
+                  <span className="mt-2 block text-base font-semibold text-[color:var(--text-strong)]">{session.referenceImage?.name ?? 'Upload JPG / PNG / WebP'}</span>
+                  <input className="mt-4 block w-full text-sm" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void handleUpload(event.target.files?.[0])} />
+                </label>
+                <div className="mt-4">
+                  <ReferenceSamplerCanvas
+                    image={session.referenceImage}
+                    sampleMode={sampleMode}
+                    radius={sampleRadius}
+                    zoom={zoom}
+                    onHoverHex={setHoverHex}
+                    onSample={({ hex, point }) => {
+                      const sample: ReferenceSample = {
+                        id: createId('sample'),
+                        name: `Sample ${session.sampledColors.length + 1}`,
+                        hex,
+                        point,
+                        radius: sampleRadius,
+                        mode: sampleMode,
+                        addedAt: new Date().toISOString(),
+                      };
+                      updateSession({ sampledColors: [sample, ...session.sampledColors] });
+                    }}
+                  />
+                </div>
               </div>
-            </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <label>
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Title</span>
-                <input className="studio-input" value={session.title} onChange={(event) => onSessionMetaChange(session.id, { title: event.target.value })} />
-              </label>
-              <label>
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Subject</span>
-                <input className="studio-input" value={session.subject ?? ''} onChange={(event) => onSessionMetaChange(session.id, { subject: event.target.value })} placeholder="Still life with copper cup" />
-              </label>
-              <label>
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Lighting notes</span>
-                <input className="studio-input" value={session.lightingNotes ?? ''} onChange={(event) => onSessionMetaChange(session.id, { lightingNotes: event.target.value })} placeholder="Warm side light, cool reflected fill" />
-              </label>
-              <label>
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Mood notes</span>
-                <input className="studio-input" value={session.moodNotes ?? ''} onChange={(event) => onSessionMetaChange(session.id, { moodNotes: event.target.value })} placeholder="Quiet, restrained, cool shadows" />
-              </label>
-              <label className="md:col-span-2">
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Session notes</span>
-                <textarea className="studio-textarea min-h-28" value={session.notes ?? ''} onChange={(event) => onSessionMetaChange(session.id, { notes: event.target.value })} placeholder="What needs to be pre-mixed before the painting session starts?" />
-              </label>
-            </div>
-          </Card>
-
-          <Card className="p-5 sm:p-7">
-            <SectionTitle eyebrow="Target intake" description="Add the colors you expect to need before painting so each one can carry its own recipe options and lock state.">
-              Add target color
-            </SectionTitle>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <label>
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Label</span>
-                <input className="studio-input" value={targetDraft.label} onChange={(event) => setTargetDraft((current) => ({ ...current, label: event.target.value }))} placeholder="Leaf highlight" />
-              </label>
-              <label>
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Target hex</span>
-                <input className="studio-input" value={targetDraft.targetHex} onChange={(event) => setTargetDraft((current) => ({ ...current, targetHex: event.target.value }))} />
-              </label>
-              <label>
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Area</span>
-                <input className="studio-input" value={targetDraft.area} onChange={(event) => setTargetDraft((current) => ({ ...current, area: event.target.value }))} placeholder="Foreground leaf cluster" />
-              </label>
-              <label>
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Family</span>
-                <input className="studio-input" value={targetDraft.family} onChange={(event) => setTargetDraft((current) => ({ ...current, family: event.target.value }))} placeholder="Leaf family" />
-              </label>
-              <label>
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Priority</span>
-                <select className="studio-select" value={targetDraft.priority} onChange={(event) => setTargetDraft((current) => ({ ...current, priority: event.target.value as TargetPriority }))}>
-                  {priorityOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
-              </label>
-              <label>
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Value role</span>
-                <select className="studio-select" value={targetDraft.valueRole} onChange={(event) => setTargetDraft((current) => ({ ...current, valueRole: event.target.value as TargetValueRole }))}>
-                  {valueRoleOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
-              </label>
-              <label className="md:col-span-2">
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Notes</span>
-                <textarea className="studio-textarea min-h-24" value={targetDraft.notes} onChange={(event) => setTargetDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="Reflected light should stay cooler than the main leaf family." />
-              </label>
-            </div>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <button className="studio-button studio-button-primary" type="button" onClick={() => {
-                onAddTarget(session.id, { ...targetDraft, tags: [] });
-                setTargetDraft((current) => ({ ...current, label: '', notes: '' }));
-              }}>
-                Add target
-              </button>
-              <button className="studio-button studio-button-secondary" type="button" onClick={() => onOpenSession(session.id)}>
-                Open session archive entry
-              </button>
-            </div>
-          </Card>
-
-          <Card className="p-5 sm:p-7">
-            <SectionTitle eyebrow="Palette planning board" description="Review targets like a preparation wall: swatches first, practical recipe cues second, scoring tucked behind the scenes.">
-              Session targets
-            </SectionTitle>
-            <div className="mt-6 grid gap-4 xl:grid-cols-2">
-              {orderedTargets.map((target) => {
-                const selectedRecipe = target.selectedRecipe ?? target.recipeOptions.find((recipe) => recipe.id === target.selectedRecipeId);
-                const isSelected = selectedTarget?.id === target.id;
-                return (
-                  <button
-                    key={target.id}
-                    type="button"
-                    className={`rounded-[30px] border p-5 text-left transition ${isSelected ? 'border-[rgba(38,33,29,0.16)] bg-[rgba(251,248,243,0.96)] shadow-[var(--shadow-soft)]' : 'border-[color:var(--border-soft)] bg-[color:var(--surface-1)]/74 hover:border-[color:var(--border-strong)] hover:bg-[rgba(255,252,247,0.92)]'}`}
-                    onClick={() => setSelectedTargetId(target.id)}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-lg font-semibold tracking-[-0.02em] text-[color:var(--text-strong)]">{target.label}</h3>
-                          <MixStatusChip status={target.mixStatus} />
-                        </div>
-                        <p className="mt-1 text-sm text-[color:var(--text-muted)]">{target.area ?? 'No area note'} · {target.valueRole ?? 'unassigned value role'}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        {target.priority ? <span className="studio-chip studio-chip-info">{target.priority}</span> : null}
-                        {target.prepStatus === 'locked' ? <span className="studio-chip studio-chip-accent">Locked</span> : null}
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-3">
-                        <p className="studio-eyebrow">Target</p>
-                        <div className="mt-3 h-20 rounded-[18px] border border-black/10" style={{ backgroundColor: target.targetHex }} />
-                      </div>
-                      <div className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-3">
-                        <p className="studio-eyebrow">Chosen mix</p>
-                        <div className="mt-3 h-20 rounded-[18px] border border-black/10" style={{ backgroundColor: selectedRecipe?.predictedHex ?? '#d6d0c8' }} />
-                      </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="studio-chip">{selectedRecipe?.practicalRatioText ?? 'No recipe selected'}</span>
-                      {selectedRecipe?.achievability ? <span className={`studio-chip ${selectedRecipe.achievability.level === 'limited' ? 'studio-chip-warm' : 'studio-chip-success'}`.trim()}>{selectedRecipe.achievability.headline}</span> : null}
-                    </div>
-                    {selectedRecipe?.detailedAdjustments[0] ? <p className="mt-3 text-sm leading-6 text-[color:var(--text-muted)]">Next: {selectedRecipe.detailedAdjustments[0].detail}</p> : null}
-                  </button>
-                );
-              })}
+              <div className="space-y-4">
+                <label>
+                  <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Sampling mode</span>
+                  <select className="studio-select" value={sampleMode} onChange={(event) => setSampleMode(event.target.value as typeof sampleMode)}>
+                    <option value="pixel">Single pixel</option>
+                    <option value="average">Average region</option>
+                    <option value="smart">Smart weighted</option>
+                  </select>
+                </label>
+                <label>
+                  <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Radius</span>
+                  <input className="studio-input" type="number" min={0} max={20} value={sampleRadius} onChange={(event) => setSampleRadius(Number(event.target.value))} />
+                </label>
+                <label>
+                  <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Loupe zoom</span>
+                  <input className="studio-input" type="number" min={4} max={20} value={zoom} onChange={(event) => setZoom(Number(event.target.value))} />
+                </label>
+                <div className="studio-mini-stat"><span>Hover</span><strong>{hoverHex ?? '—'}</strong></div>
+                <div className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] p-4">
+                  <p className="studio-eyebrow">Auto extract</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {[5, 8, 12].map((count) => (
+                      <button key={count} type="button" className={`studio-button ${paletteSize === count ? 'studio-button-primary' : 'studio-button-secondary'}`} onClick={() => setPaletteSize(count)}>{count} colors</button>
+                    ))}
+                  </div>
+                  <button className="studio-button studio-button-secondary mt-3 w-full" type="button" onClick={runExtraction} disabled={!session.referenceImage?.dataUrl}>Extract palette</button>
+                </div>
+              </div>
             </div>
           </Card>
         </div>
 
         <div className="space-y-6">
-          {selectedTarget ? (
-            <Card className="p-5 sm:p-7">
-              <SectionTitle eyebrow="Target detail" description="Tune the current target, generate deterministic options, and lock the recipe you actually want to carry into the painting session.">
-                {selectedTarget.label}
-              </SectionTitle>
-              <div className="mt-6 space-y-4">
-                <SwatchComparisonPanel targetHex={selectedTarget.targetHex} predictedHex={selectedTarget.selectedRecipe?.predictedHex} targetHelper={selectedTarget.valueRole} predictedHelper={selectedTarget.selectedRecipe?.qualityLabel} />
-
-                <div className="grid gap-4">
-                  <label>
-                    <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Label</span>
-                    <input className="studio-input" value={selectedTarget.label} onChange={(event) => onUpdateTarget(session.id, selectedTarget.id, { label: event.target.value })} />
-                  </label>
-                  <label>
-                    <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Target hex</span>
-                    <input className="studio-input" value={selectedTarget.targetHex} onChange={(event) => onUpdateTarget(session.id, selectedTarget.id, { targetHex: event.target.value })} />
-                  </label>
-                  <label>
-                    <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Notes</span>
-                    <textarea className="studio-textarea min-h-24" value={selectedTarget.notes ?? ''} onChange={(event) => onUpdateTarget(session.id, selectedTarget.id, { notes: event.target.value })} />
-                  </label>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <button className="studio-button studio-button-primary" type="button" onClick={() => onGenerateRecipes(session.id, selectedTarget.id)}>Generate recipes</button>
-                  <button className="studio-button studio-button-secondary" type="button" onClick={() => onToggleActiveTarget(session.id, selectedTarget.id)}>
-                    {session.activeTargetIds.includes(selectedTarget.id) ? 'Remove from active board' : 'Include on active board'}
-                  </button>
-                  <button className="studio-button studio-button-secondary" type="button" onClick={() => onMoveTarget(session.id, selectedTarget.id, 'up')}>Move up</button>
-                  <button className="studio-button studio-button-secondary" type="button" onClick={() => onMoveTarget(session.id, selectedTarget.id, 'down')}>Move down</button>
-                  <button className="studio-button studio-button-danger" type="button" onClick={() => onRemoveTarget(session.id, selectedTarget.id)}>Delete target</button>
-                </div>
-
-                <div className="grid gap-3">
-                  <button className="studio-button studio-button-secondary justify-start" type="button" onClick={() => onAddGeneratedTargets(session.id, generateColorFamily(selectedTarget.label, selectedTarget.targetHex, paints, selectedTarget.family))}>
-                    Generate family
-                  </button>
-                  <button className="studio-button studio-button-secondary justify-start" type="button" onClick={() => {
-                    const ladder = generateValueLadder(selectedTarget.targetHex, paints);
-                    onAddGeneratedTargets(session.id, [
-                      { label: `${selectedTarget.label} lighter`, targetHex: ladder.lighterHex, notes: 'Generated lighter value ladder target.', family: selectedTarget.family, priority: 'secondary', valueRole: 'light' },
-                      { label: `${selectedTarget.label} darker`, targetHex: ladder.darkerHex, notes: 'Generated darker value ladder target.', family: selectedTarget.family, priority: 'secondary', valueRole: 'shadow' },
-                      { label: `${selectedTarget.label} muted`, targetHex: ladder.mutedHex, notes: 'Generated muted value ladder target.', family: selectedTarget.family, priority: 'optional', valueRole: 'accent' },
-                    ]);
-                  }}>
-                    Generate value ladder
-                  </button>
-                </div>
-
-                {selectedTarget.recipeOptions.length > 0 ? (
-                  <div className="space-y-4">
-                    <div className="rounded-[28px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)] p-4">
-                      <p className="studio-eyebrow">Recipe options</p>
-                      <div className="mt-3 space-y-3">
-                        {selectedTarget.recipeOptions.map((recipe) => (
-                          <div key={recipe.id} className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-4">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div>
-                                <p className="text-base font-semibold text-[color:var(--text-strong)]">{recipe.recipeText}</p>
-                                <p className="mt-1 text-sm text-[color:var(--text-muted)]">Practical ratio {recipe.practicalRatioText} · {recipe.qualityLabel}</p>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                <button className="studio-button studio-button-secondary" type="button" onClick={() => onSelectRecipe(session.id, selectedTarget.id, recipe.id)}>Choose</button>
-                                <button className="studio-button studio-button-primary" type="button" onClick={() => onSelectRecipe(session.id, selectedTarget.id, recipe.id, true)}>Lock</button>
-                              </div>
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {recipe.badges.map((badge) => <span key={badge} className="studio-chip">{badge}</span>)}
-                              <span className={`studio-chip ${recipe.achievability.level === 'limited' ? 'studio-chip-warm' : 'studio-chip-success'}`.trim()}>{recipe.achievability.headline}</span>
-                            </div>
-                            <p className="mt-3 text-sm leading-6 text-[color:var(--text-muted)]">{recipe.achievability.detail}</p>
-                          </div>
-                        ))}
+          <Card className="p-5 sm:p-7">
+            <SectionTitle eyebrow="Candidate colors" description="These are source options only. Add only the colors you actually want in the painting palette.">
+              Candidate tray
+            </SectionTitle>
+            <div className="mt-5 space-y-5">
+              <div>
+                <p className="text-sm font-semibold text-[color:var(--text-strong)]">Manual samples</p>
+                <div className="mt-3 grid gap-3">
+                  {sampledCandidates.length ? sampledCandidates.map((sample) => (
+                    <div key={sample.id} className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-4">
+                      <div className="flex items-center gap-3">
+                        <span className="h-10 w-10 rounded-2xl border border-black/10" style={{ backgroundColor: sample.hex }} />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-[color:var(--text-strong)]">{sample.name}</p>
+                          <p className="text-sm text-[color:var(--text-muted)]">{sample.hex}</p>
+                        </div>
+                        <button className="studio-button studio-button-secondary" type="button" disabled={allCandidateHexes.has(sample.hex)} onClick={() => addCandidateToPalette(sample, 'reference-sample')}>Add</button>
                       </div>
                     </div>
-
-                    {selectedTarget.selectedRecipe ? (
-                      <>
-                        <NextAdjustmentBlock adjustments={selectedTarget.selectedRecipe.detailedAdjustments} />
-                        <MixPathBlock steps={selectedTarget.selectedRecipe.mixPath} warnings={selectedTarget.selectedRecipe.stabilityWarnings} layeringSuggestion={selectedTarget.selectedRecipe.layeringSuggestion} />
-                      </>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="rounded-[28px] border border-dashed border-[color:var(--border-strong)] bg-[color:var(--surface-1)]/74 px-5 py-8 text-center">
-                    <p className="studio-eyebrow">No recipes yet</p>
-                    <p className="mt-3 text-lg font-semibold tracking-[-0.02em] text-[color:var(--text-strong)]">Generate options when this target is ready</p>
-                    <p className="mt-3 text-sm leading-7 text-[color:var(--text-muted)]">The existing spectral engine stays on-demand: recipes only generate when you click.</p>
-                  </div>
-                )}
+                  )) : <p className="text-sm text-[color:var(--text-muted)]">Click the reference image to sample colors.</p>}
+                </div>
               </div>
-            </Card>
-          ) : null}
+
+              <div>
+                <p className="text-sm font-semibold text-[color:var(--text-strong)]">Extracted palette</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {extractedCandidates.length ? extractedCandidates.map((color) => (
+                    <button key={color.id} type="button" className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-4 text-left" onClick={() => addCandidateToPalette(color, 'palette-extraction')}>
+                      <div className="flex items-center gap-3">
+                        <span className="h-10 w-10 rounded-2xl border border-black/10" style={{ backgroundColor: color.hex }} />
+                        <div>
+                          <p className="font-semibold text-[color:var(--text-strong)]">{color.label}</p>
+                          <p className="text-sm text-[color:var(--text-muted)]">{color.hex}</p>
+                        </div>
+                      </div>
+                    </button>
+                  )) : <p className="text-sm text-[color:var(--text-muted)]">Run auto extraction to surface candidate colors.</p>}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-5 sm:p-7">
+            <SectionTitle eyebrow="Selected painting palette" description="This is the saved palette for the project. Generate recipes only for the colors you keep.">
+              Palette selection
+            </SectionTitle>
+            <div className="mt-5 space-y-4">
+              {selectedPalette.length ? selectedPalette.map((target) => (
+                <article key={target.id} className="rounded-[26px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="h-12 w-12 rounded-2xl border border-black/10" style={{ backgroundColor: target.targetHex }} />
+                      <div>
+                        <p className="font-semibold text-[color:var(--text-strong)]">{target.label}</p>
+                        <p className="text-sm text-[color:var(--text-muted)]">{target.targetHex}</p>
+                      </div>
+                    </div>
+                    <button className="studio-button studio-button-secondary" type="button" onClick={() => removePaletteColor(target.id)}>Remove</button>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button className="studio-button studio-button-primary" type="button" onClick={() => generateRecipe(target.id)} disabled={enabledPaints.length === 0}>
+                      {target.selectedRecipe ? 'Regenerate recipe' : 'Generate recipe'}
+                    </button>
+                    {target.selectedRecipe ? <span className="studio-chip studio-chip-success">{target.selectedRecipe.practicalRatioText}</span> : null}
+                  </div>
+
+                  {target.selectedRecipe ? (
+                    <div className="mt-4 space-y-4">
+                      <SwatchComparisonPanel targetHex={target.targetHex} predictedHex={target.selectedRecipe.predictedHex} targetHelper="Selected palette color" predictedHelper={target.selectedRecipe.qualityLabel} />
+                      <div className="studio-panel studio-panel-muted">
+                        <p className="studio-eyebrow">Recipe</p>
+                        <p className="mt-2 text-lg font-semibold text-[color:var(--text-strong)]">{target.selectedRecipe.recipeText}</p>
+                        <p className="mt-2 text-sm text-[color:var(--text-muted)]">Practical ratio {target.selectedRecipe.practicalRatioText}</p>
+                      </div>
+                      <NextAdjustmentBlock adjustments={target.selectedRecipe.detailedAdjustments} />
+                      <MixPathBlock steps={target.selectedRecipe.mixPath} warnings={target.selectedRecipe.stabilityWarnings} layeringSuggestion={target.selectedRecipe.layeringSuggestion} />
+                    </div>
+                  ) : null}
+                </article>
+              )) : <p className="text-sm text-[color:var(--text-muted)]">Add candidate colors here to build the final painting palette.</p>}
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button className="studio-button studio-button-primary" type="button" onClick={saveProject}>Save project</button>
+              {saveNotice ? <p className="text-sm text-[color:var(--text-muted)]">{saveNotice}</p> : null}
+            </div>
+          </Card>
         </div>
       </div>
     </div>

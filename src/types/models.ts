@@ -21,14 +21,10 @@ export type RecipeBadge =
   | 'Muted naturally'
   | 'Chromatic build'
   | 'Single-paint shortcut';
-export type WorkspaceView = 'mixer' | 'prep' | 'active' | 'sampler' | 'sessions' | 'paints' | 'recipes';
+export type WorkspaceView = 'prep' | 'paint' | 'mixer' | 'projects' | 'paints';
 export type MixStatus = 'not-mixed' | 'mixed' | 'adjusted' | 'remix-needed';
-export type TargetRole = 'primary' | 'secondary' | 'optional';
-export type TargetSortMode = 'custom' | 'light-to-dark' | 'family' | 'priority';
 export type SampleMode = 'pixel' | 'average' | 'smart';
-
 export type SessionStatus = 'planning' | 'active' | 'completed' | 'archived';
-export type MixStatus = 'not-mixed' | 'mixed' | 'adjusted' | 'remix-needed';
 export type PrepStatus = 'unreviewed' | 'reviewed' | 'locked';
 export type TargetPriority = 'primary' | 'secondary' | 'optional';
 export type TargetValueRole = 'highlight' | 'light' | 'midtone' | 'shadow' | 'accent';
@@ -134,14 +130,31 @@ export type RecipeScoreBreakdown = {
   finalScore: number;
 };
 
-export type MixPathStep = {
-  title: string;
+export type AdjustmentSuggestion = {
+  priority: AdjustmentPriority;
+  kind: AdjustmentKind;
+  label: string;
   detail: string;
+};
+
+export type MixPathStep = {
+  role?: MixPathStepRole;
+  paintId?: string;
+  paintName?: string;
+  instruction?: string;
+  title?: string;
+  detail?: string;
 };
 
 export type AchievabilitySignal = {
   level: 'easy' | 'moderate' | 'challenging';
   summary: string;
+  detail: string;
+};
+
+export type AchievabilityInsight = {
+  level: AchievabilityLevel;
+  headline: string;
   detail: string;
 };
 
@@ -240,34 +253,41 @@ export type ReferenceSamplerState = {
 
 export type PaintingTarget = {
   id: string;
-  name: string;
-  hex: string;
+  label: string;
+  targetHex: string;
   notes?: string;
-  areaTag?: string;
-  role: TargetRole;
-  priority: number;
-  source: 'manual' | 'reference-sample' | 'palette-extraction' | 'family-generator';
-  addedAt: string;
-  sortIndex: number;
-  recipe?: RankedRecipe;
-  lockedRecipeId?: string;
+  area?: string;
+  family?: string;
+  priority: TargetPriority;
+  recipeOptions: RankedRecipe[];
+  selectedRecipeId?: string;
+  selectedRecipe?: RankedRecipe;
   mixStatus: MixStatus;
-  isPinned: boolean;
-  familyGroup?: string;
+  prepStatus: PrepStatus;
+  tags: string[];
+  valueRole?: TargetValueRole;
+  source?: 'manual' | 'reference-sample' | 'palette-extraction';
   sampleId?: string;
 };
 
 export type PaintingSession = {
   id: string;
-  name: string;
-  description?: string;
+  title: string;
   createdAt: string;
   updatedAt: string;
-  status: 'planning' | 'active';
-  prepNotes?: string;
-  referenceImageId?: string;
-  targetSortMode: TargetSortMode;
+  status: SessionStatus;
+  notes?: string;
+  subject?: string;
+  lightingNotes?: string;
+  moodNotes?: string;
+  canvasNotes?: string;
+  referenceImage?: ReferenceImageMeta;
+  extractedCandidatePalette: ExtractedPaletteColor[];
+  sampledColors: ReferenceSample[];
+  targetOrder: string[];
   targets: PaintingTarget[];
+  activeTargetIds: string[];
+  pinnedTargetIds: string[];
 };
 
 export type RankedRecipe = {
@@ -294,9 +314,12 @@ export type RankedRecipe = {
   predictedAnalysis: ColorAnalysis;
   whyThisRanked: string[];
   mixStrategy: string[];
-  mixPath?: MixPathStep[];
+  mixPath: MixPathStep[];
+  stabilityWarnings?: string[];
+  roleNotes?: string[];
   dominanceWarnings?: MixWarning[];
-  achievability?: AchievabilitySignal;
+  achievability: AchievabilityInsight | AchievabilitySignal;
+  layeringSuggestion?: string;
   glazingSuggestion?: string;
 };
 
