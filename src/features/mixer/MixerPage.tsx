@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card } from '../../components/Card';
-import { SectionTitle } from '../../components/SectionTitle';
 import { SwatchComparisonPanel } from '../../components/SwatchComparisonPanel';
 import { analyzeColor } from '../../lib/color/colorAnalysis';
 import { normalizeHex } from '../../lib/color/colorMath';
@@ -72,40 +71,36 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
   const recentVisible = useMemo(() => recentColors.slice(0, 6), [recentColors]);
 
   return (
-    <div className="space-y-6 lg:space-y-8">
-      <Card className="p-5 sm:p-7">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px] xl:items-end">
-          <SectionTitle eyebrow="Mixer" description="Use the standalone mixer for one-off color lookups without leaving the local painting workflow.">
-            Quick color lookup
-          </SectionTitle>
-          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            <div className="studio-metric">
-              <p className="studio-eyebrow">Active paints</p>
-              <p className="mt-2 text-2xl font-semibold text-[color:var(--text-strong)]">{enabledPaints.length}</p>
-              <p className="mt-1 text-sm text-[color:var(--text-muted)]">Available for the next mix search.</p>
+    <div className="space-y-5 lg:space-y-6">
+      <Card className="p-4 sm:p-5">
+        <div className="workspace-header workspace-header-compact">
+          <div>
+            <p className="studio-eyebrow">Mixer</p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[color:var(--text-strong)]">Quick color lookup</h2>
+              <span className="studio-chip">Standalone utility</span>
             </div>
-            <div className="studio-metric">
-              <p className="studio-eyebrow">Ranking profile</p>
-              <p className="mt-2 text-lg font-semibold text-[color:var(--text-strong)]">{rankingModeLabels[settings.rankingMode]}</p>
-              <p className="mt-1 text-sm text-[color:var(--text-muted)]">Practical guidance stays primary.</p>
-            </div>
-            <div className="studio-metric">
-              <p className="studio-eyebrow">Best ratio</p>
-              <p className="mt-2 text-lg font-semibold text-[color:var(--text-strong)]">{topRecipe?.practicalRatioText ?? 'Pending'}</p>
-              <p className="mt-1 text-sm text-[color:var(--text-muted)]">Top working mix once recipes generate.</p>
+            <p className="mt-2 text-sm text-[color:var(--text-muted)]">Keep swatch comparison, practical ratio, and next adjustments front and center. Technical detail stays optional.</p>
+          </div>
+          <div className="workspace-header-actions">
+            <div className="workspace-stat-row">
+              <div className="studio-mini-stat"><span>Active paints</span><strong>{enabledPaints.length}</strong></div>
+              <div className="studio-mini-stat"><span>Profile</span><strong>{rankingModeLabels[settings.rankingMode]}</strong></div>
+              <div className="studio-mini-stat"><span>Top ratio</span><strong>{topRecipe?.practicalRatioText ?? 'Pending'}</strong></div>
             </div>
           </div>
         </div>
       </Card>
 
-      <div className="grid gap-6 2xl:grid-cols-[380px,minmax(0,1fr)]">
-        <div className="space-y-6">
-          <Card className="p-5 sm:p-7">
-            <SectionTitle eyebrow="Target" description="Enter a target color, compare swatches, and generate working recipes.">
-              Mixer controls
-            </SectionTitle>
+      <div className="grid gap-5 mixer-layout">
+        <div className="space-y-5">
+          <Card className="p-4 sm:p-5">
+            <div>
+              <p className="studio-eyebrow">Target</p>
+              <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">Mixer controls</h3>
+            </div>
 
-            <div className="mt-6 space-y-4">
+            <div className="mt-5 space-y-4">
               <label>
                 <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Target hex</span>
                 <input className="studio-input" value={mixerState.draftHex} onChange={(event) => handleDraftChange(event.target.value)} placeholder="#7A8FB3" aria-invalid={showInvalidHexMessage} />
@@ -122,6 +117,15 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
                 targetHelper={previewAnalysis ? `${previewAnalysis.hueFamily} · ${previewAnalysis.valueClassification}` : 'Enter a valid hex'}
                 predictedHelper={topRecipe ? topRecipe.practicalRatioText : 'Generate recipes'}
               />
+
+              {topRecipe ? (
+                <div className="studio-panel studio-panel-strong">
+                  <p className="studio-eyebrow">Best working mix</p>
+                  <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[color:var(--text-strong)]">{topRecipe.practicalRatioText}</p>
+                  <p className="mt-2 text-sm text-[color:var(--text-muted)]">{topRecipe.recipeText}</p>
+                  {topRecipe.nextAdjustments.length ? <p className="mt-3 text-sm text-[color:var(--text-body)]">Next: {topRecipe.nextAdjustments[0]}</p> : null}
+                </div>
+              ) : null}
 
               <label>
                 <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Ranking mode</span>
@@ -143,10 +147,11 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
             </div>
           </Card>
 
-          <Card className="p-5 sm:p-7">
-            <SectionTitle eyebrow="Recent" description="Jump back into recent one-off targets.">
-              Recent colors
-            </SectionTitle>
+          <Card className="p-4 sm:p-5">
+            <div>
+              <p className="studio-eyebrow">Recent</p>
+              <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">Recent colors</h3>
+            </div>
             <div className="mt-4 flex flex-wrap gap-2">
               {recentVisible.length ? recentVisible.map((hex) => (
                 <button key={hex} type="button" className="rounded-full border border-[color:var(--border-soft)] px-3 py-2 text-sm text-[color:var(--text-strong)]" onClick={() => handleDraftChange(hex)}>
@@ -158,11 +163,11 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           {recipes.length === 0 ? (
             <Card className="p-6 sm:p-7">
               <p className="studio-eyebrow">Waiting on target</p>
-              <p className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">Generate recipes to see swatches, ratios, and adjustment guidance.</p>
+              <p className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">Generate recipes to see swatches, practical ratios, and next adjustment guidance.</p>
             </Card>
           ) : null}
 

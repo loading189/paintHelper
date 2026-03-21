@@ -17,20 +17,20 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
 
   return (
-    <Card className="p-5 sm:p-7">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[color:var(--border-soft)] pb-5">
+    <Card className="p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[color:var(--border-soft)] pb-4">
         <div>
           <div className="flex flex-wrap gap-2">
             <span className="studio-chip">Recipe #{rank}</span>
             <span className="studio-chip studio-chip-success">{recipe.qualityLabel}</span>
           </div>
-          <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">{recipe.recipeText}</h3>
-          <p className="mt-2 text-sm leading-6 text-[color:var(--text-muted)]">Use the swatch match, practical ratio, and next adjustments first. Technical scoring stays tucked away below.</p>
+          <h3 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">{recipe.recipeText}</h3>
+          <p className="mt-2 text-sm leading-6 text-[color:var(--text-muted)]">Use the swatch match, practical ratio, and next adjustments first.</p>
         </div>
         <div className="flex flex-col items-start gap-3 sm:items-end">
-          <div className="rounded-[24px] border border-[rgba(38,33,29,0.12)] bg-[linear-gradient(180deg,rgba(40,34,31,0.98),rgba(30,26,23,0.96))] px-5 py-4 text-stone-50">
+          <div className="recipe-ratio-hero">
             <p className="studio-eyebrow text-stone-300">Practical ratio</p>
-            <p className="mt-2 text-4xl font-semibold tracking-[-0.05em]">{recipe.practicalRatioText}</p>
+            <p className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-stone-50">{recipe.practicalRatioText}</p>
           </div>
           <button className="studio-button studio-button-primary" type="button" onClick={() => onSave(recipe)}>
             Save recipe
@@ -38,8 +38,8 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.05fr),minmax(0,0.95fr)]">
-        <div className="space-y-6">
+      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.02fr),minmax(0,0.98fr)]">
+        <div className="space-y-5">
           <SwatchComparisonPanel
             targetHex={recipe.targetAnalysis.normalizedHex}
             predictedHex={recipe.predictedHex}
@@ -75,10 +75,9 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
           </section>
 
           <NextAdjustmentBlock adjustments={recipe.detailedAdjustments} />
-          <MixPathBlock steps={recipe.mixPath} warnings={recipe.stabilityWarnings} layeringSuggestion={recipe.layeringSuggestion} />
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           <section className="studio-panel studio-panel-muted">
             <p className="studio-eyebrow">Working notes</p>
             <p className="mt-2 text-lg font-semibold text-[color:var(--text-strong)]">{('headline' in recipe.achievability ? recipe.achievability.headline : recipe.achievability.summary) ?? 'Use as a starting point'}</p>
@@ -95,27 +94,30 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="studio-eyebrow">Optional details</p>
-                  <p className="mt-2 text-lg font-semibold text-[color:var(--text-strong)]">Technical breakdown</p>
+                  <p className="mt-2 text-lg font-semibold text-[color:var(--text-strong)]">Mix path + technical breakdown</p>
                 </div>
                 <span className="studio-chip studio-chip-info">Expand</span>
               </div>
             </summary>
-            <div className="mt-4 grid gap-3 text-sm text-[color:var(--text-body)]">
-              <div className="rounded-[22px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] px-4 py-3">
-                <p className="font-semibold text-[color:var(--text-strong)]">Score summary</p>
-                <p className="mt-2">Final score: {recipe.scoreBreakdown.finalScore.toFixed(3)}</p>
-                <p>Spectral distance: {recipe.scoreBreakdown.spectralDistance.toFixed(3)}</p>
-                <p>Value difference: {recipe.scoreBreakdown.valueDifference.toFixed(3)}</p>
-                <p>Chroma difference: {recipe.scoreBreakdown.chromaDifference.toFixed(3)}</p>
-              </div>
-              {recipe.whyThisRanked.length ? (
+            <div className="mt-4 space-y-4">
+              <MixPathBlock steps={recipe.mixPath} warnings={recipe.stabilityWarnings} layeringSuggestion={recipe.layeringSuggestion} />
+              <div className="grid gap-3 text-sm text-[color:var(--text-body)]">
                 <div className="rounded-[22px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] px-4 py-3">
-                  <p className="font-semibold text-[color:var(--text-strong)]">Why this ranked</p>
-                  <ul className="mt-2 space-y-2">
-                    {recipe.whyThisRanked.map((line) => <li key={line}>• {line}</li>)}
-                  </ul>
+                  <p className="font-semibold text-[color:var(--text-strong)]">Score summary</p>
+                  <p className="mt-2">Final score: {recipe.scoreBreakdown.finalScore.toFixed(3)}</p>
+                  <p>Spectral distance: {recipe.scoreBreakdown.spectralDistance.toFixed(3)}</p>
+                  <p>Value difference: {recipe.scoreBreakdown.valueDifference.toFixed(3)}</p>
+                  <p>Chroma difference: {recipe.scoreBreakdown.chromaDifference.toFixed(3)}</p>
                 </div>
-              ) : null}
+                {recipe.whyThisRanked.length ? (
+                  <div className="rounded-[22px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] px-4 py-3">
+                    <p className="font-semibold text-[color:var(--text-strong)]">Why this ranked</p>
+                    <ul className="mt-2 space-y-2">
+                      {recipe.whyThisRanked.map((line) => <li key={line}>• {line}</li>)}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </details>
         </div>
