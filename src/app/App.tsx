@@ -5,7 +5,7 @@ import { PaintingPrepPage } from '../features/prep/PaintingPrepPage';
 import { PaintsPage } from '../features/paints/PaintsPage';
 import { SessionsPage } from '../features/sessions/SessionsPage';
 import { loadAppState, saveAppState } from '../lib/storage/localState';
-import { createPaintingSession } from '../features/sessions/sessionState';
+import { createPaintingSession, prepareSessionForPainting } from '../features/sessions/sessionState';
 import type { MixRecipe, Paint, RankedRecipe, UserSettings, WorkspaceView } from '../types/models';
 import { createId } from '../lib/utils/id';
 
@@ -22,6 +22,7 @@ const App = () => {
   const [state, setState] = useState(loadAppState);
   const [loadedTargetHex, setLoadedTargetHex] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState('');
+  const [isPreparingSave, setIsPreparingSave] = useState(false);
 
   useEffect(() => {
     saveAppState(state);
@@ -115,12 +116,16 @@ const App = () => {
       return;
     }
 
-    updateCurrentSession({
-      ...currentSession,
-      status: currentSession.targets.some((target) => target.selectedRecipe) ? 'active' : currentSession.status,
-      updatedAt: new Date().toISOString(),
-    });
-    setSaveMessage('Saved locally');
+    setIsPreparingSave(true);
+    setSaveMessage('Saving project and preparing palette...');
+
+    const preparedSession = prepareSessionForPainting(currentSession, state.paints, state.settings);
+    updateCurrentSession(preparedSession);
+
+    window.setTimeout(() => {
+      setIsPreparingSave(false);
+      setSaveMessage('Saved locally. Palette ready for Paint.');
+    }, 0);
   };
 
   return (
@@ -150,26 +155,13 @@ const App = () => {
               />
             </label>
 
-            <label className="studio-inline-field studio-inline-field-select">
-              <span className="studio-inline-label">Status</span>
-              <select
-                className="studio-select studio-input-compact"
-                value={currentSession.status}
-                onChange={(event) => updateCurrentSession({ ...currentSession, status: event.target.value as typeof currentSession.status, updatedAt: new Date().toISOString() })}
-                aria-label="Current project status"
-              >
-                <option value="planning">Planning</option>
-                <option value="active">Active</option>
-                <option value="completed">Completed</option>
-                <option value="archived">Archived</option>
-              </select>
-            </label>
-
             <span className="studio-chip">Selected {prepCounts.selected}</span>
             <span className="studio-chip">Candidates {prepCounts.candidates}</span>
             <span className="studio-chip studio-chip-success">Recipes {prepCounts.recipes}</span>
             {saveMessage ? <span className="studio-chip studio-chip-info">{saveMessage}</span> : null}
-            <button className="studio-button studio-button-primary studio-button-compact" type="button" onClick={saveCurrentProject}>Save</button>
+            <button className="studio-button studio-button-primary studio-button-compact" type="button" onClick={saveCurrentProject} disabled={isPreparingSave}>
+              {isPreparingSave ? 'Preparing…' : 'Save'}
+            </button>
           </div>
         ) : (
           <div className="studio-control-cluster studio-control-session">

@@ -32,6 +32,9 @@ export const ActivePaintingPage = ({ session, onSessionChange, onReopenInPrep }:
   const activeTargets = (session.activeTargetIds.length ? session.activeTargetIds : session.targetOrder)
     .map((id) => session.targets.find((target) => target.id === id))
     .filter((target): target is NonNullable<typeof target> => Boolean(target?.selectedRecipe));
+  const pendingTargets = session.targetOrder
+    .map((id) => session.targets.find((target) => target.id === id))
+    .filter((target): target is NonNullable<typeof target> => Boolean(target && !target.selectedRecipe));
 
   const updateMixStatus = (targetId: string, status: MixStatus) => {
     onSessionChange({
@@ -101,6 +104,18 @@ export const ActivePaintingPage = ({ session, onSessionChange, onReopenInPrep }:
               </div>
             </div>
           </Card>
+
+          {pendingTargets.length ? (
+            <Card className="p-4 sm:p-5">
+              <p className="studio-eyebrow">Needs prep attention</p>
+              <p className="mt-2 text-sm text-[color:var(--text-muted)]">These selected palette colors still need a recipe before they can appear on the paint board.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {pendingTargets.map((target) => (
+                  <span key={target.id} className="studio-chip">{target.label}</span>
+                ))}
+              </div>
+            </Card>
+          ) : null}
 
           {activeTargets.length === 0 ? (
             <Card className="p-6 sm:p-7">

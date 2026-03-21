@@ -12,5 +12,7 @@ describe('App workstation shell', () => {
     expect(markup).toContain('Projects');
     expect(markup).toContain('My Paints');
     expect(markup).toContain('Save');
+    expect(markup).not.toContain('Current project status');
+    expect(markup).not.toContain('Project notes');
   });
 });
