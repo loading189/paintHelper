@@ -9,44 +9,45 @@ import { createPaintingSession } from '../features/sessions/sessionState';
 import type { MixRecipe, Paint, RankedRecipe, UserSettings, WorkspaceView } from '../types/models';
 import { createId } from '../lib/utils/id';
 
-const navItems: Array<{ id: WorkspaceView; label: string; blurb: string }> = [
-  { id: 'prep', label: 'Prep', blurb: 'Build the painting palette from the image' },
-  { id: 'paint', label: 'Paint', blurb: 'Large reference with saved recipes' },
-  { id: 'mixer', label: 'Mixer', blurb: 'Standalone quick mix utility' },
-  { id: 'projects', label: 'Projects', blurb: 'Saved painting workspaces' },
-  { id: 'paints', label: 'My Paints', blurb: 'Local paint inventory' },
+const navItems: Array<{ id: WorkspaceView; label: string }> = [
+  { id: 'prep', label: 'Prep' },
+  { id: 'paint', label: 'Paint' },
+  { id: 'mixer', label: 'Mixer' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'paints', label: 'My Paints' },
 ];
-
-const viewTitles: Record<WorkspaceView, string> = {
-  prep: 'Prep workspace',
-  paint: 'Paint workspace',
-  mixer: 'Mixer utility',
-  projects: 'Projects',
-  paints: 'My Paints',
-};
 
 const App = () => {
   const [view, setView] = useState<WorkspaceView>('prep');
   const [state, setState] = useState(loadAppState);
   const [loadedTargetHex, setLoadedTargetHex] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState('');
 
   useEffect(() => {
     saveAppState(state);
   }, [state]);
+
+  useEffect(() => {
+    if (!saveMessage) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => setSaveMessage(''), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [saveMessage]);
 
   const currentSession = useMemo(
     () => state.sessions.find((session) => session.id === state.currentSessionId) ?? state.sessions[0] ?? null,
     [state.currentSessionId, state.sessions],
   );
 
-  const counts = useMemo(
+  const prepCounts = useMemo(
     () => ({
-      enabledPaints: state.paints.filter((paint) => paint.isEnabled).length,
-      projects: state.sessions.length,
-      paletteColors: currentSession?.targets.length ?? 0,
-      savedRecipes: currentSession?.targets.filter((target) => target.selectedRecipe).length ?? 0,
+      selected: currentSession?.targetOrder.length ?? 0,
+      candidates: (currentSession?.sampledColors.length ?? 0) + (currentSession?.extractedCandidatePalette.length ?? 0),
+      recipes: currentSession?.targets.filter((target) => target.selectedRecipe).length ?? 0,
     }),
-    [currentSession, state.paints, state.sessions.length],
+    [currentSession],
   );
 
   const upsertPaint = (paint: Paint) => {
@@ -109,34 +110,83 @@ const App = () => {
     }));
   };
 
+  const saveCurrentProject = () => {
+    if (!currentSession) {
+      return;
+    }
+
+    updateCurrentSession({
+      ...currentSession,
+      status: currentSession.targets.some((target) => target.selectedRecipe) ? 'active' : currentSession.status,
+      updatedAt: new Date().toISOString(),
+    });
+    setSaveMessage('Saved locally');
+  };
+
   return (
     <div className="studio-app-shell">
-      <header className="studio-topbar studio-topbar-compact">
-        <div className="studio-topbar-brand">
-          <p className="studio-eyebrow">Paint Mix Matcher</p>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-[-0.05em] text-[color:var(--text-strong)] sm:text-[2rem]">Artist-native spectral painting workflow</h1>
-            <span className="studio-chip studio-chip-info">{viewTitles[view]}</span>
-          </div>
-          <p className="mt-2 max-w-2xl text-sm text-[color:var(--text-muted)]">Prep is palette-first, Paint is image-dominant, and Mixer stays available for focused one-off checks.</p>
+      <header className="studio-topbar studio-control-strip" aria-label="Workspace controls">
+        <div className="studio-control-cluster studio-control-brand">
+          <span className="studio-chip studio-chip-info">Paint Mix Matcher</span>
         </div>
 
-        <div className="studio-topbar-meta">
-          <nav className="workspace-nav workspace-nav-inline" aria-label="Workspace navigation">
-            {navItems.map((item) => (
-              <button key={item.id} type="button" className={`workspace-nav-item workspace-nav-pill ${view === item.id ? 'workspace-nav-item-active' : ''}`} onClick={() => setView(item.id)}>
-                <span className="block text-sm font-semibold text-[color:var(--text-strong)]">{item.label}</span>
-              </button>
-            ))}
-          </nav>
+        <nav className="workspace-nav workspace-nav-inline workspace-nav-strip" aria-label="Workspace navigation">
+          {navItems.map((item) => (
+            <button key={item.id} type="button" className={`workspace-nav-item workspace-nav-pill ${view === item.id ? 'workspace-nav-item-active' : ''}`} onClick={() => setView(item.id)}>
+              <span className="text-sm font-semibold text-[color:var(--text-strong)]">{item.label}</span>
+            </button>
+          ))}
+        </nav>
 
-          <div className="topbar-stats topbar-stats-compact">
-            <div className="studio-mini-stat"><span>Projects</span><strong>{counts.projects}</strong></div>
-            <div className="studio-mini-stat"><span>Palette</span><strong>{counts.paletteColors}</strong></div>
-            <div className="studio-mini-stat"><span>Recipes</span><strong>{counts.savedRecipes}</strong></div>
-            <div className="studio-mini-stat"><span>Paints</span><strong>{counts.enabledPaints}</strong></div>
+        {currentSession ? (
+          <div className="studio-control-cluster studio-control-session">
+            <label className="studio-inline-field">
+              <span className="studio-inline-label">Project</span>
+              <input
+                className="studio-input studio-input-compact"
+                value={currentSession.title}
+                onChange={(event) => updateCurrentSession({ ...currentSession, title: event.target.value, updatedAt: new Date().toISOString() })}
+                aria-label="Current project name"
+              />
+            </label>
+
+            <label className="studio-inline-field studio-inline-field-select">
+              <span className="studio-inline-label">Status</span>
+              <select
+                className="studio-select studio-input-compact"
+                value={currentSession.status}
+                onChange={(event) => updateCurrentSession({ ...currentSession, status: event.target.value as typeof currentSession.status, updatedAt: new Date().toISOString() })}
+                aria-label="Current project status"
+              >
+                <option value="planning">Planning</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="archived">Archived</option>
+              </select>
+            </label>
+
+            <span className="studio-chip">Selected {prepCounts.selected}</span>
+            <span className="studio-chip">Candidates {prepCounts.candidates}</span>
+            <span className="studio-chip studio-chip-success">Recipes {prepCounts.recipes}</span>
+            {saveMessage ? <span className="studio-chip studio-chip-info">{saveMessage}</span> : null}
+            <button className="studio-button studio-button-primary studio-button-compact" type="button" onClick={saveCurrentProject}>Save</button>
           </div>
-        </div>
+        ) : (
+          <div className="studio-control-cluster studio-control-session">
+            <span className="studio-chip">No project</span>
+            <button
+              className="studio-button studio-button-primary studio-button-compact"
+              type="button"
+              onClick={() => {
+                const session = createPaintingSession({ title: `Painting project ${state.sessions.length + 1}` });
+                setState((current) => ({ ...current, sessions: [session, ...current.sessions], currentSessionId: session.id }));
+                setView('prep');
+              }}
+            >
+              Create project
+            </button>
+          </div>
+        )}
       </header>
 
       <main className="studio-main studio-main-fullwidth">
