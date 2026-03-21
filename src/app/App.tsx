@@ -204,7 +204,11 @@ const App = () => {
         ) : null}
 
         {view === 'paint' ? (
-          <ActivePaintingPage session={currentSession} onSessionChange={(session) => updateCurrentSession(session)} />
+          <ActivePaintingPage
+            session={currentSession}
+            onSessionChange={(session) => updateCurrentSession(session)}
+            onReopenInPrep={() => setView('prep')}
+          />
         ) : null}
 
         {view === 'mixer' ? (
