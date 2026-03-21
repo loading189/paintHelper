@@ -125,7 +125,7 @@ describe('workflow pages', () => {
 
   it('renders Paint mode with the image and saved recipe guidance, not primary technical stats', () => {
     const markup = renderToStaticMarkup(
-      <ActivePaintingPage session={session} onSessionChange={() => undefined} />,
+      <ActivePaintingPage session={session} onSessionChange={() => undefined} onReopenInPrep={() => undefined} />,
     );
 
     expect(markup).toContain('Painting image');

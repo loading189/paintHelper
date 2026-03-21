@@ -374,15 +374,38 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .prep-notes-disclosure { margin-top: 0; }
 
   .paint-layout {
-    grid-template-columns: minmax(0, 1.95fr) minmax(360px, 1fr);
+    grid-template-columns: minmax(0, 2.15fr) minmax(360px, 1.05fr);
     align-items: start;
   }
+  .paint-layout-workspace { gap: 18px; }
   .paint-reference-card { min-height: 100%; }
+  .paint-reference-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 158px);
+  }
+  .paint-reference-topline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .paint-reference-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
   .paint-reference-stage {
     border-radius: 30px;
     border: 1px solid var(--border-soft);
     background: rgba(9, 12, 18, 0.84);
     padding: 12px;
+  }
+  .paint-reference-stage-workspace {
+    flex: 1 1 auto;
+    min-height: 0;
   }
   .paint-reference-image {
     display: block;
@@ -392,23 +415,128 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     object-fit: contain;
     border-radius: 24px;
   }
-  .recipe-ratio-hero {
+  .paint-reference-image-workspace {
+    height: 100%;
+    min-height: 70vh;
+    max-height: calc(100vh - 320px);
+    background: rgba(7, 9, 14, 0.92);
+  }
+  .paint-reference-footer {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(180px, 0.32fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .paint-reference-palette-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .paint-reference-palette-pill {
+    display: inline-flex;
+    max-width: 220px;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-soft);
+    background: rgba(16, 21, 29, 0.84);
+    font-size: 12px;
+    color: var(--text-body);
+  }
+  .paint-reference-palette-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.18);
+    flex-shrink: 0;
+  }
+  .recipe-ratio-hero,
+  .paint-card-ratio-band {
     border-radius: 24px;
     border: 1px solid rgba(209, 221, 239, 0.12);
     background: linear-gradient(180deg, rgba(40,34,31,0.98), rgba(30,26,23,0.96));
     padding: 14px 18px;
   }
+  .paint-board-workspace {
+    position: sticky;
+    top: 88px;
+    align-self: start;
+    max-height: calc(100vh - 100px);
+    overflow: auto;
+    padding-right: 4px;
+  }
+  .paint-board-header-card {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .paint-board-header-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .paint-board-summary {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(110px, 1fr));
+  }
+  .paint-recipe-card { border-radius: 28px; }
+  .paint-recipe-card-shell {
+    display: grid;
+    gap: 14px;
+  }
+  .paint-recipe-card-topline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .paint-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .paint-card-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .paint-card-panel,
+  .paint-card-status-panel {
+    padding: 14px;
+    border-radius: 24px;
+  }
+  .paint-card-list-item {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .paint-adjustment-item {
+    border-radius: 18px;
+    border: 1px solid rgba(84, 111, 88, 0.18);
+    background: rgba(84, 111, 88, 0.08);
+    padding: 10px 12px;
+  }
+  .paint-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .paint-swatch-row {
     display: grid;
     gap: 12px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .paint-swatch-row-compact { gap: 10px; }
   .paint-swatch-card {
     border-radius: 24px;
     border: 1px solid var(--border-soft);
     background: rgba(17, 22, 30, 0.78);
     padding: 14px;
   }
+  .paint-swatch-card-compact { padding: 12px; }
   .paint-swatch-block {
     min-height: 98px;
     border-radius: 18px;
@@ -540,7 +668,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .sampler-canvas-shell,
   .workspace-stat-row,
   .workspace-inline-fields,
-  .paint-swatch-row { grid-template-columns: 1fr; }
+  .paint-swatch-row,
+  .paint-card-grid,
+  .paint-reference-footer { grid-template-columns: 1fr; }
   .prep-sidebar-stack {
     position: static;
     max-height: none;
@@ -549,8 +679,20 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .prep-sidebar-panel-selected { flex: initial; }
   .prep-primary-scroll,
   .prep-secondary-scroll { max-height: none; }
+  .paint-board-workspace {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+  .paint-board-header-card { position: static; }
+  .paint-reference-shell { min-height: auto; }
   .paint-reference-image {
     min-height: 52vh;
+    max-height: 68vh;
+  }
+  .paint-reference-image-workspace {
+    min-height: 56vh;
     max-height: 68vh;
   }
 }
@@ -568,6 +710,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .workspace-nav-pill,
   .studio-inline-field,
   .studio-input-compact { width: 100%; }
+  .paint-status-grid,
+  .paint-board-summary { grid-template-columns: 1fr; }
+  .paint-card-actions { width: 100%; }
+  .paint-card-actions .studio-button { flex: 1 1 0; }
   .workspace-nav-strip,
   .studio-control-session,
   .prep-control-row,
