@@ -38,14 +38,12 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
   const [sampleMode, setSampleMode] = useState<'pixel' | 'average' | 'smart'>('average');
   const [sampleRadius, setSampleRadius] = useState(4);
   const [zoom, setZoom] = useState(10);
-  const [saveNotice, setSaveNotice] = useState('');
 
   const selectedPalette = session?.targetOrder.map((id) => session.targets.find((target) => target.id === id)).filter((target): target is PaintingTarget => Boolean(target)) ?? [];
   const sampledCandidates = session?.sampledColors ?? [];
   const extractedCandidates = session?.extractedCandidatePalette ?? [];
   const enabledPaints = paints.filter((paint) => paint.isEnabled);
 
-  const selectedCount = selectedPalette.length;
   const lockedCount = selectedPalette.filter((target) => target.selectedRecipe).length;
   const candidateCount = sampledCandidates.length + extractedCandidates.length;
 
@@ -111,11 +109,6 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
     });
   };
 
-  const saveProject = () => {
-    updateSession({ status: session.targets.some((target) => target.selectedRecipe) ? 'active' : session.status });
-    setSaveNotice('Project saved locally. Reference image, selected palette, recipes, and mix statuses stay on this device.');
-  };
-
   const handleUpload = async (file: File | undefined) => {
     if (!file) return;
     const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -157,243 +150,184 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
   };
 
   return (
-    <div className="space-y-5 lg:space-y-6">
-      <Card className="p-4 sm:p-5">
-        <div className="workspace-header workspace-header-compact">
-          <div>
-            <p className="studio-eyebrow">Prep</p>
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[color:var(--text-strong)]">Painting Prep</h2>
-              <span className="studio-chip">{session.status}</span>
-            </div>
-            <p className="mt-2 text-sm text-[color:var(--text-muted)]">Build a selected painting palette from the reference image, then lock recipes to carry into Paint mode.</p>
-          </div>
+    <div className="prep-layout prep-layout-dense">
+      <div className="space-y-4">
+        <Card className="p-4 sm:p-5 prep-workspace-card">
+          <div className="prep-toolbar">
+            <label className="studio-upload prep-upload-tile">
+              <span className="studio-eyebrow">Reference image</span>
+              <span className="mt-2 block text-sm font-semibold text-[color:var(--text-strong)]">{session.referenceImage?.name ?? 'Upload JPG / PNG / WebP'}</span>
+              <input className="mt-3 block w-full text-sm" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void handleUpload(event.target.files?.[0])} />
+            </label>
 
-          <div className="workspace-header-actions">
-            <div className="workspace-stat-row">
-              <div className="studio-mini-stat"><span>Candidates</span><strong>{candidateCount}</strong></div>
-              <div className="studio-mini-stat"><span>Selected</span><strong>{selectedCount}</strong></div>
-              <div className="studio-mini-stat"><span>Recipes</span><strong>{lockedCount}</strong></div>
-            </div>
-            <button className="studio-button studio-button-primary" type="button" onClick={saveProject}>Save project</button>
-          </div>
-        </div>
-      </Card>
-
-      <div className="grid gap-5 prep-layout">
-        <div className="space-y-5">
-          <Card className="p-4 sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="studio-eyebrow">Workspace</p>
-                <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">Image-led palette building</h3>
-                <p className="mt-2 text-sm text-[color:var(--text-muted)]">Upload the reference, sample directly from the image, and extract candidate colors without leaving the canvas.</p>
-              </div>
-              <div className="workspace-inline-fields">
+            <div className="studio-panel studio-panel-muted prep-control-panel">
+              <div className="prep-control-row">
                 <label>
-                  <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">Project title</span>
-                  <input className="studio-input" value={session.title} onChange={(event) => updateSession({ title: event.target.value })} />
-                </label>
-                <label>
-                  <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">Status</span>
-                  <select className="studio-select" value={session.status} onChange={(event) => updateSession({ status: event.target.value as PaintingSession['status'] })}>
-                    <option value="planning">Planning</option>
-                    <option value="active">Active</option>
-                    <option value="completed">Completed</option>
-                    <option value="archived">Archived</option>
+                  <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">Mode</span>
+                  <select className="studio-select studio-input-compact" value={sampleMode} onChange={(event) => setSampleMode(event.target.value as typeof sampleMode)}>
+                    <option value="pixel">Pixel</option>
+                    <option value="average">Average</option>
+                    <option value="smart">Smart</option>
                   </select>
                 </label>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-4 prep-reference-grid">
-              <div className="space-y-4">
-                <label className="studio-upload block">
-                  <span className="studio-eyebrow">Reference image</span>
-                  <span className="mt-2 block text-base font-semibold text-[color:var(--text-strong)]">{session.referenceImage?.name ?? 'Upload JPG / PNG / WebP'}</span>
-                  <p className="mt-2 text-sm text-[color:var(--text-muted)]">Keep the source image large while you pull palette candidates from it.</p>
-                  <input className="mt-4 block w-full text-sm" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void handleUpload(event.target.files?.[0])} />
+                <label>
+                  <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">Radius</span>
+                  <input className="studio-input studio-input-compact" type="number" min={0} max={20} value={sampleRadius} onChange={(event) => setSampleRadius(Number(event.target.value))} />
                 </label>
-
-                <div className="prep-canvas-card">
-                  <ReferenceSamplerCanvas
-                    image={session.referenceImage}
-                    sampleMode={sampleMode}
-                    radius={sampleRadius}
-                    zoom={zoom}
-                    onHoverHex={setHoverHex}
-                    onSample={({ hex, point }) => {
-                      const sample: ReferenceSample = {
-                        id: createId('sample'),
-                        name: `Sample ${session.sampledColors.length + 1}`,
-                        hex,
-                        point,
-                        radius: sampleRadius,
-                        mode: sampleMode,
-                        addedAt: new Date().toISOString(),
-                      };
-                      updateSession({ sampledColors: [sample, ...session.sampledColors] });
-                    }}
-                  />
-                </div>
+                <label>
+                  <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">Zoom</span>
+                  <input className="studio-input studio-input-compact" type="number" min={4} max={20} value={zoom} onChange={(event) => setZoom(Number(event.target.value))} />
+                </label>
+                <div className="studio-chip">Hover {hoverHex ?? '—'}</div>
               </div>
 
-              <div className="space-y-4">
-                <div className="studio-panel studio-panel-muted space-y-4">
-                  <div>
-                    <p className="studio-eyebrow">Sampling controls</p>
-                    <p className="mt-2 text-sm text-[color:var(--text-muted)]">Click the image to add manual samples to the candidate tray.</p>
-                  </div>
-                  <label>
-                    <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Sampling mode</span>
-                    <select className="studio-select" value={sampleMode} onChange={(event) => setSampleMode(event.target.value as typeof sampleMode)}>
-                      <option value="pixel">Single pixel</option>
-                      <option value="average">Average region</option>
-                      <option value="smart">Smart weighted</option>
-                    </select>
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label>
-                      <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Radius</span>
-                      <input className="studio-input" type="number" min={0} max={20} value={sampleRadius} onChange={(event) => setSampleRadius(Number(event.target.value))} />
-                    </label>
-                    <label>
-                      <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Loupe zoom</span>
-                      <input className="studio-input" type="number" min={4} max={20} value={zoom} onChange={(event) => setZoom(Number(event.target.value))} />
-                    </label>
-                  </div>
-                  <div className="studio-mini-stat"><span>Hover</span><strong>{hoverHex ?? '—'}</strong></div>
+              <div className="prep-control-row prep-control-row-actions">
+                <div className="flex flex-wrap gap-2">
+                  {[5, 8, 12].map((count) => (
+                    <button key={count} type="button" className={`studio-button ${paletteSize === count ? 'studio-button-primary' : 'studio-button-secondary'} studio-button-compact`} onClick={() => setPaletteSize(count)}>{count}</button>
+                  ))}
                 </div>
-
-                <div className="studio-panel studio-panel-strong space-y-4">
-                  <div>
-                    <p className="studio-eyebrow">Auto extract</p>
-                    <p className="mt-2 text-sm text-[color:var(--text-muted)]">Pull a compact starting palette from the current reference image.</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {[5, 8, 12].map((count) => (
-                      <button key={count} type="button" className={`studio-button ${paletteSize === count ? 'studio-button-primary' : 'studio-button-secondary'}`} onClick={() => setPaletteSize(count)}>{count} colors</button>
-                    ))}
-                  </div>
-                  <button className="studio-button studio-button-secondary w-full" type="button" onClick={runExtraction} disabled={!session.referenceImage?.dataUrl}>Extract palette</button>
-                </div>
+                <button className="studio-button studio-button-secondary studio-button-compact" type="button" onClick={runExtraction} disabled={!session.referenceImage?.dataUrl}>Extract palette</button>
               </div>
             </div>
+          </div>
 
-            <details className="studio-disclosure mt-5">
-              <summary className="studio-disclosure-summary">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="studio-eyebrow">Project notes</p>
-                    <p className="mt-2 text-base font-semibold text-[color:var(--text-strong)]">Keep notes nearby, not dominant</p>
-                  </div>
-                  <span className="studio-chip">Optional</span>
-                </div>
-              </summary>
-              <div className="mt-4">
-                <textarea className="studio-textarea min-h-24" value={session.notes ?? ''} onChange={(event) => updateSession({ notes: event.target.value })} placeholder="What matters most while painting this image?" />
-              </div>
-            </details>
+          <div className="mt-4 prep-reference-stage prep-reference-stage-dense">
+            <ReferenceSamplerCanvas
+              image={session.referenceImage}
+              sampleMode={sampleMode}
+              radius={sampleRadius}
+              zoom={zoom}
+              onHoverHex={setHoverHex}
+              onSample={({ hex, point }) => {
+                const sample: ReferenceSample = {
+                  id: createId('sample'),
+                  name: `Sample ${session.sampledColors.length + 1}`,
+                  hex,
+                  point,
+                  radius: sampleRadius,
+                  mode: sampleMode,
+                  addedAt: new Date().toISOString(),
+                };
+                updateSession({ sampledColors: [sample, ...session.sampledColors] });
+              }}
+            />
+          </div>
+        </Card>
 
-            {saveNotice ? <p className="mt-4 text-sm text-[color:var(--text-muted)]">{saveNotice}</p> : null}
-          </Card>
-        </div>
-
-        <div className="prep-sidebar-stack">
-          <Card className="p-4 sm:p-5 prep-sidebar-panel prep-sidebar-panel-candidates">
+        <details className="studio-disclosure prep-notes-disclosure">
+          <summary className="studio-disclosure-summary">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="studio-eyebrow">Candidate Tray</p>
-                <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">Candidate colors</h3>
+                <p className="studio-eyebrow">Project notes</p>
+                <p className="mt-1 text-sm text-[color:var(--text-muted)]">Collapsed by default to keep the image workspace clear.</p>
               </div>
-              <span className="studio-chip">{candidateCount}</span>
+              <span className="studio-chip">Optional</span>
             </div>
+          </summary>
+          <div className="mt-4">
+            <textarea className="studio-textarea min-h-24" value={session.notes ?? ''} onChange={(event) => updateSession({ notes: event.target.value })} placeholder="Critical reminders for this painting." />
+          </div>
+        </details>
+      </div>
 
-            <div className="mt-4 space-y-4 prep-scroll-panel">
-              <section>
-                <p className="text-sm font-semibold text-[color:var(--text-strong)]">Manual samples</p>
-                <div className="mt-3 grid gap-3">
-                  {sampledCandidates.length ? sampledCandidates.map((sample) => (
-                    <div key={sample.id} className="rounded-[22px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-3.5">
-                      <div className="flex items-center gap-3">
-                        <span className="h-10 w-10 rounded-2xl border border-black/10" style={{ backgroundColor: sample.hex }} />
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-[color:var(--text-strong)]">{sample.name}</p>
-                          <p className="text-sm text-[color:var(--text-muted)]">{sample.hex}</p>
-                        </div>
-                        <button className="studio-button studio-button-secondary" type="button" disabled={allCandidateHexes.has(sample.hex)} onClick={() => addCandidateToPalette(sample, 'reference-sample')}>Add</button>
-                      </div>
+      <div className="prep-sidebar-stack prep-sidebar-dense">
+        <Card className="p-4 sm:p-5 prep-sidebar-panel prep-sidebar-panel-selected prep-sidebar-panel-primary">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="studio-eyebrow">Selected Painting Palette</p>
+              <h3 className="mt-1 text-lg font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">Main output</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className="studio-chip">{selectedPalette.length} colors</span>
+              <span className="studio-chip studio-chip-success">{lockedCount} recipes</span>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-4 prep-scroll-panel prep-primary-scroll">
+            {selectedPalette.length ? selectedPalette.map((target) => (
+              <article key={target.id} className="prep-target-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="h-12 w-12 rounded-2xl border border-black/10" style={{ backgroundColor: target.targetHex }} />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[color:var(--text-strong)]">{target.label}</p>
+                      <p className="text-sm text-[color:var(--text-muted)]">{target.targetHex}</p>
                     </div>
-                  )) : <p className="text-sm text-[color:var(--text-muted)]">Click the reference image to sample colors.</p>}
+                  </div>
+                  <button className="studio-button studio-button-secondary studio-button-compact" type="button" onClick={() => removePaletteColor(target.id)}>Remove</button>
                 </div>
-              </section>
 
-              <section>
-                <p className="text-sm font-semibold text-[color:var(--text-strong)]">Extracted palette</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  {extractedCandidates.length ? extractedCandidates.map((color) => (
-                    <button key={color.id} type="button" className="rounded-[22px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-3.5 text-left" onClick={() => addCandidateToPalette(color, 'palette-extraction')}>
-                      <div className="flex items-center gap-3">
-                        <span className="h-10 w-10 rounded-2xl border border-black/10" style={{ backgroundColor: color.hex }} />
-                        <div className="min-w-0">
-                          <p className="font-semibold text-[color:var(--text-strong)]">{color.label}</p>
-                          <p className="text-sm text-[color:var(--text-muted)]">{color.hex}</p>
-                        </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button className="studio-button studio-button-primary studio-button-compact" type="button" onClick={() => generateRecipe(target.id)} disabled={enabledPaints.length === 0}>
+                    {target.selectedRecipe ? 'Regenerate recipe' : 'Generate recipe'}
+                  </button>
+                  {target.selectedRecipe ? <span className="studio-chip studio-chip-success">{target.selectedRecipe.practicalRatioText}</span> : null}
+                </div>
+
+                {target.selectedRecipe ? (
+                  <div className="mt-4 space-y-4">
+                    <SwatchComparisonPanel targetHex={target.targetHex} predictedHex={target.selectedRecipe.predictedHex} targetHelper="Selected palette color" predictedHelper="Saved recipe swatch" />
+                    <div className="studio-panel studio-panel-muted">
+                      <p className="studio-eyebrow">Practical ratio</p>
+                      <p className="mt-2 text-lg font-semibold text-[color:var(--text-strong)]">{target.selectedRecipe.practicalRatioText}</p>
+                      <p className="mt-2 text-sm text-[color:var(--text-muted)]">{target.selectedRecipe.recipeText}</p>
+                    </div>
+                    <NextAdjustmentBlock adjustments={target.selectedRecipe.detailedAdjustments} />
+                    <MixPathBlock steps={target.selectedRecipe.mixPath} warnings={target.selectedRecipe.stabilityWarnings} layeringSuggestion={target.selectedRecipe.layeringSuggestion} />
+                  </div>
+                ) : null}
+              </article>
+            )) : <p className="text-sm text-[color:var(--text-muted)]">Add source options below to build the final painting palette.</p>}
+          </div>
+        </Card>
+
+        <Card className="p-4 sm:p-5 prep-sidebar-panel prep-sidebar-panel-candidates prep-sidebar-panel-secondary">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="studio-eyebrow">Candidate Tray</p>
+              <h3 className="mt-1 text-lg font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">Source options</h3>
+            </div>
+            <span className="studio-chip">{candidateCount}</span>
+          </div>
+
+          <div className="mt-4 space-y-4 prep-scroll-panel prep-secondary-scroll">
+            <section>
+              <p className="text-sm font-semibold text-[color:var(--text-strong)]">Manual samples</p>
+              <div className="mt-3 grid gap-3">
+                {sampledCandidates.length ? sampledCandidates.map((sample) => (
+                  <div key={sample.id} className="prep-candidate-card">
+                    <div className="flex items-center gap-3">
+                      <span className="h-10 w-10 rounded-2xl border border-black/10" style={{ backgroundColor: sample.hex }} />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-[color:var(--text-strong)]">{sample.name}</p>
+                        <p className="text-sm text-[color:var(--text-muted)]">{sample.hex}</p>
                       </div>
-                    </button>
-                  )) : <p className="text-sm text-[color:var(--text-muted)]">Run auto extraction to surface candidate colors.</p>}
-                </div>
-              </section>
-            </div>
-          </Card>
-
-          <Card className="p-4 sm:p-5 prep-sidebar-panel prep-sidebar-panel-selected">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="studio-eyebrow">Selected Painting Palette</p>
-                <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">Selected painting palette</h3>
+                      <button className="studio-button studio-button-secondary studio-button-compact" type="button" disabled={allCandidateHexes.has(sample.hex)} onClick={() => addCandidateToPalette(sample, 'reference-sample')}>Add</button>
+                    </div>
+                  </div>
+                )) : <p className="text-sm text-[color:var(--text-muted)]">Click the reference image to sample colors.</p>}
               </div>
-              <span className="studio-chip studio-chip-success">{lockedCount} saved</span>
-            </div>
+            </section>
 
-            <div className="mt-4 space-y-4 prep-scroll-panel">
-              {selectedPalette.length ? selectedPalette.map((target) => (
-                <article key={target.id} className="rounded-[24px] border border-[color:var(--border-soft)] bg-[color:var(--surface-0)] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="h-12 w-12 rounded-2xl border border-black/10" style={{ backgroundColor: target.targetHex }} />
+            <section>
+              <p className="text-sm font-semibold text-[color:var(--text-strong)]">Extracted palette</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                {extractedCandidates.length ? extractedCandidates.map((color) => (
+                  <button key={color.id} type="button" className="prep-candidate-card prep-candidate-button" onClick={() => addCandidateToPalette(color, 'palette-extraction')}>
+                    <div className="flex items-center gap-3">
+                      <span className="h-10 w-10 rounded-2xl border border-black/10" style={{ backgroundColor: color.hex }} />
                       <div className="min-w-0">
-                        <p className="font-semibold text-[color:var(--text-strong)]">{target.label}</p>
-                        <p className="text-sm text-[color:var(--text-muted)]">{target.targetHex}</p>
+                        <p className="font-semibold text-[color:var(--text-strong)]">{color.label}</p>
+                        <p className="text-sm text-[color:var(--text-muted)]">{color.hex}</p>
                       </div>
                     </div>
-                    <button className="studio-button studio-button-secondary" type="button" onClick={() => removePaletteColor(target.id)}>Remove</button>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button className="studio-button studio-button-primary" type="button" onClick={() => generateRecipe(target.id)} disabled={enabledPaints.length === 0}>
-                      {target.selectedRecipe ? 'Regenerate recipe' : 'Generate recipe'}
-                    </button>
-                    {target.selectedRecipe ? <span className="studio-chip studio-chip-success">{target.selectedRecipe.practicalRatioText}</span> : null}
-                  </div>
-
-                  {target.selectedRecipe ? (
-                    <div className="mt-4 space-y-4">
-                      <SwatchComparisonPanel targetHex={target.targetHex} predictedHex={target.selectedRecipe.predictedHex} targetHelper="Selected palette color" predictedHelper="Saved recipe swatch" />
-                      <div className="studio-panel studio-panel-muted">
-                        <p className="studio-eyebrow">Practical ratio</p>
-                        <p className="mt-2 text-lg font-semibold text-[color:var(--text-strong)]">{target.selectedRecipe.practicalRatioText}</p>
-                        <p className="mt-2 text-sm text-[color:var(--text-muted)]">{target.selectedRecipe.recipeText}</p>
-                      </div>
-                      <NextAdjustmentBlock adjustments={target.selectedRecipe.detailedAdjustments} />
-                      <MixPathBlock steps={target.selectedRecipe.mixPath} warnings={target.selectedRecipe.stabilityWarnings} layeringSuggestion={target.selectedRecipe.layeringSuggestion} />
-                    </div>
-                  ) : null}
-                </article>
-              )) : <p className="text-sm text-[color:var(--text-muted)]">Add candidate colors here to build the final painting palette.</p>}
-            </div>
-          </Card>
-        </div>
+                  </button>
+                )) : <p className="text-sm text-[color:var(--text-muted)]">Run extraction to surface source options.</p>}
+              </div>
+            </section>
+          </div>
+        </Card>
       </div>
     </div>
   );
