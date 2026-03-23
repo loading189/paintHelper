@@ -134,6 +134,8 @@ export type RecipeScoreBreakdown = {
   darkNaturalGreenPenalty?: number;
   neutralBalancePenalty?: number;
   boundaryDriftPenalty?: number;
+  greenVividOffHuePenalty?: number;
+  greenHuePenalty?: number;
   hasRequiredHueConstructionPath: boolean;
   staysInTargetHueFamily: boolean;
   finalScore: number;

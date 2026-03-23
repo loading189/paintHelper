@@ -5,7 +5,7 @@ import { PaintingPrepPage } from '../features/prep/PaintingPrepPage';
 import { PaintsPage } from '../features/paints/PaintsPage';
 import { SessionsPage } from '../features/sessions/SessionsPage';
 import { loadAppState, saveAppState } from '../lib/storage/localState';
-import { createPaintingSession, prepareSessionForPainting } from '../features/sessions/sessionState';
+import { createPaintingSession, createStarterSessionState, prepareSessionForPainting } from '../features/sessions/sessionState';
 import type { MixRecipe, Paint, RankedRecipe, UserSettings, WorkspaceView } from '../types/models';
 import { createId } from '../lib/utils/id';
 
@@ -95,6 +95,22 @@ const App = () => {
 
   const setSettings = (settings: UserSettings) =>
     setState((c) => ({ ...c, settings }));
+
+  const addRecentColor = (hex: string) => {
+    setState((current) => ({
+      ...current,
+      recentTargetColors: [
+        { hex, usedAt: new Date().toISOString() },
+        ...current.recentTargetColors.filter((entry) => entry.hex !== hex),
+      ].slice(0, 8),
+    }));
+  };
+
+  const createProject = () => {
+    setState((current) =>
+      createStarterSessionState(current, `Painting ${current.sessions.length + 1}`),
+    );
+  };
 
   const updateSession = (next: NonNullable<typeof currentSession>) => {
     setState((c) => ({
@@ -205,6 +221,7 @@ const App = () => {
             paints={state.paints}
             settings={state.settings}
             onSessionChange={updateSession}
+            onCreateProject={createProject}
           />
         )}
 
@@ -222,6 +239,7 @@ const App = () => {
             settings={state.settings}
             recentColors={state.recentTargetColors.map((c) => c.hex)}
             onSettingsChange={setSettings}
+            onRecentColor={addRecentColor}
             onSaveRecipe={saveRecipe}
           />
         )}
@@ -234,6 +252,7 @@ const App = () => {
               setState((c) => ({ ...c, currentSessionId: id }));
               setView('prep');
             }}
+            onCreate={createProject}
           />
         )}
 

@@ -32,6 +32,7 @@ import { assignRecipeBadges, buildMixStrategy, buildRecipeGuidance, buildRecipeW
 import { buildLayeringSuggestion, buildMixPath, buildRoleNotes, buildStabilityWarnings } from './mixPathEngine';
 import { predictSpectralMix, spectralDistanceBetweenHexes } from './spectralMixing';
 import { distributePercentages, formatRatio, practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
+import { inverseSearchTuning } from './inverseSearchTuning';
 
 export type WeightCombination = number[];
 export type CandidateMix = { paintIds: string[]; weights: number[] };
@@ -133,7 +134,11 @@ const getPaintFamilies = (paints: Paint[], components: RecipeComponent[]): HueFa
 const isEarthPaint = (paint: Paint): boolean => paint.heuristics?.naturalBias === 'earth';
 
 const isStructuralEarthForTarget = (paint: Paint, targetAnalysis: ColorAnalysis): boolean =>
-  isEarthPaint(paint) && (isDarkEarthWarmTarget(targetAnalysis) || isDarkNaturalGreenTarget(targetAnalysis));
+  isEarthPaint(paint) &&
+  (isDarkEarthWarmTarget(targetAnalysis) ||
+    isDarkNaturalGreenTarget(targetAnalysis) ||
+    (isDarkValueTarget(targetAnalysis) && isOliveLikeTarget(targetAnalysis)) ||
+    isRedBrownOrangeCrossoverTarget(targetAnalysis));
 
 const isWarmHueBuilderPaint = (paint: Paint): boolean => {
   const family = getPaintRoleFamily(paint);
@@ -150,7 +155,13 @@ const hasTargetAwareConstructionPath = (paints: Paint[], components: RecipeCompo
   }
 
   if (isDarkNaturalGreenTarget(targetAnalysis)) {
-    const hasGreenPath = stats.greenShare > 0 || (families.includes('yellow') && families.includes('blue'));
+    const hasOliveNearBlackPath =
+      isNearBlackChromaticTarget(targetAnalysis) &&
+      isOliveLikeTarget(targetAnalysis) &&
+      stats.earthShare > 0 &&
+      stats.yellowShare > 0 &&
+      stats.blackShare > 0;
+    const hasGreenPath = stats.greenShare > 0 || (families.includes('yellow') && families.includes('blue')) || hasOliveNearBlackPath;
     const earthStructured = stats.earthShare > 0;
     const blackOnlySeat = isNearBlackChromaticGreenTarget(targetAnalysis) && stats.blackShare > 0 && stats.blackShare <= 8 && stats.earthShare > 0;
     return hasGreenPath && (earthStructured || blackOnlySeat) && stats.whiteShare + stats.warmLightenerShare === 0;
@@ -259,6 +270,14 @@ const getBlueFamilyRestrictionMax = (paint: Paint, targetAnalysis: ColorAnalysis
   return null;
 };
 
+const isDarkCapablePaint = (paint: Paint, targetAnalysis: ColorAnalysis): boolean =>
+  paint.isBlack ||
+  isEarthPaint(paint) ||
+  (isNearBlackChromaticTarget(targetAnalysis) &&
+    !paint.isWhite &&
+    paint.heuristics?.preferredRole !== 'neutralizer' &&
+    (getPaintRoleFamily(paint) === 'blue' || getPaintRoleFamily(paint) === 'red' || getPaintRoleFamily(paint) === 'green'));
+
 const getTargetAwareMaxShare = (paint: Paint, targetAnalysis: ColorAnalysis): number => {
   const baseMaxShare = paint.heuristics?.recommendedMaxShare ?? 100;
   const name = paint.name.toLowerCase();
@@ -291,7 +310,7 @@ const getTargetAwareMaxShare = (paint: Paint, targetAnalysis: ColorAnalysis): nu
 
   if (paint.isBlack) {
     if (isNearBlackChromaticTarget(targetAnalysis)) {
-      return Math.min(baseMaxShare, isVeryDarkValueTarget(targetAnalysis) ? 12 : 10);
+      return Math.min(baseMaxShare, isVeryDarkValueTarget(targetAnalysis) ? 35 : 28);
     }
     if (isDarkEarthWarmTarget(targetAnalysis) || isDarkChromaticWarmTarget(targetAnalysis)) {
       return Math.min(baseMaxShare, 12);
@@ -341,6 +360,7 @@ const getTargetAwareMaxShare = (paint: Paint, targetAnalysis: ColorAnalysis): nu
 
   if (name.includes('burnt umber')) {
     if (isDarkEarthWarmTarget(targetAnalysis)) return Math.min(baseMaxShare, 60);
+    if (isDarkValueTarget(targetAnalysis) && isOliveLikeTarget(targetAnalysis)) return Math.min(baseMaxShare, 55);
     if (isNearBlackChromaticTarget(targetAnalysis)) return Math.min(baseMaxShare, 32);
     if (saturation === 'vivid') return Math.min(baseMaxShare, 20);
     if (saturation === 'moderate') return Math.min(baseMaxShare, 28);
@@ -427,6 +447,65 @@ const withDerivedStructureStats = (stats: RecipeStructureStats): RecipeStructure
   yellowBlueStructureShare: Math.min(stats.yellowShare, stats.blueShare) + stats.greenShare,
 });
 
+const hasStructurallyPlausibleDarkValue = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): boolean => {
+  if (!isDarkValueTarget(targetAnalysis)) {
+    return true;
+  }
+
+  const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
+  const stats = withDerivedStructureStats(getRecipeStructureStats(paints, components));
+  const dominantComponent = components[0];
+  const dominantPaint = dominantComponent ? paintMap.get(dominantComponent.paintId) : null;
+  const darkCapableShare = components.reduce((sum, component) => {
+    const paint = paintMap.get(component.paintId);
+    return paint && isDarkCapablePaint(paint, targetAnalysis) ? sum + component.percentage : sum;
+  }, 0);
+  const lightShare = stats.whiteShare + stats.warmLightenerShare;
+  const dominantFamily = dominantPaint ? getPaintRoleFamily(dominantPaint) : null;
+
+  if (lightShare > inverseSearchTuning.darkTargets.maxLightShare) {
+    return false;
+  }
+
+  if (darkCapableShare < inverseSearchTuning.darkTargets.minDarkShare) {
+    return false;
+  }
+
+  if (stats.yellowShare > inverseSearchTuning.darkTargets.maxYellowShare && !isOliveGreenTarget(targetAnalysis)) {
+    return false;
+  }
+
+  if (dominantPaint?.isWhite || dominantPaint?.name.toLowerCase().includes('unbleached titanium')) {
+    return false;
+  }
+
+  if (dominantComponent && dominantComponent.percentage > inverseSearchTuning.darkTargets.dominantLightShareCap) {
+    const dominantIsLightFamily = dominantPaint?.isWhite || dominantPaint?.name.toLowerCase().includes('unbleached titanium');
+    if (dominantIsLightFamily) {
+      return false;
+    }
+  }
+
+  if (
+    dominantComponent &&
+    dominantFamily === 'yellow' &&
+    dominantComponent.percentage > inverseSearchTuning.darkTargets.dominantYellowShareCap &&
+    !isOliveGreenTarget(targetAnalysis)
+  ) {
+    return false;
+  }
+
+  if (isDarkNaturalGreenTarget(targetAnalysis) && inverseSearchTuning.greenTargets.requireEarthForDarkNatural && stats.earthShare === 0) {
+    return false;
+  }
+
+  if (isNearBlackChromaticTarget(targetAnalysis) && darkCapableShare < inverseSearchTuning.darkTargets.minDarkShare + 10) {
+    return false;
+  }
+
+  return true;
+};
+
 export const isPainterValidForTarget = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): boolean => {
   const stats = withDerivedStructureStats(getRecipeStructureStats(paints, components));
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
@@ -435,7 +514,12 @@ export const isPainterValidForTarget = (paints: Paint[], components: RecipeCompo
   const earthCount = orderedPaints.filter(isEarthPaint).length;
   const chromaticNonSupportShare = components.reduce((sum, component) => {
     const paint = paintMap.get(component.paintId);
-    if (!paint || paint.isWhite || paint.isBlack || paint.heuristics?.preferredRole === 'neutralizer') {
+    if (
+      !paint ||
+      paint.isWhite ||
+      paint.isBlack ||
+      (paint.heuristics?.preferredRole === 'neutralizer' && !isStructuralEarthForTarget(paint, targetAnalysis))
+    ) {
       return sum;
     }
     return sum + component.percentage;
@@ -456,7 +540,7 @@ export const isPainterValidForTarget = (paints: Paint[], components: RecipeCompo
       if (stats.violetShare > 0 || stats.blackShare > 0) {
         return false;
       }
-      const allowedBlueShare = isYellowGreenTarget(targetAnalysis) ? 10 : 5;
+      const allowedBlueShare = isYellowGreenTarget(targetAnalysis) ? 10 : inverseSearchTuning.yellows.maxBlueShareLight;
       if (stats.blueShare > allowedBlueShare) {
         return false;
       }
@@ -482,20 +566,29 @@ export const isPainterValidForTarget = (paints: Paint[], components: RecipeCompo
   }
 
   if (isDarkNaturalGreenTarget(targetAnalysis)) {
-    const hasGreenPath = stats.greenShare > 0 || (stats.yellowShare > 0 && stats.blueShare > 0);
+    const hasOliveNearBlackPath =
+      isNearBlackChromaticTarget(targetAnalysis) &&
+      isOliveLikeTarget(targetAnalysis) &&
+      stats.earthShare > 0 &&
+      stats.yellowShare > 0 &&
+      stats.blackShare > 0;
+    const hasGreenPath = stats.greenShare > 0 || (stats.yellowShare > 0 && stats.blueShare > 0) || hasOliveNearBlackPath;
     if (!hasGreenPath) {
       return false;
     }
     if (stats.whiteShare > 0 || stats.warmLightenerShare > 0) {
       return false;
     }
-    if (stats.earthShare === 0) {
+    if (inverseSearchTuning.greenTargets.requireEarthForDarkNatural && stats.earthShare === 0) {
       return false;
     }
     if (stats.redShare > 18) {
       return false;
     }
     if (isNearBlackChromaticGreenTarget(targetAnalysis) && stats.blackShare > 10) {
+      return false;
+    }
+    if (hasOliveNearBlackPath && stats.blackShare > 35) {
       return false;
     }
   }
@@ -573,6 +666,10 @@ export const isPainterValidForTarget = (paints: Paint[], components: RecipeCompo
     return false;
   }
 
+  if (!hasStructurallyPlausibleDarkValue(paints, components, targetAnalysis)) {
+    return false;
+  }
+
   return true;
 };
 
@@ -618,10 +715,12 @@ const getSupportPenalty = (paints: Paint[], components: RecipeComponent[], targe
     penalty += overage / 180;
   });
 
+  const supportShareSoftCap = isDarkValueTarget(targetAnalysis) ? 42 : 28;
+
   if (isChromaticTarget(targetAnalysis) && supportComponents.length > 1) {
     penalty += 0.05 + (supportComponents.length - 1) * 0.045;
-    if (supportShare > 28) {
-      penalty += (supportShare - 28) / 180;
+    if (supportShare > supportShareSoftCap) {
+      penalty += (supportShare - supportShareSoftCap) / 180;
     }
   }
 
@@ -634,8 +733,9 @@ const getSupportPenalty = (paints: Paint[], components: RecipeComponent[], targe
       const paint = paintMap.get(component.paintId);
       return paint?.isBlack ? sum + component.percentage : sum;
     }, 0);
-    if (blackShare > 8) {
-      penalty += 0.12 + (blackShare - 8) / 70;
+    const blackSoftCap = isVeryDarkValueTarget(targetAnalysis) ? 22 : 16;
+    if (blackShare > blackSoftCap) {
+      penalty += 0.1 + (blackShare - blackSoftCap) / 80;
     }
   }
 
@@ -660,8 +760,8 @@ const getNaturalMixBonus = (paints: Paint[], components: RecipeComponent[], targ
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
   const hasEarth = components.some((component) => paintMap.get(component.paintId)?.heuristics?.naturalBias === 'earth');
   if (!hasEarth) return 0;
-  if (isDarkNaturalGreenTarget(targetAnalysis)) return 0.09;
-  return 0.05;
+  if (isDarkNaturalGreenTarget(targetAnalysis)) return 0.09 + inverseSearchTuning.darkTargets.earthStructuralBonus;
+  return 0.05 + (isDarkEarthWarmTarget(targetAnalysis) ? inverseSearchTuning.darkTargets.earthStructuralBonus : 0);
 };
 
 const getYellowLightPlausibilityPenalty = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): number => {
@@ -755,7 +855,7 @@ const getDarkTargetValuePenalty = (targetAnalysis: ColorAnalysis, predictedAnaly
     ? (isNearBlackChromaticGreenTarget(targetAnalysis) ? delta * 2.4 : delta * 1.75) + (delta > 0.06 ? 0.12 + (delta - 0.06) * 1.8 : 0)
     : 0;
   const thresholdBonus = delta > 0.08 ? 0.08 + (delta - 0.08) * 1.2 : 0;
-  return base + severityBonus + darkGreenBonus + thresholdBonus;
+  return (base + severityBonus + darkGreenBonus + thresholdBonus) * inverseSearchTuning.darkTargets.valuePenaltyScale;
 };
 
 const getMutedTargetCleanPenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
@@ -785,7 +885,7 @@ const getMutedTargetCleanPenalty = (targetAnalysis: ColorAnalysis, predictedAnal
       penalty += 0.12;
     }
   }
-  return penalty;
+  return penalty * inverseSearchTuning.mutedTargets.cleanlinessPenalty;
 };
 
 const getDarkNaturalGreenPenalty = (
@@ -805,7 +905,8 @@ const getDarkNaturalGreenPenalty = (
   if (stats.earthShare === 0) {
     penalty += isNearBlackChromaticGreenTarget(targetAnalysis) ? 0.2 : 0.26;
   }
-  if (predictedAnalysis.hueFamily === 'yellow' || predictedAnalysis.hueFamily === 'orange') {
+  const oliveNearBlackTarget = isNearBlackChromaticTarget(targetAnalysis) && isOliveLikeTarget(targetAnalysis);
+  if ((predictedAnalysis.hueFamily === 'yellow' || predictedAnalysis.hueFamily === 'orange') && !oliveNearBlackTarget) {
     penalty += 0.14;
   }
   if (valueDelta > 0.06) {
@@ -821,7 +922,7 @@ const getDarkNaturalGreenPenalty = (
     penalty += 0.06;
   }
 
-  return penalty;
+  return penalty * inverseSearchTuning.vividTargets.muddinessPenalty;
 };
 
 const getVividTargetMudPenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
@@ -841,7 +942,15 @@ const getVividTargetMudPenalty = (targetAnalysis: ColorAnalysis, predictedAnalys
   if (predictedAnalysis.saturationClassification === 'neutral') {
     penalty += 0.18;
   }
-  return penalty;
+  return penalty * inverseSearchTuning.vividTargets.muddinessPenalty;
+};
+
+const getGreenVividOffHuePenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  if (!(targetAnalysis.hueFamily === 'green' && targetAnalysis.saturationClassification === 'vivid')) {
+    return 0;
+  }
+
+  return predictedAnalysis.hueFamily === 'green' ? 0 : inverseSearchTuning.greenTargets.vividOffHuePenalty;
 };
 
 const getNeutralBalancePenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
@@ -859,7 +968,7 @@ const getNeutralBalancePenalty = (targetAnalysis: ColorAnalysis, predictedAnalys
   if (isCoolMutedNeutralTarget(targetAnalysis) && (predictedAnalysis.hueFamily === 'orange' || predictedAnalysis.hueFamily === 'yellow')) {
     penalty += 0.12;
   }
-  return penalty;
+  return penalty * inverseSearchTuning.neutrals.balancePenalty;
 };
 
 const getBoundaryDriftPenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
@@ -892,6 +1001,18 @@ const getBoundaryDriftPenalty = (targetAnalysis: ColorAnalysis, predictedAnalysi
   return penalty;
 };
 
+const getGreenHuePenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  if (targetAnalysis.hueFamily !== 'green' || predictedAnalysis.hueFamily === 'green') {
+    return 0;
+  }
+
+  if (targetAnalysis.saturationClassification === 'vivid') {
+    return predictedAnalysis.hueFamily === 'yellow' ? 0.28 : 0.22;
+  }
+
+  return predictedAnalysis.hueFamily === 'yellow' || predictedAnalysis.hueFamily === 'orange' ? 0.12 : 0.08;
+};
+
 const getPainterPlausibilityPenalty = (
   paints: Paint[],
   components: RecipeComponent[],
@@ -910,7 +1031,7 @@ const getPainterPlausibilityPenalty = (
     } else if (stats.earthShare < 15) {
       penalty += 0.1;
     } else {
-      penalty -= 0.05;
+      penalty -= 0.05 + inverseSearchTuning.darkTargets.earthStructuralBonus;
     }
     if (stats.whiteShare + stats.warmLightenerShare > 0) {
       penalty += 0.28;
@@ -977,7 +1098,7 @@ const getPainterPlausibilityPenalty = (
       if (earthShare === 0) {
         penalty += isNearBlackChromaticGreenTarget(targetAnalysis) ? 0.22 : 0.28;
       } else if (earthShare >= 12 && earthShare <= 45) {
-        penalty -= 0.06;
+        penalty -= 0.06 + inverseSearchTuning.darkTargets.earthStructuralBonus;
       }
       if (redShare > 8) {
         penalty += 0.1 + (redShare - 8) / 120;
@@ -1062,7 +1183,8 @@ const getBlackPenalty = (settings: UserSettings, paints: Paint[], components: Re
     return 0;
   }
   if (isNearBlackChromaticTarget(targetAnalysis)) {
-    return blackShare > 8 ? 0.08 + (blackShare - 8) / 90 : 0;
+    const blackSoftCap = isVeryDarkValueTarget(targetAnalysis) ? 22 : 16;
+    return blackShare > blackSoftCap ? 0.06 + (blackShare - blackSoftCap) / 110 : 0;
   }
   return blackShare > 12 ? (blackShare - 12) / 160 : 0;
 };
@@ -1169,6 +1291,8 @@ export const scoreRecipe = (
   const darkNaturalGreenPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getDarkNaturalGreenPenalty(paints, components, targetAnalysis, predictedAnalysis);
   const neutralBalancePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getNeutralBalancePenalty(targetAnalysis, predictedAnalysis);
   const boundaryDriftPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getBoundaryDriftPenalty(targetAnalysis, predictedAnalysis);
+  const greenVividOffHuePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenVividOffHuePenalty(targetAnalysis, predictedAnalysis);
+  const greenHuePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenHuePenalty(targetAnalysis, predictedAnalysis);
   const twoPaintUsabilityBonus = getTwoPaintUsabilityBonus(settings, components, spectralDistance);
   const vividTargetPenalty =
     settings.rankingMode === 'strict-closest-color' || targetAnalysis.saturationClassification !== 'vivid' || staysInTargetHueFamily
@@ -1196,6 +1320,8 @@ export const scoreRecipe = (
     darkNaturalGreenPenalty +
     neutralBalancePenalty +
     boundaryDriftPenalty +
+    greenVividOffHuePenalty +
+    greenHuePenalty +
     vividTargetPenalty -
     naturalMixBonus -
     chromaticPathBonus -
@@ -1232,13 +1358,15 @@ export const scoreRecipe = (
     darkNaturalGreenPenalty,
     neutralBalancePenalty,
     boundaryDriftPenalty,
+    greenVividOffHuePenalty,
+    greenHuePenalty,
     hasRequiredHueConstructionPath: hasConstructionPath,
     staysInTargetHueFamily,
     finalScore,
   };
 };
 
-const isCandidateUsefulForTarget = (paints: Paint[], paintIds: string[], weights: number[], target: ColorAnalysis): boolean => {
+export const isCandidateUsefulForTarget = (paints: Paint[], paintIds: string[], weights: number[], target: ColorAnalysis): boolean => {
   const group = paintIds.map((paintId) => paints.find((paint) => paint.id === paintId)).filter((paint): paint is Paint => Boolean(paint));
   if (group.length !== paintIds.length) return false;
   const components = buildComponents(buildOrderedEntries(paintIds, weights));
@@ -1270,7 +1398,8 @@ const isCandidateUsefulForTarget = (paints: Paint[], paintIds: string[], weights
   const blueShare = weights.reduce((sum, weight, index) => (
     getPaintRoleFamily(group[index]) === 'blue' ? sum + weight : sum
   ), 0);
-  if (isChromaticTarget(target) && supportWeights.length > 1 && supportShare > 35) {
+  const supportShareCap = isDarkValueTarget(target) ? 45 : 35;
+  if (isChromaticTarget(target) && supportWeights.length > 1 && supportShare > supportShareCap) {
     return false;
   }
 
@@ -1301,8 +1430,9 @@ const isCandidateUsefulForTarget = (paints: Paint[], paintIds: string[], weights
     const blueShare = weights.reduce((sum, weight, index) => (getPaintRoleFamily(group[index]) === 'blue' ? sum + weight : sum), 0);
     const redShare = weights.reduce((sum, weight, index) => (getPaintRoleFamily(group[index]) === 'red' ? sum + weight : sum), 0);
     const blackShare = weights.reduce((sum, weight, index) => (group[index].isBlack ? sum + weight : sum), 0);
+    const hasOliveNearBlackPath = isNearBlackChromaticTarget(target) && isOliveLikeTarget(target) && earthShare > 0 && yellowShare > 0 && blackShare > 0;
 
-    if (whiteLikeShare > 0 || earthShare === 0 || yellowShare === 0 || blueShare === 0) {
+    if (whiteLikeShare > 0 || earthShare === 0 || yellowShare === 0 || (blueShare === 0 && !hasOliveNearBlackPath)) {
       return false;
     }
     if (redShare > 20) {
@@ -1312,7 +1442,7 @@ const isCandidateUsefulForTarget = (paints: Paint[], paintIds: string[], weights
       if (blackShare > 10) {
         return false;
       }
-    } else if (blackShare > 12) {
+    } else if (!hasOliveNearBlackPath && blackShare > 12) {
       return false;
     }
   }
@@ -1320,7 +1450,9 @@ const isCandidateUsefulForTarget = (paints: Paint[], paintIds: string[], weights
   if (isNearBlackChromaticTarget(target)) {
     const blackShare = weights.reduce((sum, weight, index) => (group[index].isBlack ? sum + weight : sum), 0);
     const chromaticShare = weights.reduce((sum, weight, index) => (
-      !group[index].isBlack && !group[index].isWhite && group[index].heuristics?.preferredRole !== 'neutralizer' ? sum + weight : sum
+      !group[index].isBlack &&
+      !group[index].isWhite &&
+      (group[index].heuristics?.preferredRole !== 'neutralizer' || isStructuralEarthForTarget(group[index], target)) ? sum + weight : sum
     ), 0);
     if (blackShare >= chromaticShare) {
       return false;
@@ -1341,21 +1473,138 @@ const isCandidateUsefulForTarget = (paints: Paint[], paintIds: string[], weights
   return true;
 };
 
+const dedupeWeightSets = (weightSets: number[][]): number[][] => {
+  const seen = new Set<string>();
+  return weightSets.filter((weights) => {
+    const signature = weights.join(':');
+    if (seen.has(signature)) {
+      return false;
+    }
+    seen.add(signature);
+    return true;
+  });
+};
+
+const buildDarkTargetWeightSets = (group: Paint[], targetAnalysis: ColorAnalysis): number[][] => {
+  if (!inverseSearchTuning.ratioSearch.darkRatioFamiliesEnabled || !isDarkValueTarget(targetAnalysis)) {
+    return [];
+  }
+
+  const size = group.length;
+  const earthIndex = group.findIndex((paint) => isEarthPaint(paint));
+  const blackIndex = group.findIndex((paint) => paint.isBlack);
+  const yellowIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'yellow');
+  const blueIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'blue');
+  const redIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'red');
+  const greenIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'green');
+  const darkStructureIndex = earthIndex >= 0 ? earthIndex : blackIndex;
+  const chromaticAnchorIndex = blueIndex >= 0 ? blueIndex : redIndex >= 0 ? redIndex : yellowIndex >= 0 ? yellowIndex : greenIndex;
+
+  if (size === 2) {
+    if (darkStructureIndex < 0) {
+      return [];
+    }
+
+    return [
+      [55, 45],
+      [60, 40],
+      [45, 55],
+      [65, 35],
+    ].map((weights) => {
+      const ordered = [...weights];
+      if (darkStructureIndex === 1) {
+        ordered.reverse();
+      }
+      return ordered;
+    });
+  }
+
+  if (size === 3 && darkStructureIndex >= 0 && chromaticAnchorIndex >= 0) {
+    const remainingIndex = [0, 1, 2].find((index) => index !== darkStructureIndex && index !== chromaticAnchorIndex);
+    if (remainingIndex === undefined) {
+      return [];
+    }
+
+    const families: number[][] = [];
+    const darkCoreFamilies = [
+      { dark: 40, anchor: 35, support: 25 },
+      { dark: 35, anchor: 40, support: 25 },
+      { dark: 45, anchor: 30, support: 25 },
+      { dark: 30, anchor: 45, support: 25 },
+      { dark: 38, anchor: 32, support: 30 },
+      { dark: 45, anchor: 40, support: 15 },
+      { dark: 40, anchor: 45, support: 15 },
+      { dark: 50, anchor: 35, support: 15 },
+      { dark: 50, anchor: 40, support: 10 },
+      { dark: 45, anchor: 45, support: 10 },
+    ];
+
+    darkCoreFamilies.forEach(({ dark, anchor, support }) => {
+      const weights = [0, 0, 0];
+      weights[darkStructureIndex] = dark;
+      weights[chromaticAnchorIndex] = anchor;
+      weights[remainingIndex] = support;
+      families.push(weights);
+    });
+
+    return families;
+  }
+
+  return [];
+};
+
+const buildVividGreenWeightSets = (group: Paint[], targetAnalysis: ColorAnalysis): number[][] => {
+  if (!(targetAnalysis.hueFamily === 'green' && targetAnalysis.saturationClassification === 'vivid')) {
+    return [];
+  }
+
+  const yellowIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'yellow');
+  const blueIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'blue');
+  if (yellowIndex < 0 || blueIndex < 0) {
+    return [];
+  }
+
+  if (group.length === 2) {
+    return [
+      [80, 20],
+      [85, 15],
+      [70, 30],
+    ].map((weights) => {
+      const ordered = [0, 0];
+      ordered[yellowIndex] = weights[0];
+      ordered[blueIndex] = weights[1];
+      return ordered;
+    });
+  }
+
+  return [];
+};
+
 export const generateCandidateMixes = (paints: Paint[], maxPaintsPerRecipe: number, step: number, targetHex?: string): CandidateMix[] => {
   const enabledPaints = paints.filter((paint) => paint.isEnabled);
   const targetAnalysis = targetHex ? analyzeColor(targetHex) : null;
   const candidates: CandidateMix[] = [];
 
-  for (let size = 1; size <= Math.min(maxPaintsPerRecipe, enabledPaints.length); size += 1) {
+  for (let size = 1; size <= Math.min(maxPaintsPerRecipe, inverseSearchTuning.ratioSearch.maxComponents, enabledPaints.length); size += 1) {
     const groups = choosePaintGroups(enabledPaints, size);
 
     groups.forEach((group) => {
-      const weightSets = generateWeightCombinations(size, step).filter((weights) => {
+      const baseWeightSets = generateWeightCombinations(size, step);
+      const targetAwareWeightSets = targetAnalysis
+        ? [...buildDarkTargetWeightSets(group, targetAnalysis), ...buildVividGreenWeightSets(group, targetAnalysis)]
+        : [];
+      const weightSets = dedupeWeightSets([...baseWeightSets, ...targetAwareWeightSets]).filter((weights) => {
         if (targetAnalysis && !isCandidateUsefulForTarget(enabledPaints, group.map((paint) => paint.id), weights, targetAnalysis)) {
           return false;
         }
         const strongCount = group.filter(isStrongPaint).length;
-        if (size === 3 && strongCount >= 2 && weights.filter((weight) => weight >= 30).length >= 2) {
+        const allowDarkStructuredThreePaintBuild =
+          targetAnalysis &&
+          isDarkValueTarget(targetAnalysis) &&
+          group.some((paint) => isDarkCapablePaint(paint, targetAnalysis)) &&
+          weights.some((weight, index) => weight >= 30 && isDarkCapablePaint(group[index], targetAnalysis));
+
+        if (size === 3 && strongCount >= 2 && weights.filter((weight) => weight >= 30).length >= 2 && !allowDarkStructuredThreePaintBuild) {
           return false;
         }
         return true;
@@ -1399,6 +1648,9 @@ export const rankRecipes = (targetHex: string, paints: Paint[], settings: UserSe
     const exactPercentages = distributePercentages(orderedWeights);
     const practicalParts = practicalRatioFromWeights(orderedWeights, { idealMaxParts: orderedWeights.length === 3 ? 9 : 8, hardMaxParts: 12 });
     const practicalPercentages = distributePercentages(practicalParts);
+    // Forward-model contract: the predicted swatch comes only from the
+    // recipe's actual paints + normalized weights. Target data may filter or
+    // rank recipes, but it must never alter this mixed result after the fact.
     const mix = predictSpectralMix(paints, components);
     const predictedAnalysis = analyzeColor(mix.hex);
     if (!predictedAnalysis) {
