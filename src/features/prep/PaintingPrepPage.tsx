@@ -153,14 +153,36 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
     <div className="prep-layout prep-layout-dense">
       <div className="space-y-4">
         <Card className="p-4 sm:p-5 prep-workspace-card">
-          <div className="prep-toolbar">
+          <div className="workspace-mode-header">
+            <div>
+              <p className="studio-eyebrow">Prep</p>
+              <h2 className="workspace-mode-title">Reference-led palette planning</h2>
+              <p className="workspace-mode-copy">Keep the image dominant, sample with intent, and promote only the colors that belong in the working painting palette.</p>
+            </div>
+            <div className="workspace-mode-meta">
+              <div className="studio-mini-stat"><span>Selected</span><strong>{selectedPalette.length}</strong></div>
+              <div className="studio-mini-stat"><span>Locked</span><strong>{lockedCount}</strong></div>
+              <div className="studio-mini-stat"><span>Candidates</span><strong>{candidateCount}</strong></div>
+            </div>
+          </div>
+
+          <div className="prep-toolbar prep-toolbar-luxe">
             <label className="studio-upload prep-upload-tile">
               <span className="studio-eyebrow">Reference image</span>
-              <span className="mt-2 block text-sm font-semibold text-[color:var(--text-strong)]">{session.referenceImage?.name ?? 'Upload JPG / PNG / WebP'}</span>
+              <span className="prep-upload-title">{session.referenceImage?.name ?? 'Upload JPG / PNG / WebP'}</span>
+              <span className="prep-upload-copy">Mounted reference board for palette extraction and manual sampling.</span>
               <input className="mt-3 block w-full text-sm" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void handleUpload(event.target.files?.[0])} />
             </label>
 
             <div className="studio-panel studio-panel-muted prep-control-panel">
+              <div className="prep-control-heading">
+                <div>
+                  <p className="studio-eyebrow">Sampler controls</p>
+                  <p className="prep-panel-title">Instrument settings</p>
+                </div>
+                <div className="studio-chip studio-chip-info">Hover {hoverHex ?? '—'}</div>
+              </div>
+
               <div className="prep-control-row">
                 <label>
                   <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">Mode</span>
@@ -178,13 +200,14 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
                   <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">Zoom</span>
                   <input className="studio-input studio-input-compact" type="number" min={4} max={20} value={zoom} onChange={(event) => setZoom(Number(event.target.value))} />
                 </label>
-                <div className="studio-chip">Hover {hoverHex ?? '—'}</div>
               </div>
 
               <div className="prep-control-row prep-control-row-actions">
-                <div className="flex flex-wrap gap-2">
+                <div className="studio-segmented-control" role="group" aria-label="Palette extraction size">
                   {[5, 8, 12].map((count) => (
-                    <button key={count} type="button" className={`studio-button ${paletteSize === count ? 'studio-button-primary' : 'studio-button-secondary'} studio-button-compact`} onClick={() => setPaletteSize(count)}>{count}</button>
+                    <button key={count} type="button" className={`studio-segmented-option ${paletteSize === count ? 'studio-segmented-option-active' : ''}`} onClick={() => setPaletteSize(count)}>
+                      {count}
+                    </button>
                   ))}
                 </div>
                 <button className="studio-button studio-button-secondary studio-button-compact" type="button" onClick={runExtraction} disabled={!session.referenceImage?.dataUrl}>Extract palette</button>
@@ -214,15 +237,15 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
             />
           </div>
         </Card>
-
       </div>
 
       <div className="prep-sidebar-stack prep-sidebar-dense">
         <Card className="p-4 sm:p-5 prep-sidebar-panel prep-sidebar-panel-selected prep-sidebar-panel-primary">
-          <div className="flex items-center justify-between gap-3">
+          <div className="panel-heading-row">
             <div>
-              <p className="studio-eyebrow">Selected Painting Palette</p>
-              <h3 className="mt-1 text-lg font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">Main output</h3>
+              <p className="studio-eyebrow">Selected painting palette</p>
+              <h3 className="panel-heading-title">Main output</h3>
+              <p className="panel-heading-copy">This is the working palette that moves forward into Paint mode.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <span className="studio-chip">{selectedPalette.length} colors</span>
@@ -232,35 +255,48 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
 
           <div className="mt-4 space-y-4 prep-scroll-panel prep-primary-scroll">
             {selectedPalette.length ? selectedPalette.map((target) => (
-              <article key={target.id} className="prep-target-card">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="h-12 w-12 rounded-2xl border border-black/10" style={{ backgroundColor: target.targetHex }} />
+              <article key={target.id} className="prep-target-card prep-target-card-selected">
+                <div className="prep-target-card__topline">
+                  <div className="prep-target-card__identity">
+                    <span className="prep-target-swatch" style={{ backgroundColor: target.targetHex }} />
                     <div className="min-w-0">
-                      <p className="font-semibold text-[color:var(--text-strong)]">{target.label}</p>
-                      <p className="text-sm text-[color:var(--text-muted)]">{target.targetHex}</p>
+                      <p className="prep-target-label">{target.label}</p>
+                      <p className="prep-target-hex">{target.targetHex}</p>
                     </div>
                   </div>
                   <button className="studio-button studio-button-secondary studio-button-compact" type="button" onClick={() => removePaletteColor(target.id)}>Remove</button>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="prep-target-card__controls">
                   <button className="studio-button studio-button-secondary studio-button-compact" type="button" onClick={() => generateRecipe(target.id)} disabled={enabledPaints.length === 0}>
                     {target.selectedRecipe ? 'Refresh recipe' : 'Preview recipe'}
                   </button>
-                  {target.selectedRecipe ? <span className="studio-chip studio-chip-success">{target.selectedRecipe.practicalRatioText}</span> : null}
+                  {target.selectedRecipe ? <span className="studio-chip studio-chip-success">Recipe-ready {target.selectedRecipe.practicalRatioText}</span> : <span className="studio-chip studio-chip-muted">Waiting on recipe</span>}
                 </div>
 
                 {target.selectedRecipe ? (
-                  <div className="mt-4 space-y-4">
+                  <div className="mt-4 space-y-4 prep-recipe-preview">
                     <SwatchComparisonPanel targetHex={target.targetHex} predictedHex={target.selectedRecipe.predictedHex} targetHelper="Selected palette color" predictedHelper="Saved recipe swatch" />
-                    <div className="studio-panel studio-panel-muted">
+                    <div className="studio-panel studio-panel-strong prep-ratio-panel">
                       <p className="studio-eyebrow">Practical ratio</p>
-                      <p className="mt-2 text-lg font-semibold text-[color:var(--text-strong)]">{target.selectedRecipe.practicalRatioText}</p>
-                      <p className="mt-2 text-sm text-[color:var(--text-muted)]">{target.selectedRecipe.recipeText}</p>
+                      <p className="prep-ratio-hero">{target.selectedRecipe.practicalRatioText}</p>
+                      <p className="prep-ratio-copy">{target.selectedRecipe.recipeText}</p>
                     </div>
-                    <NextAdjustmentBlock adjustments={target.selectedRecipe.detailedAdjustments} />
-                    <MixPathBlock steps={target.selectedRecipe.mixPath} warnings={target.selectedRecipe.stabilityWarnings} layeringSuggestion={target.selectedRecipe.layeringSuggestion} />
+                    <details className="studio-disclosure prep-notes-disclosure">
+                      <summary className="studio-disclosure-summary">
+                        <div className="panel-heading-row panel-heading-row-compact">
+                          <div>
+                            <p className="studio-eyebrow">Recipe notes</p>
+                            <p className="panel-heading-title panel-heading-title-sm">Adjustments + path</p>
+                          </div>
+                          <span className="studio-chip studio-chip-info">Expand</span>
+                        </div>
+                      </summary>
+                      <div className="mt-4 space-y-4">
+                        <NextAdjustmentBlock adjustments={target.selectedRecipe.detailedAdjustments} />
+                        <MixPathBlock steps={target.selectedRecipe.mixPath} warnings={target.selectedRecipe.stabilityWarnings} layeringSuggestion={target.selectedRecipe.layeringSuggestion} />
+                      </div>
+                    </details>
                   </div>
                 ) : null}
               </article>
@@ -269,10 +305,11 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
         </Card>
 
         <Card className="p-4 sm:p-5 prep-sidebar-panel prep-sidebar-panel-candidates prep-sidebar-panel-secondary">
-          <div className="flex items-center justify-between gap-3">
+          <div className="panel-heading-row">
             <div>
               <p className="studio-eyebrow">Candidate Tray</p>
-              <h3 className="mt-1 text-lg font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">Source options</h3>
+              <h3 className="panel-heading-title">Source options</h3>
+              <p className="panel-heading-copy">Manual picks and extracted notes stay quieter so the selected palette remains dominant.</p>
             </div>
             <span className="studio-chip">{candidateCount}</span>
           </div>
@@ -284,7 +321,7 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
                 {sampledCandidates.length ? sampledCandidates.map((sample) => (
                   <div key={sample.id} className="prep-candidate-card">
                     <div className="flex items-center gap-3">
-                      <span className="h-10 w-10 rounded-2xl border border-black/10" style={{ backgroundColor: sample.hex }} />
+                      <span className="prep-candidate-swatch" style={{ backgroundColor: sample.hex }} />
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-[color:var(--text-strong)]">{sample.name}</p>
                         <p className="text-sm text-[color:var(--text-muted)]">{sample.hex}</p>
@@ -302,7 +339,7 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
                 {extractedCandidates.length ? extractedCandidates.map((color) => (
                   <button key={color.id} type="button" className="prep-candidate-card prep-candidate-button" onClick={() => addCandidateToPalette(color, 'palette-extraction')}>
                     <div className="flex items-center gap-3">
-                      <span className="h-10 w-10 rounded-2xl border border-black/10" style={{ backgroundColor: color.hex }} />
+                      <span className="prep-candidate-swatch" style={{ backgroundColor: color.hex }} />
                       <div className="min-w-0">
                         <p className="font-semibold text-[color:var(--text-strong)]">{color.label}</p>
                         <p className="text-sm text-[color:var(--text-muted)]">{color.hex}</p>
