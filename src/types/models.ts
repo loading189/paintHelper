@@ -125,6 +125,9 @@ export type RecipeScoreBreakdown = {
   chromaticPathBonus: number;
   twoPaintUsabilityBonus: number;
   vividTargetPenalty: number;
+  painterPlausibilityPenalty?: number;
+  yellowLightPlausibilityPenalty?: number;
+  greenStructureBonus?: number;
   hasRequiredHueConstructionPath: boolean;
   staysInTargetHueFamily: boolean;
   finalScore: number;
