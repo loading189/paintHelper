@@ -7,11 +7,16 @@ const labelMap: Record<MixStatus, string> = {
   'remix-needed': 'Remix needed',
 };
 
-const classMap: Record<MixStatus, string> = {
-  'not-mixed': 'studio-chip-muted',
-  mixed: 'studio-chip-success',
-  adjusted: 'studio-chip-info',
-  'remix-needed': 'studio-chip-warm',
+const toneMap: Record<MixStatus, string> = {
+  'not-mixed': 'studio-status-muted',
+  mixed: 'studio-status-success',
+  adjusted: 'studio-status-info',
+  'remix-needed': 'studio-status-warn',
 };
 
-export const MixStatusChip = ({ status }: { status: MixStatus }) => <span className={`studio-chip mix-status-chip ${classMap[status]}`.trim()}>{labelMap[status]}</span>;
+export const MixStatusChip = ({ status }: { status: MixStatus }) => (
+  <span className={`studio-status ${toneMap[status]}`.trim()}>
+    <span className="studio-status-dot" />
+    {labelMap[status]}
+  </span>
+);

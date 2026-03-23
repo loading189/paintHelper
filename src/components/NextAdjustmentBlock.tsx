@@ -1,18 +1,37 @@
 import type { AdjustmentSuggestion } from '../types/models';
 
-export const NextAdjustmentBlock = ({ adjustments, title = 'Next adjustments' }: { adjustments: AdjustmentSuggestion[]; title?: string }) => {
+export const NextAdjustmentBlock = ({
+  adjustments,
+  title = 'Next adjustments',
+}: {
+  adjustments: AdjustmentSuggestion[];
+  title?: string;
+}) => {
   if (adjustments.length === 0) {
     return null;
   }
 
   return (
-    <section className="rounded-[28px] border border-[rgba(84,111,88,0.16)] bg-[rgba(84,111,88,0.08)] p-4">
-      <p className="studio-eyebrow">{title}</p>
-      <div className="mt-3 space-y-2.5">
-        {adjustments.map((adjustment) => (
-          <div key={`${adjustment.priority}-${adjustment.detail}`} className="rounded-[20px] border border-[rgba(84,111,88,0.14)] bg-[rgba(251,248,243,0.78)] px-4 py-3 text-sm text-[color:var(--text-body)]">
-            <p className="font-semibold text-[color:var(--text-strong)]">{adjustment.priority} · {adjustment.label}</p>
-            <p className="mt-1 leading-6">{adjustment.detail}</p>
+    <section className="studio-block studio-block-tinted">
+      <div className="studio-block-header">
+        <p className="studio-kicker">{title}</p>
+      </div>
+
+      <div className="studio-adjustment-list">
+        {adjustments.map((adjustment, index) => (
+          <div
+            key={`${adjustment.priority}-${adjustment.detail}-${index}`}
+            className="studio-adjustment-row"
+          >
+            <div className="studio-adjustment-meta">
+              <span className="studio-adjustment-priority">
+                {adjustment.priority}
+              </span>
+              <span className="studio-adjustment-label">
+                {adjustment.label}
+              </span>
+            </div>
+            <p className="studio-adjustment-detail">{adjustment.detail}</p>
           </div>
         ))}
       </div>
