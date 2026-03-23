@@ -682,4 +682,117 @@ describe('mixEngine', () => {
     expect(vividBad.vividTargetMudPenalty).toBeGreaterThan(vividGood.vividTargetMudPenalty ?? 0);
     expect(mutedBad.mutedTargetCleanPenalty).toBeGreaterThan(mutedGood.mutedTargetCleanPenalty ?? 0);
   });
+
+  it('moves pale yellow structure work upstream into candidate generation', () => {
+    const candidates = generateCandidateMixes(starterPaints, 3, 5, '#F3E58A');
+    const topYellowFamilies = candidates.filter((candidate) =>
+      candidate.paintIds.includes('paint-cadmium-yellow-medium') &&
+      candidate.paintIds.some((paintId) => ['paint-titanium-white', 'paint-unbleached-titanium'].includes(paintId)),
+    );
+
+    expect(topYellowFamilies.length).toBeGreaterThan(0);
+    expect(topYellowFamilies.some((candidate) => {
+      const yellowIndex = candidate.paintIds.indexOf('paint-cadmium-yellow-medium');
+      return yellowIndex >= 0 && candidate.weights[yellowIndex] >= 50;
+    })).toBe(true);
+    expect(candidates.some((candidate) =>
+      candidate.paintIds.includes('paint-cadmium-yellow-medium') &&
+      candidate.paintIds.includes('paint-phthalo-blue'),
+    )).toBe(false);
+  });
+
+  it('moves dark earth warm structure work upstream into candidate generation', () => {
+    const candidates = generateCandidateMixes(starterPaints, 3, 5, '#A6310D');
+    const earthWarmFamilies = candidates.filter((candidate) =>
+      candidate.paintIds.includes('paint-burnt-umber') &&
+      candidate.paintIds.includes('paint-cadmium-yellow-medium') &&
+      candidate.paintIds.some((paintId) => ['paint-cadmium-red', 'paint-alizarin-crimson'].includes(paintId)),
+    );
+
+    expect(earthWarmFamilies.length).toBeGreaterThan(0);
+    expect(earthWarmFamilies.every((candidate) => !candidate.paintIds.includes('paint-titanium-white'))).toBe(true);
+  });
+
+  it('keeps spectral-first ranking dominated by truthful closeness and exposes ablation differences', () => {
+    const target = analyzeColor('#545F27');
+    const closerPredicted = analyzeColor('#56622E');
+    const fartherPredicted = analyzeColor('#786F2C');
+    expect(target && closerPredicted && fartherPredicted).toBeTruthy();
+
+    const structurallyPlain = [
+      { paintId: 'paint-cadmium-yellow-medium', percentage: 65, weight: 65 },
+      { paintId: 'paint-ultramarine-blue', percentage: 20, weight: 20 },
+      { paintId: 'paint-titanium-white', percentage: 15, weight: 15 },
+    ];
+    const painterlyButFarther = [
+      { paintId: 'paint-cadmium-yellow-medium', percentage: 45, weight: 45 },
+      { paintId: 'paint-ultramarine-blue', percentage: 25, weight: 25 },
+      { paintId: 'paint-burnt-umber', percentage: 30, weight: 30 },
+    ];
+
+    const spectralOnly = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'spectral-first' },
+      starterPaints,
+      target!,
+      closerPredicted!,
+      structurallyPlain,
+    );
+    const balanced = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      closerPredicted!,
+      structurallyPlain,
+    );
+    const legacy = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'full-heuristics-legacy' },
+      starterPaints,
+      target!,
+      closerPredicted!,
+      structurallyPlain,
+    );
+    const fartherBalanced = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      fartherPredicted!,
+      painterlyButFarther,
+    );
+
+    expect(spectralOnly.finalScore).toBe(spectralOnly.primaryScore);
+    expect(balanced.regularizationPenalty).toBeGreaterThan(0);
+    expect(legacy.legacyHeuristicPenalty).toBeGreaterThan(0);
+    expect(balanced.finalScore).toBeLessThan(fartherBalanced.finalScore);
+  });
+
+  it('keeps light regularizers smaller than legacy heuristic pressure', () => {
+    const target = analyzeColor('#0B1906');
+    const predicted = analyzeColor('#1A2611');
+    expect(target && predicted).toBeTruthy();
+
+    const components = [
+      { paintId: 'paint-cadmium-yellow-medium', percentage: 45, weight: 45 },
+      { paintId: 'paint-ultramarine-blue', percentage: 20, weight: 20 },
+      { paintId: 'paint-burnt-umber', percentage: 35, weight: 35 },
+    ];
+
+    const balanced = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      predicted!,
+      components,
+    );
+    const legacy = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'full-heuristics-legacy' },
+      starterPaints,
+      target!,
+      predicted!,
+      components,
+    );
+
+    expect(balanced.regularizationPenalty - balanced.regularizationBonus).toBeLessThan(
+      legacy.regularizationPenalty + legacy.legacyHeuristicPenalty - legacy.regularizationBonus,
+    );
+  });
 });

@@ -13,8 +13,10 @@ const DEFAULT_TARGET = '#7A8FB3';
 
 const rankingModeLabels: Record<UserSettings['rankingMode'], string> = {
   'strict-closest-color': 'Strict closest',
+  'spectral-first': 'Spectral first',
   'painter-friendly-balanced': 'Painter friendly',
   'simpler-recipes-preferred': 'Simpler recipes',
+  'full-heuristics-legacy': 'Full heuristics',
 };
 
 type MixerPageProps = {
@@ -136,6 +138,7 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
+                <span className="mt-2 block text-xs text-[color:var(--text-muted)]">Compare spectral-only, spectral-first with light regularization, and legacy full heuristics without changing the forward recipe → predicted contract.</span>
               </label>
 
               <button className="studio-button studio-button-primary w-full" type="button" disabled={generateDisabled} onClick={() => void handleGenerate()}>
