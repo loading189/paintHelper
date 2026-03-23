@@ -1,4 +1,5 @@
 import type { ColorAnalysis, Paint, RankedRecipe, RecipeBadge, RecipeQualityLabel, RecipeScoreBreakdown } from '../../types/models';
+import { isDarkEarthWarmTarget, isLightWarmNeutralTarget, isNearBlackChromaticTarget } from './colorAnalysis';
 
 const getPaintMap = (paints: Paint[]) => new Map(paints.map((paint) => [paint.id, paint]));
 
@@ -43,6 +44,12 @@ export const buildRecipeWhyThisRanked = (
       reasons.push(`Uses ${earthPaint.name} to naturalize the mix instead of flattening it with black.`);
     }
   }
+  if (scoreBreakdown.darkTargetValuePenalty && scoreBreakdown.darkTargetValuePenalty > 0.08) {
+    reasons.push('Dark targets are being held to a stricter value check so an over-light mix does not outrank a believable dark build.');
+  }
+  if (scoreBreakdown.boundaryDriftPenalty && scoreBreakdown.boundaryDriftPenalty > 0) {
+    reasons.push('Keeps the mix on the correct side of a hue-boundary target instead of drifting into the next family.');
+  }
   if (scoreBreakdown.earlyWhitePenalty > 0) {
     reasons.push('White was kept in a support role so the chromatic path stays believable.');
   }
@@ -83,11 +90,21 @@ export const buildRecipeGuidance = (
   if (predictedAnalysis.value < targetAnalysis.value - 0.04) {
     lines.push('The prediction sits slightly dark, so lift value only after the hue reads correctly.');
   } else if (predictedAnalysis.value > targetAnalysis.value + 0.04) {
-    lines.push('The prediction runs a touch light, so lower value with support paint only after checking hue.');
+    lines.push(isDarkEarthWarmTarget(targetAnalysis)
+      ? 'The prediction runs light, so deepen it with earth support first and use black only if the warm dark still is not seated.'
+      : 'The prediction runs a touch light, so lower value with support paint only after checking hue.');
   }
 
   if (targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'neutral') {
     lines.push('For muted targets, let the earth support do the softening before you reach for black.');
+  }
+
+  if (isLightWarmNeutralTarget(targetAnalysis)) {
+    lines.push('Keep this on a warm-light path: Unbleached Titanium or white should manage value before stronger cooling corrections enter.');
+  }
+
+  if (isNearBlackChromaticTarget(targetAnalysis)) {
+    lines.push('Keep the hue identity visible in the dark. Mars Black should only finish the value, not build the color family.');
   }
 
   const surprisingPaint = orderedPaints.find((paint) =>
@@ -123,6 +140,8 @@ export const buildMixStrategy = (
     }
   } else if (targetAnalysis.hueFamily === 'orange') {
     lines.push('Build orange from yellow and red first. Save white and earth colors for correction passes.');
+  } else if (isDarkEarthWarmTarget(targetAnalysis)) {
+    lines.push('Build the warm dark from red + yellow + earth. Let Burnt Umber seat the value before you consider black.');
   } else if (targetAnalysis.hueFamily === 'violet') {
     lines.push('Build violet from the red-blue pair before deciding whether it needs value or chroma adjustment.');
   } else if (dominant) {
@@ -135,9 +154,13 @@ export const buildMixStrategy = (
   }
 
   if (targetAnalysis.valueClassification === 'very dark' || targetAnalysis.valueClassification === 'dark') {
-    lines.push('Do not let dark support replace the hue path. Darken only after the family reads correctly.');
+    lines.push(isDarkEarthWarmTarget(targetAnalysis)
+      ? 'Do not let a clean orange pile stand in for a dark earth. The earth component is part of the core build here.'
+      : 'Do not let dark support replace the hue path. Darken only after the family reads correctly.');
   } else if (targetAnalysis.valueClassification === 'light' || targetAnalysis.valueClassification === 'very light') {
-    lines.push('Keep white additions late and incremental so the color stays lively instead of chalky.');
+    lines.push(isLightWarmNeutralTarget(targetAnalysis)
+      ? 'Keep value lifts warm and incremental so the color stays believable instead of turning chalky or cold.'
+      : 'Keep white additions late and incremental so the color stays lively instead of chalky.');
   }
 
   return [...new Set(lines)].slice(0, 4);

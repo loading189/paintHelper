@@ -1,4 +1,5 @@
 import type { MixPathStep, Paint, RankedRecipe } from '../../types/models';
+import { isDarkEarthWarmTarget, isNearBlackChromaticTarget } from './colorAnalysis';
 
 const sortComponents = (recipe: Pick<RankedRecipe, 'components'>) => [...recipe.components].sort((left, right) => right.percentage - left.percentage);
 
@@ -7,6 +8,7 @@ const findPaint = (paints: Paint[], paintId: string): Paint | undefined => paint
 const getRoleForPaint = (paint: Paint | undefined, index: number, count: number): MixPathStep['role'] => {
   if (!paint) return index === 0 ? 'base' : 'refine';
   if (index === 0) return 'base';
+  if (paint.heuristics?.naturalBias === 'earth') return 'hue-build';
   if (paint.isBlack || paint.isWhite || paint.heuristics?.preferredRole === 'neutralizer' || paint.heuristics?.preferredRole === 'lightener') {
     return index === count - 1 ? 'support' : 'refine';
   }
@@ -30,7 +32,16 @@ export const buildMixPath = (recipe: Pick<RankedRecipe, 'components' | 'targetAn
       return { role, paintId: paint?.id, paintName, instruction: `Only then lift value with ${paintName} in small touches.` };
     }
     if (paint?.isBlack || paint?.heuristics?.preferredRole === 'neutralizer') {
-      return { role, paintId: paint?.id, paintName, instruction: `Use ${paintName} last as support to deepen or mute without replacing the hue build.` };
+      return {
+        role,
+        paintId: paint?.id,
+        paintName,
+        instruction: isDarkEarthWarmTarget(recipe.targetAnalysis) && paintName.includes('Burnt Umber')
+          ? `Use ${paintName} to seat the warm earth structure after the red-yellow path is established.`
+          : isNearBlackChromaticTarget(recipe.targetAnalysis) && paint?.isBlack
+            ? `Use ${paintName} last and minimally so the deep chromatic identity stays visible.`
+            : `Use ${paintName} last as support to deepen or mute without replacing the hue build.`,
+      };
     }
     return { role, paintId: paint?.id, paintName, instruction: `Refine with ${paintName} only after the main mix is reading correctly.` };
   });

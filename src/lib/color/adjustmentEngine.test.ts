@@ -109,4 +109,36 @@ describe('adjustmentEngine', () => {
 
     expect(suggestions).toContain('Open the value first with Unbleached Titanium, then use only a trace of Ultramarine Blue if the yellow still needs a slight yellow-green correction.');
   });
+
+  it('guides dark earth warms toward earth-first darkening instead of black-first collapse', () => {
+    const target = analyzeColor('#511D04');
+    const predicted = analyzeColor('#8B4A1E');
+    expect(target && predicted).toBeTruthy();
+
+    const suggestions = generateNextAdjustments(target!, predicted!, starterPaints, {
+      components: [
+        { paintId: 'paint-cadmium-red', weight: 45, percentage: 45 },
+        { paintId: 'paint-cadmium-yellow-medium', weight: 25, percentage: 25 },
+        { paintId: 'paint-burnt-umber', weight: 30, percentage: 30 },
+      ],
+    });
+
+    expect(suggestions[0]).toBe('Lower value with a touch of Burnt Umber. Dark earth warms usually deepen more plausibly with earth color first; keep black as a last resort.');
+  });
+
+  it('keeps near-black chromatic adjustment advice from collapsing straight into black', () => {
+    const target = analyzeColor('#1A1120');
+    const predicted = analyzeColor('#251F27');
+    expect(target && predicted).toBeTruthy();
+
+    const suggestions = generateNextAdjustments(target!, predicted!, starterPaints, {
+      components: [
+        { paintId: 'paint-ultramarine-blue', weight: 40, percentage: 40 },
+        { paintId: 'paint-alizarin-crimson', weight: 35, percentage: 35 },
+        { paintId: 'paint-mars-black', weight: 25, percentage: 25 },
+      ],
+    });
+
+    expect(suggestions.some((line) => line.includes('before collapsing into black'))).toBe(true);
+  });
 });

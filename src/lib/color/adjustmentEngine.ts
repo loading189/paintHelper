@@ -1,4 +1,5 @@
 import type { AdjustmentSuggestion, ColorAnalysis, Paint, RankedRecipe } from '../../types/models';
+import { isCoolMutedNeutralTarget, isDarkEarthWarmTarget, isLightWarmNeutralTarget, isNearBlackChromaticTarget } from './colorAnalysis';
 
 const SMALL_VALUE_DELTA = 0.045;
 const SMALL_CHROMA_DELTA = 0.02;
@@ -33,6 +34,9 @@ const isYellowGreenTarget = (target: ColorAnalysis): boolean =>
   target.hue !== null && target.hue >= 96 && target.hue <= 120;
 
 const getValueLiftPaint = (paints: Paint[], target: ColorAnalysis): string => {
+  if (isLightWarmNeutralTarget(target)) {
+    return findPaintName(paints, (paint) => paint.name.includes('Unbleached Titanium'), 'Unbleached Titanium');
+  }
   if (
     target.hueFamily === 'neutral' ||
     target.saturationClassification === 'muted' ||
@@ -45,7 +49,7 @@ const getValueLiftPaint = (paints: Paint[], target: ColorAnalysis): string => {
 };
 
 const getDarkeningPaint = (paints: Paint[], target: ColorAnalysis): string => {
-  if (target.hueFamily === 'neutral' || target.saturationClassification === 'muted') {
+  if (isDarkEarthWarmTarget(target) || target.hueFamily === 'neutral' || target.saturationClassification === 'muted') {
     return findPaintName(paints, (paint) => paint.name.includes('Burnt Umber'), 'Burnt Umber');
   }
   return findPaintName(paints, (paint) => paint.isBlack, 'Mars Black');
@@ -156,7 +160,11 @@ export const generateAdjustmentSuggestions = (
       : `Lift value with a small amount of ${whiteName}.`;
     suggestions.push(makeSuggestion('primary', 'lightness', 'Too dark', detail));
   } else if (predicted.value > target.value + SMALL_VALUE_DELTA) {
-    const detail = darkeningName === 'Mars Black' ? 'Use only a tiny touch so the hue stays readable.' : 'Keep it in support, not as the base pile.';
+    const detail = isDarkEarthWarmTarget(target)
+      ? 'Dark earth warms usually deepen more plausibly with earth color first; keep black as a last resort.'
+      : darkeningName === 'Mars Black'
+        ? 'Use only a tiny touch so the hue stays readable.'
+        : 'Keep it in support, not as the base pile.';
     suggestions.push(makeSuggestion('primary', 'darkness', 'Too light', `Lower value with a touch of ${darkeningName}. ${detail}`));
   }
 
@@ -173,7 +181,9 @@ export const generateAdjustmentSuggestions = (
         'secondary',
         'muting',
         'Too saturated',
-        hasBurntUmber
+        isNearBlackChromaticTarget(target)
+          ? `Mute with a little ${findPaintName(enabledPaints, (paint) => paint.name.includes('Burnt Umber'), 'Burnt Umber')} or a neighboring chromatic partner before collapsing into black.`
+          : hasBurntUmber
           ? `Mute naturally with ${findPaintName(enabledPaints, (paint) => paint.name.includes('Burnt Umber'), 'Burnt Umber')} before reaching for black.`
           : 'Mute the mix with the smallest possible neutralizing support paint from your palette.',
       ),
@@ -192,7 +202,17 @@ export const generateAdjustmentSuggestions = (
       suggestions.push(makeSuggestion('secondary', 'chroma', 'Too muted', `Reinforce chroma with a touch of ${getYellowAdjustmentPaint(enabledPaints)} and ${getRedAdjustmentPaint(enabledPaints, target)}.`));
     } else if (target.hueFamily === 'violet') {
       suggestions.push(makeSuggestion('secondary', 'chroma', 'Too muted', `Reinforce chroma with a touch of ${getRedAdjustmentPaint(enabledPaints, target)} and ${getBlueAdjustmentPaint(enabledPaints, target)}.`));
+    } else if (isDarkEarthWarmTarget(target)) {
+      suggestions.push(makeSuggestion('secondary', 'chroma', 'Too muted', `Keep the warm dark alive with a little ${getRedAdjustmentPaint(enabledPaints, target)} + ${getYellowAdjustmentPaint(enabledPaints)}, then re-seat it with Burnt Umber.`));
     }
+  }
+
+  if (isLightWarmNeutralTarget(target) && suggestions.length < 3) {
+    suggestions.push(makeSuggestion('optional', 'value', 'Keep it warm', `Favor ${getValueLiftPaint(enabledPaints, target)} or white for value changes before making stronger complementary corrections.`));
+  }
+
+  if (isCoolMutedNeutralTarget(target) && suggestions.length < 3) {
+    suggestions.push(makeSuggestion('optional', 'temperature', 'Keep it restrained', 'For cool muted neutrals, adjust with very small blue-gray shifts rather than a saturated blue jump.'));
   }
 
   if (target.hueFamily !== 'neutral' && target.saturationClassification !== 'neutral' && componentIds.has('paint-titanium-white') && suggestions.length < 3) {
