@@ -26,6 +26,12 @@ const getRedAdjustmentPaint = (paints: Paint[], target: ColorAnalysis): string =
 const getYellowAdjustmentPaint = (paints: Paint[]): string =>
   findPaintName(paints, (paint) => paint.name.includes('Cadmium Yellow'), 'Cadmium Yellow Medium');
 
+const isLightYellowTarget = (target: ColorAnalysis): boolean =>
+  target.hueFamily === 'yellow' && (target.valueClassification === 'light' || target.valueClassification === 'very light');
+
+const isYellowGreenTarget = (target: ColorAnalysis): boolean =>
+  target.hue !== null && target.hue >= 96 && target.hue <= 120;
+
 const getValueLiftPaint = (paints: Paint[], target: ColorAnalysis): string => {
   if (
     target.hueFamily === 'neutral' ||
@@ -80,9 +86,26 @@ const getHueAdjustment = (target: ColorAnalysis, predicted: ColorAnalysis, paint
         ? makeSuggestion('secondary', 'temperature', 'Too warm', `Warm the blue slightly with a touch of ${getRedAdjustmentPaint(paints, target)} if it drifts too green.`)
         : makeSuggestion('secondary', 'temperature', 'Too cool', `Cool the blue with a touch of ${getBlueAdjustmentPaint(paints, target)}.`);
     case 'yellow':
-      return delta < 0
-        ? makeSuggestion('secondary', 'temperature', 'Too cool', `Warm the yellow with a touch of ${getRedAdjustmentPaint(paints, target)} if it starts to green out.`)
-        : makeSuggestion('secondary', 'temperature', 'Too warm', `Cool the yellow-green edge with a touch of ${getBlueAdjustmentPaint(paints, target)}.`);
+      if (delta < 0) {
+        return makeSuggestion('secondary', 'temperature', 'Too cool', `Warm the yellow with a touch of ${getRedAdjustmentPaint(paints, target)} if it starts to green out.`);
+      }
+      if (isLightYellowTarget(target)) {
+        if (isYellowGreenTarget(target)) {
+          return makeSuggestion(
+            'secondary',
+            'temperature',
+            'Too warm',
+            `Open the value first with ${getValueLiftPaint(paints, target)}, then use only a trace of ${getBlueAdjustmentPaint(paints, target)} if the yellow still needs a slight yellow-green correction.`,
+          );
+        }
+        return makeSuggestion(
+          'secondary',
+          'temperature',
+          'Too warm',
+          `Keep the yellow on a lightening path: add a little ${getValueLiftPaint(paints, target)} before making any cooler correction.`,
+        );
+      }
+      return makeSuggestion('secondary', 'temperature', 'Too warm', `Nudge the yellow toward a cooler note with only a trace of ${getBlueAdjustmentPaint(paints, target)} if it still reads too orange.`);
     case 'red':
       return delta < 0
         ? makeSuggestion('secondary', 'temperature', 'Too cool', `Warm the red with a touch of ${getYellowAdjustmentPaint(paints)} if it slips toward violet.`)
@@ -128,7 +151,10 @@ export const generateAdjustmentSuggestions = (
   const hasBurntUmber = hasPaint(enabledPaints, (paint) => paint.name.includes('Burnt Umber'));
 
   if (predicted.value < target.value - SMALL_VALUE_DELTA) {
-    suggestions.push(makeSuggestion('primary', 'lightness', 'Too dark', `Lift value with a small amount of ${whiteName}.`));
+    const detail = isLightYellowTarget(target)
+      ? `Lift value with a small amount of ${whiteName} before trying to cool the yellow.`
+      : `Lift value with a small amount of ${whiteName}.`;
+    suggestions.push(makeSuggestion('primary', 'lightness', 'Too dark', detail));
   } else if (predicted.value > target.value + SMALL_VALUE_DELTA) {
     const detail = darkeningName === 'Mars Black' ? 'Use only a tiny touch so the hue stays readable.' : 'Keep it in support, not as the base pile.';
     suggestions.push(makeSuggestion('primary', 'darkness', 'Too light', `Lower value with a touch of ${darkeningName}. ${detail}`));

@@ -77,4 +77,36 @@ describe('adjustmentEngine', () => {
       'Cool the neutral with a trace of Ultramarine Blue before darkening further.',
     ]);
   });
+
+  it('keeps pale lemon yellow guidance on a lightening-first path', () => {
+    const target = analyzeColor('#F3EE8A');
+    const predicted = analyzeColor('#E0C95A');
+    expect(target && predicted).toBeTruthy();
+
+    const suggestions = generateNextAdjustments(target!, predicted!, starterPaints, {
+      components: [
+        { paintId: 'paint-cadmium-yellow-medium', weight: 70, percentage: 70 },
+        { paintId: 'paint-unbleached-titanium', weight: 30, percentage: 30 },
+      ],
+    });
+
+    expect(suggestions).toContain('Lift value with a small amount of Unbleached Titanium before trying to cool the yellow.');
+    expect(suggestions.some((line) => line.includes('trace of'))).toBe(false);
+  });
+
+  it('limits blue correction language for a light yellow-green edge case', () => {
+    const target = analyzeColor('#E8EB8D');
+    const predicted = analyzeColor('#DCC36E');
+    expect(target && predicted).toBeTruthy();
+
+    const suggestions = generateNextAdjustments(target!, predicted!, starterPaints, {
+      components: [
+        { paintId: 'paint-cadmium-yellow-medium', weight: 60, percentage: 60 },
+        { paintId: 'paint-unbleached-titanium', weight: 25, percentage: 25 },
+        { paintId: 'paint-titanium-white', weight: 15, percentage: 15 },
+      ],
+    });
+
+    expect(suggestions).toContain('Open the value first with Unbleached Titanium, then use only a trace of Ultramarine Blue if the yellow still needs a slight yellow-green correction.');
+  });
 });

@@ -3,7 +3,7 @@ import type { Paint, UserSettings } from '../../types/models';
 import { defaultSettings, starterPaints } from '../storage/seedData';
 import { practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
 import { analyzeColor } from './colorAnalysis';
-import { generateCandidateMixes, generateWeightCombinations, rankRecipes, scoreRecipe } from './mixEngine';
+import { generateCandidateMixes, generateWeightCombinations, isPainterValidForTarget, rankRecipes, scoreRecipe } from './mixEngine';
 
 const basicPaints: Paint[] = [
   { id: 'white', name: 'White', hex: '#FFFFFF', isEnabled: true, isWhite: true, isBlack: false },
@@ -226,6 +226,22 @@ describe('mixEngine', () => {
     expect(top?.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue')).toBe(false);
   });
 
+  it('rejects painter-invalid pale lemon structures before ranking', () => {
+    const paleLemon = analyzeColor('#F3EE8A');
+    expect(paleLemon).toBeTruthy();
+
+    expect(isPainterValidForTarget(starterPaints, [
+      { paintId: 'paint-cadmium-yellow-medium', percentage: 80, weight: 80 },
+      { paintId: 'paint-phthalo-blue', percentage: 20, weight: 20 },
+    ], paleLemon!)).toBe(false);
+
+    expect(isPainterValidForTarget(starterPaints, [
+      { paintId: 'paint-cadmium-yellow-medium', percentage: 55, weight: 55 },
+      { paintId: 'paint-unbleached-titanium', percentage: 30, weight: 30 },
+      { paintId: 'paint-titanium-white', percentage: 15, weight: 15 },
+    ], paleLemon!)).toBe(true);
+  });
+
   it('demotes blue-family paths for warm light yellows unless the hue really leans green', () => {
     const ranked = rankRecipes('#F1DE74', starterPaints, {
       ...defaultSettings,
@@ -252,6 +268,20 @@ describe('mixEngine', () => {
     expect(top?.components.some((component) => component.paintId === 'paint-unbleached-titanium' || component.paintId === 'paint-titanium-white')).toBe(true);
   });
 
+  it('keeps warm cream and light yellow-orange recipes on yellow plus warm lightener structure', () => {
+    const ranked = rankRecipes('#F4D8B2', starterPaints, {
+      ...defaultSettings,
+      weightStep: 5,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 6);
+
+    const top = ranked[0];
+    expect(top?.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium')).toBe(true);
+    expect(top?.components.some((component) => component.paintId === 'paint-unbleached-titanium' || component.paintId === 'paint-titanium-white')).toBe(true);
+    expect(top?.components.some((component) => component.paintId === 'paint-mars-black')).toBe(false);
+  });
+
   it('preserves green and olive behavior after yellow-light safeguards', () => {
     const olive = rankRecipes('#8A8B4A', starterPaints, {
       ...defaultSettings,
@@ -268,6 +298,64 @@ describe('mixEngine', () => {
 
     expect(olive[0]?.components.some((component) => component.paintId === 'paint-ultramarine-blue' || component.paintId === 'paint-phthalo-blue')).toBe(true);
     expect(vivid[0]?.components.some((component) => component.paintId === 'paint-phthalo-blue' || component.paintId === 'paint-ultramarine-blue')).toBe(true);
+  });
+
+  it('gives spring green a yellow-blue-white structure bonus over muddy complements', () => {
+    const target = analyzeColor('#9EDB63');
+    const structuredPredicted = analyzeColor('#A7DA79');
+    const muddyPredicted = analyzeColor('#97B06A');
+    expect(target && structuredPredicted && muddyPredicted).toBeTruthy();
+
+    const structured = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      structuredPredicted!,
+      [
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 45, weight: 45 },
+        { paintId: 'paint-phthalo-blue', percentage: 15, weight: 15 },
+        { paintId: 'paint-titanium-white', percentage: 40, weight: 40 },
+      ],
+    );
+
+    const muddy = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      muddyPredicted!,
+      [
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 45, weight: 45 },
+        { paintId: 'paint-burnt-umber', percentage: 30, weight: 30 },
+        { paintId: 'paint-titanium-white', percentage: 25, weight: 25 },
+      ],
+    );
+
+    expect(structured.greenStructureBonus).toBeGreaterThan(0);
+    expect(muddy.greenStructureBonus).toBe(0);
+    expect(structured.finalScore).toBeLessThan(muddy.finalScore);
+  });
+
+  it('allows muted olive green and light sage green to keep yellow-blue structure with earth or white support', () => {
+    const olive = rankRecipes('#6E7741', starterPaints, {
+      ...defaultSettings,
+      weightStep: 5,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 6);
+    const sage = rankRecipes('#B7C7A1', starterPaints, {
+      ...defaultSettings,
+      weightStep: 5,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 6);
+
+    expect(olive[0]?.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium')).toBe(true);
+    expect(olive[0]?.components.some((component) => component.paintId === 'paint-ultramarine-blue' || component.paintId === 'paint-phthalo-blue')).toBe(true);
+    expect(olive[0]?.components.some((component) => component.paintId === 'paint-burnt-umber')).toBe(true);
+
+    expect(sage[0]?.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium')).toBe(true);
+    expect(sage[0]?.components.some((component) => component.paintId === 'paint-ultramarine-blue' || component.paintId === 'paint-phthalo-blue')).toBe(true);
+    expect(sage[0]?.components.some((component) => component.paintId === 'paint-unbleached-titanium' || component.paintId === 'paint-titanium-white')).toBe(true);
   });
 
   it('covers painter-common warm orange and violet targets with plausible families', () => {
