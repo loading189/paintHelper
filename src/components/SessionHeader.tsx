@@ -11,24 +11,49 @@ export const SessionHeader = ({
   summary: Array<{ label: string; value: string | number; note: string }>;
   actions?: ReactNode;
 }) => (
-  <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),360px] xl:items-start">
+  <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr),320px] xl:items-start">
     <div>
-      <SectionTitle eyebrow="Painting session" description={session.subject ? `Subject: ${session.subject}` : 'Preparation, target planning, and active painting now live inside a reusable local session.'}>
+      <SectionTitle
+        eyebrow="Painting session"
+        description={
+          session.subject
+            ? `Subject: ${session.subject}`
+            : 'Build, prepare, and paint from a saved project.'
+        }
+      >
         {session.title}
       </SectionTitle>
-      {session.notes ? <p className="mt-4 max-w-3xl text-sm leading-7 text-[color:var(--text-muted)]">{session.notes}</p> : null}
+
       <div className="mt-4 flex flex-wrap gap-2">
-        <span className="studio-chip studio-chip-info">{session.status}</span>
-        {session.lightingNotes ? <span className="studio-chip">Lighting noted</span> : null}
-        {session.canvasNotes ? <span className="studio-chip">Canvas noted</span> : null}
+        <span className="inline-flex h-7 items-center rounded-[9px] border border-[rgba(142,166,207,0.22)] px-2.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[rgba(214,225,245,0.92)]">
+          {session.status}
+        </span>
+        {session.lightingNotes ? (
+          <span className="inline-flex h-7 items-center rounded-[9px] border border-[color:var(--border-soft)] px-2.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+            Lighting noted
+          </span>
+        ) : null}
+        {session.canvasNotes ? (
+          <span className="inline-flex h-7 items-center rounded-[9px] border border-[color:var(--border-soft)] px-2.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+            Canvas noted
+          </span>
+        ) : null}
       </div>
     </div>
-    <div className="space-y-3">
+
+    <div className="grid gap-2.5">
       {summary.map((item) => (
-        <div key={item.label} className="studio-metric">
-          <p className="studio-eyebrow">{item.label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">{item.value}</p>
-          <p className="mt-1 text-sm text-[color:var(--text-muted)]">{item.note}</p>
+        <div
+          key={item.label}
+          className="rounded-[14px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)]/84 px-4 py-3"
+        >
+          <p className="studio-kicker">{item.label}</p>
+          <p className="mt-1.5 text-[1.35rem] font-semibold tracking-[-0.05em] text-[color:var(--text-strong)]">
+            {item.value}
+          </p>
+          <p className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">
+            {item.note}
+          </p>
         </div>
       ))}
       {actions}

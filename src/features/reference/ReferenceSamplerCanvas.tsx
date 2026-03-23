@@ -128,6 +128,10 @@ export const ReferenceSamplerCanvas = ({
   return (
     <div className="sampler-canvas-shell">
       <div className="sampler-canvas-wrap">
+        <div className="sampler-stage-label">
+          <span className="studio-chip studio-chip-muted">Click to sample</span>
+          <span className="studio-chip">{sampleMode}</span>
+        </div>
         <canvas
           ref={canvasRef}
           className="sampler-canvas"
@@ -149,9 +153,18 @@ export const ReferenceSamplerCanvas = ({
         />
       </div>
       <div className="loupe-panel">
-        <p className="studio-eyebrow">Precision loupe</p>
+        <div className="loupe-panel__header">
+          <div>
+            <p className="studio-eyebrow">Precision loupe</p>
+            <p className="loupe-panel__caption">Inspect a region before committing it to the tray.</p>
+          </div>
+          <span className="studio-chip studio-chip-info">{zoom}×</span>
+        </div>
         <canvas ref={loupeRef} className="sampler-loupe mt-3" />
-        <p className="mt-3 text-sm text-[color:var(--text-muted)]">{currentHoverHex ?? 'Hover to inspect a region'}</p>
+        <div className="loupe-readout">
+          <span className="loupe-readout__dot" style={{ backgroundColor: currentHoverHex ?? '#1b2029' }} />
+          <span>{currentHoverHex ?? 'Hover to inspect a region'}</span>
+        </div>
       </div>
     </div>
   );
