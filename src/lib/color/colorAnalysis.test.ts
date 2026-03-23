@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeColor, classifyHueFamily, classifySaturation, classifyValue, generateTargetPaletteInsights } from './colorAnalysis';
+import {
+  analyzeColor,
+  classifyHueFamily,
+  classifySaturation,
+  classifyValue,
+  generateTargetPaletteInsights,
+  isBlueVioletBoundaryTarget,
+  isCoolMutedNeutralTarget,
+  isDarkEarthWarmTarget,
+  isLightWarmNeutralTarget,
+  isNearBlackChromaticTarget,
+  isRedBrownOrangeCrossoverTarget,
+  isYellowGreenBoundaryTarget,
+} from './colorAnalysis';
 import { starterPaints } from '../storage/seedData';
 
 describe('colorAnalysis', () => {
@@ -48,5 +61,23 @@ describe('colorAnalysis', () => {
     expect(darkInsights.some((line) => line.includes('Olive and natural greens'))).toBe(true);
     expect(vividInsights.some((line) => line.includes('yellow + blue first'))).toBe(true);
     expect(vividInsights.some((line) => line.includes('dark chromatic target'))).toBe(false);
+  });
+
+  it('derives edge-case target helpers without expanding public enums', () => {
+    const darkEarth = analyzeColor('#511D04');
+    const warmLightNeutral = analyzeColor('#E7D8C5');
+    const coolMutedNeutral = analyzeColor('#8A909A');
+    const nearBlackChromatic = analyzeColor('#15101A');
+    const yellowGreenBoundary = analyzeColor('#B9D13A');
+    const blueVioletBoundary = analyzeColor('#6669B8');
+    expect(darkEarth && warmLightNeutral && coolMutedNeutral && nearBlackChromatic && yellowGreenBoundary && blueVioletBoundary).toBeTruthy();
+
+    expect(isDarkEarthWarmTarget(darkEarth!)).toBe(true);
+    expect(isRedBrownOrangeCrossoverTarget(darkEarth!)).toBe(true);
+    expect(isLightWarmNeutralTarget(warmLightNeutral!)).toBe(true);
+    expect(isCoolMutedNeutralTarget(coolMutedNeutral!)).toBe(true);
+    expect(isNearBlackChromaticTarget(nearBlackChromatic!)).toBe(true);
+    expect(isYellowGreenBoundaryTarget(yellowGreenBoundary!)).toBe(true);
+    expect(isBlueVioletBoundaryTarget(blueVioletBoundary!)).toBe(true);
   });
 });

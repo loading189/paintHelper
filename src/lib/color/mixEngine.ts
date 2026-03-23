@@ -8,7 +8,21 @@ import type {
   UserSettings,
 } from '../../types/models';
 import { generateAdjustmentSuggestions, generateNextAdjustments } from './adjustmentEngine';
-import { analyzeColor, hueDifference } from './colorAnalysis';
+import {
+  analyzeColor,
+  hueDifference,
+  isBlueVioletBoundaryTarget,
+  isCoolMutedNeutralTarget,
+  isDarkChromaticWarmTarget,
+  isDarkEarthWarmTarget,
+  isDarkValueTarget,
+  isLightValueTarget,
+  isLightWarmNeutralTarget,
+  isNearBlackChromaticTarget,
+  isRedBrownOrangeCrossoverTarget,
+  isVeryDarkValueTarget,
+  isYellowGreenBoundaryTarget,
+} from './colorAnalysis';
 import { assessAchievability } from './achievability';
 import { assignRecipeBadges, buildMixStrategy, buildRecipeGuidance, buildRecipeWhyThisRanked, determineRecipeQuality } from './guidance';
 import { buildLayeringSuggestion, buildMixPath, buildRoleNotes, buildStabilityWarnings } from './mixPathEngine';
@@ -112,6 +126,45 @@ const getPaintFamilies = (paints: Paint[], components: RecipeComponent[]): HueFa
   return [...new Set(components.map((component) => paintMap.get(component.paintId)).filter((paint): paint is Paint => Boolean(paint)).map(getPaintRoleFamily))];
 };
 
+const isEarthPaint = (paint: Paint): boolean => paint.heuristics?.naturalBias === 'earth';
+
+const isWarmHueBuilderPaint = (paint: Paint): boolean => {
+  const family = getPaintRoleFamily(paint);
+  return family === 'red' || family === 'yellow' || family === 'orange';
+};
+
+const hasTargetAwareConstructionPath = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): boolean => {
+  const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
+  const families = getPaintFamilies(paints, components);
+  const stats = withDerivedStructureStats(getRecipeStructureStats(paints, components));
+
+  if (isDarkEarthWarmTarget(targetAnalysis)) {
+    return families.includes('red') && families.includes('yellow') && stats.earthShare > 0;
+  }
+
+  if (isNearBlackChromaticTarget(targetAnalysis)) {
+    const chromaticShare = components.reduce((sum, component) => {
+      const paint = paintMap.get(component.paintId);
+      if (!paint || paint.isBlack || paint.isWhite || paint.heuristics?.preferredRole === 'neutralizer') {
+        return sum;
+      }
+      return sum + component.percentage;
+    }, 0);
+
+    return hasRequiredHueConstructionPath(paints, components, targetAnalysis) && chromaticShare > stats.blackShare;
+  }
+
+  if (isLightWarmNeutralTarget(targetAnalysis)) {
+    return stats.whiteShare + stats.warmLightenerShare > 0 && (stats.yellowShare > 0 || stats.redShare > 0 || stats.earthShare > 0);
+  }
+
+  if (isCoolMutedNeutralTarget(targetAnalysis)) {
+    return stats.blueShare > 0 && (stats.earthShare > 0 || stats.blackShare > 0 || stats.whiteShare > 0);
+  }
+
+  return hasRequiredHueConstructionPath(paints, components, targetAnalysis);
+};
+
 const hasRequiredHueConstructionPath = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): boolean => {
   const required = getRequiredConstructionFamilies(targetAnalysis);
   if (required.length === 0) return true;
@@ -147,9 +200,6 @@ const staysInBroadHueFamily = (targetAnalysis: ColorAnalysis, predictedAnalysis:
 
 const isChromaticTarget = (targetAnalysis: ColorAnalysis): boolean => targetAnalysis.hueFamily !== 'neutral';
 
-const isLightValueTarget = (targetAnalysis: ColorAnalysis): boolean =>
-  targetAnalysis.valueClassification === 'light' || targetAnalysis.valueClassification === 'very light';
-
 const isNearYellowGreen = (targetAnalysis: ColorAnalysis): boolean =>
   targetAnalysis.hue !== null && targetAnalysis.hue >= 96;
 
@@ -168,7 +218,7 @@ const isVeryLightYellowFamilyTarget = (targetAnalysis: ColorAnalysis): boolean =
   targetAnalysis.hueFamily === 'yellow' && targetAnalysis.valueClassification === 'very light';
 
 const isYellowGreenTarget = (targetAnalysis: ColorAnalysis): boolean =>
-  (targetAnalysis.hueFamily === 'yellow' && isNearYellowGreen(targetAnalysis)) ||
+  isYellowGreenBoundaryTarget(targetAnalysis) ||
   (targetAnalysis.hueFamily === 'green' && targetAnalysis.hue !== null && targetAnalysis.hue <= 132);
 
 const isVividGreenTarget = (targetAnalysis: ColorAnalysis): boolean =>
@@ -231,6 +281,12 @@ const getTargetAwareMaxShare = (paint: Paint, targetAnalysis: ColorAnalysis): nu
   }
 
   if (paint.isBlack) {
+    if (isNearBlackChromaticTarget(targetAnalysis)) {
+      return Math.min(baseMaxShare, isVeryDarkValueTarget(targetAnalysis) ? 12 : 10);
+    }
+    if (isDarkEarthWarmTarget(targetAnalysis) || isDarkChromaticWarmTarget(targetAnalysis)) {
+      return Math.min(baseMaxShare, 12);
+    }
     if (!chromaticTarget) {
       return Math.min(baseMaxShare, value === 'very dark' || value === 'dark' ? 25 : 18);
     }
@@ -275,6 +331,8 @@ const getTargetAwareMaxShare = (paint: Paint, targetAnalysis: ColorAnalysis): nu
   }
 
   if (name.includes('burnt umber')) {
+    if (isDarkEarthWarmTarget(targetAnalysis)) return Math.min(baseMaxShare, 60);
+    if (isNearBlackChromaticTarget(targetAnalysis)) return Math.min(baseMaxShare, 32);
     if (saturation === 'vivid') return Math.min(baseMaxShare, 20);
     if (saturation === 'moderate') return Math.min(baseMaxShare, 28);
     return Math.min(baseMaxShare, 45);
@@ -362,6 +420,17 @@ const withDerivedStructureStats = (stats: RecipeStructureStats): RecipeStructure
 
 export const isPainterValidForTarget = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): boolean => {
   const stats = withDerivedStructureStats(getRecipeStructureStats(paints, components));
+  const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
+  const orderedPaints = components.map((component) => paintMap.get(component.paintId)).filter((paint): paint is Paint => Boolean(paint));
+  const warmHueBuilderCount = orderedPaints.filter((paint) => isWarmHueBuilderPaint(paint)).length;
+  const earthCount = orderedPaints.filter(isEarthPaint).length;
+  const chromaticNonSupportShare = components.reduce((sum, component) => {
+    const paint = paintMap.get(component.paintId);
+    if (!paint || paint.isWhite || paint.isBlack || paint.heuristics?.preferredRole === 'neutralizer') {
+      return sum;
+    }
+    return sum + component.percentage;
+  }, 0);
 
   if (isLightValueTarget(targetAnalysis) && stats.blackShare > 0) {
     return false;
@@ -403,10 +472,84 @@ export const isPainterValidForTarget = (paints: Paint[], components: RecipeCompo
     }
   }
 
+  if (isDarkEarthWarmTarget(targetAnalysis)) {
+    if (stats.whiteShare > 0 || stats.warmLightenerShare > 0) {
+      return false;
+    }
+    if (stats.earthShare === 0 || earthCount === 0) {
+      return false;
+    }
+    if (warmHueBuilderCount < 2 || stats.redShare === 0 || stats.yellowShare === 0) {
+      return false;
+    }
+    if (stats.blueShare > 10 || stats.violetShare > 0) {
+      return false;
+    }
+    if (stats.earthShare >= stats.redShare + stats.yellowShare) {
+      return false;
+    }
+  }
+
+  if (isDarkChromaticWarmTarget(targetAnalysis) && !isDarkEarthWarmTarget(targetAnalysis)) {
+    if (stats.redShare === 0) {
+      return false;
+    }
+    if (targetAnalysis.hueFamily === 'orange' && stats.yellowShare === 0) {
+      return false;
+    }
+    if (stats.whiteShare > 0 && !isRedBrownOrangeCrossoverTarget(targetAnalysis)) {
+      return false;
+    }
+  }
+
+  if (targetAnalysis.hueFamily === 'violet') {
+    if (stats.blueShare === 0 || stats.redShare === 0) {
+      return false;
+    }
+    if (targetAnalysis.saturationClassification === 'muted' && stats.yellowShare > 0) {
+      return false;
+    }
+  }
+
+  if (targetAnalysis.hueFamily === 'blue' && targetAnalysis.saturationClassification === 'muted') {
+    if (stats.blueShare === 0) {
+      return false;
+    }
+    if (stats.yellowShare > 10) {
+      return false;
+    }
+  }
+
+  if (isLightWarmNeutralTarget(targetAnalysis)) {
+    if (stats.whiteShare + stats.warmLightenerShare === 0) {
+      return false;
+    }
+    if (stats.blackShare > 0) {
+      return false;
+    }
+    if (stats.yellowShare + stats.redShare + stats.earthShare === 0) {
+      return false;
+    }
+  }
+
+  if (isCoolMutedNeutralTarget(targetAnalysis)) {
+    if (stats.blueShare === 0) {
+      return false;
+    }
+    if (stats.yellowShare > 20 || stats.redShare > 20) {
+      return false;
+    }
+  }
+
+  if (isNearBlackChromaticTarget(targetAnalysis) && chromaticNonSupportShare <= stats.blackShare) {
+    return false;
+  }
+
   return true;
 };
 
 const isSupportPaintForTarget = (paint: Paint, targetAnalysis: ColorAnalysis): boolean => {
+  if (isDarkEarthWarmTarget(targetAnalysis) && isEarthPaint(paint)) return false;
   if (paint.isBlack) return true;
   if (paint.heuristics?.preferredRole === 'neutralizer') return true;
   if (isChromaticTarget(targetAnalysis) && (paint.isWhite || paint.name.includes('Unbleached Titanium') || paint.heuristics?.preferredRole === 'lightener')) {
@@ -456,6 +599,16 @@ const getSupportPenalty = (paints: Paint[], components: RecipeComponent[], targe
 
   if (isChromaticTarget(targetAnalysis) && supportShare >= hueBuilderShare) {
     penalty += 0.08;
+  }
+
+  if (isNearBlackChromaticTarget(targetAnalysis)) {
+    const blackShare = supportComponents.reduce((sum, component) => {
+      const paint = paintMap.get(component.paintId);
+      return paint?.isBlack ? sum + component.percentage : sum;
+    }, 0);
+    if (blackShare > 8) {
+      penalty += 0.12 + (blackShare - 8) / 70;
+    }
   }
 
   return penalty;
@@ -547,6 +700,105 @@ const getGreenStructureBonus = (paints: Paint[], components: RecipeComponent[], 
   return bonus;
 };
 
+const getDarkTargetValuePenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  if (!isDarkValueTarget(targetAnalysis) || predictedAnalysis.value <= targetAnalysis.value) {
+    return 0;
+  }
+
+  const delta = predictedAnalysis.value - targetAnalysis.value;
+  const base = isVeryDarkValueTarget(targetAnalysis) ? delta * 2.2 : delta * 1.35;
+  const severityBonus = isDarkEarthWarmTarget(targetAnalysis) ? delta * 1.2 : isNearBlackChromaticTarget(targetAnalysis) ? delta * 0.75 : 0;
+  const thresholdBonus = delta > 0.08 ? 0.08 + (delta - 0.08) * 1.2 : 0;
+  return base + severityBonus + thresholdBonus;
+};
+
+const getMutedTargetCleanPenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  if (!(targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'neutral')) {
+    return 0;
+  }
+
+  const chromaOverage = predictedAnalysis.chroma - targetAnalysis.chroma;
+  if (chromaOverage <= 0.015 && predictedAnalysis.saturationClassification !== 'vivid') {
+    return 0;
+  }
+
+  let penalty = Math.max(0, chromaOverage) * 1.45;
+  if (predictedAnalysis.saturationClassification === 'vivid') {
+    penalty += 0.14;
+  } else if (predictedAnalysis.saturationClassification === 'moderate' && targetAnalysis.saturationClassification === 'neutral') {
+    penalty += 0.08;
+  }
+  return penalty;
+};
+
+const getVividTargetMudPenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  if (targetAnalysis.saturationClassification !== 'vivid') {
+    return 0;
+  }
+
+  const chromaLoss = targetAnalysis.chroma - predictedAnalysis.chroma;
+  if (chromaLoss <= 0.02 && predictedAnalysis.saturationClassification !== 'muted' && predictedAnalysis.saturationClassification !== 'neutral') {
+    return 0;
+  }
+
+  let penalty = Math.max(0, chromaLoss) * 1.2;
+  if (predictedAnalysis.saturationClassification === 'muted') {
+    penalty += 0.12;
+  }
+  if (predictedAnalysis.saturationClassification === 'neutral') {
+    penalty += 0.18;
+  }
+  return penalty;
+};
+
+const getNeutralBalancePenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  if (!(targetAnalysis.hueFamily === 'neutral' || isLightWarmNeutralTarget(targetAnalysis) || isCoolMutedNeutralTarget(targetAnalysis))) {
+    return 0;
+  }
+
+  let penalty = 0;
+  if (targetAnalysis.hueFamily === 'neutral' && predictedAnalysis.hueFamily !== 'neutral' && predictedAnalysis.chroma > Math.max(0.035, targetAnalysis.chroma + 0.01)) {
+    penalty += 0.1 + (predictedAnalysis.chroma - targetAnalysis.chroma) * 0.6;
+  }
+  if (isLightWarmNeutralTarget(targetAnalysis) && predictedAnalysis.hueFamily === 'blue') {
+    penalty += 0.12;
+  }
+  if (isCoolMutedNeutralTarget(targetAnalysis) && (predictedAnalysis.hueFamily === 'orange' || predictedAnalysis.hueFamily === 'yellow')) {
+    penalty += 0.12;
+  }
+  return penalty;
+};
+
+const getBoundaryDriftPenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  if (targetAnalysis.hue === null || predictedAnalysis.hue === null) {
+    return 0;
+  }
+
+  let penalty = 0;
+  if (isYellowGreenTarget(targetAnalysis)) {
+    if (!['yellow', 'green'].includes(predictedAnalysis.hueFamily)) {
+      penalty += 0.12;
+    }
+  }
+  if (isBlueVioletBoundaryTarget(targetAnalysis)) {
+    if (!['blue', 'violet'].includes(predictedAnalysis.hueFamily)) {
+      penalty += 0.12;
+    }
+  }
+  if (isRedBrownOrangeCrossoverTarget(targetAnalysis)) {
+    if (!['red', 'orange'].includes(predictedAnalysis.hueFamily)) {
+      penalty += 0.12;
+    }
+  }
+
+  const boundaryDelta = hueDifference(targetAnalysis.hue, predictedAnalysis.hue);
+  if (penalty === 0 && boundaryDelta > 0.1 && (isYellowGreenTarget(targetAnalysis) || isBlueVioletBoundaryTarget(targetAnalysis) || isRedBrownOrangeCrossoverTarget(targetAnalysis))) {
+    penalty += 0.05 + (boundaryDelta - 0.1) * 0.6;
+  }
+
+  return penalty;
+};
+
 const getPainterPlausibilityPenalty = (
   paints: Paint[],
   components: RecipeComponent[],
@@ -554,6 +806,33 @@ const getPainterPlausibilityPenalty = (
 ): number => {
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
   const stats = withDerivedStructureStats(getRecipeStructureStats(paints, components));
+
+  if (isDarkEarthWarmTarget(targetAnalysis)) {
+    let penalty = 0;
+    if (stats.redShare === 0 || stats.yellowShare === 0) {
+      penalty += 0.22;
+    }
+    if (stats.earthShare === 0) {
+      penalty += 0.3;
+    } else if (stats.earthShare < 15) {
+      penalty += 0.1;
+    } else {
+      penalty -= 0.05;
+    }
+    if (stats.whiteShare + stats.warmLightenerShare > 0) {
+      penalty += 0.28;
+    }
+    if (stats.blueShare > 0) {
+      penalty += 0.16 + stats.blueShare / 100;
+    }
+    if (stats.blackShare > 15) {
+      penalty += 0.12 + (stats.blackShare - 15) / 100;
+    }
+    if (stats.redShare + stats.yellowShare <= stats.earthShare) {
+      penalty += 0.12;
+    }
+    return penalty;
+  }
 
   if (targetAnalysis.hueFamily === 'violet') {
     const yellowShare = stats.yellowShare;
@@ -645,12 +924,16 @@ const getPainterPlausibilityPenalty = (
 
 const getChromaticPathBonus = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): number => {
   if (targetAnalysis.hueFamily === 'neutral') return 0;
-  return hasRequiredHueConstructionPath(paints, components, targetAnalysis) ? 0.06 : 0;
+  if (!hasTargetAwareConstructionPath(paints, components, targetAnalysis)) return 0;
+  if (isDarkEarthWarmTarget(targetAnalysis)) return 0.09;
+  if (isNearBlackChromaticTarget(targetAnalysis)) return 0.08;
+  return 0.06;
 };
 
 const getConstructionPenalty = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): number => {
   if (targetAnalysis.hueFamily === 'neutral') return 0;
-  return hasRequiredHueConstructionPath(paints, components, targetAnalysis) ? 0 : 0.11;
+  if (hasTargetAwareConstructionPath(paints, components, targetAnalysis)) return 0;
+  return isDarkEarthWarmTarget(targetAnalysis) || isNearBlackChromaticTarget(targetAnalysis) ? 0.18 : 0.11;
 };
 
 const getBlackPenalty = (settings: UserSettings, paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): number => {
@@ -663,6 +946,9 @@ const getBlackPenalty = (settings: UserSettings, paints: Paint[], components: Re
   const blackShare = components.find((component) => paintMap.get(component.paintId)?.isBlack)?.percentage ?? 0;
   if (targetAnalysis.hueFamily === 'neutral') {
     return 0;
+  }
+  if (isNearBlackChromaticTarget(targetAnalysis)) {
+    return blackShare > 8 ? 0.08 + (blackShare - 8) / 90 : 0;
   }
   return blackShare > 12 ? (blackShare - 12) / 160 : 0;
 };
@@ -746,7 +1032,7 @@ export const scoreRecipe = (
   const hueDelta = hueDifference(targetAnalysis.hue, predictedAnalysis.hue);
   const saturationDifference = Math.abs(targetAnalysis.saturation - predictedAnalysis.saturation);
   const chromaDifference = Math.abs(targetAnalysis.chroma - predictedAnalysis.chroma) * 2.2;
-  const hasConstructionPath = hasRequiredHueConstructionPath(paints, components, targetAnalysis);
+  const hasConstructionPath = hasTargetAwareConstructionPath(paints, components, targetAnalysis);
   const staysInTargetHueFamily = staysInBroadHueFamily(targetAnalysis, predictedAnalysis);
   const complexityPenalty = getComplexityPenalty(settings, components);
   const hueFamilyPenalty = targetAnalysis.hueFamily === 'neutral' || staysInTargetHueFamily ? 0 : 0.18;
@@ -763,6 +1049,11 @@ export const scoreRecipe = (
   const painterPlausibilityPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getPainterPlausibilityPenalty(paints, components, targetAnalysis);
   const yellowLightPlausibilityPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getYellowLightPlausibilityPenalty(paints, components, targetAnalysis);
   const greenStructureBonus = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenStructureBonus(paints, components, targetAnalysis);
+  const darkTargetValuePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getDarkTargetValuePenalty(targetAnalysis, predictedAnalysis);
+  const mutedTargetCleanPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getMutedTargetCleanPenalty(targetAnalysis, predictedAnalysis);
+  const vividTargetMudPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getVividTargetMudPenalty(targetAnalysis, predictedAnalysis);
+  const neutralBalancePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getNeutralBalancePenalty(targetAnalysis, predictedAnalysis);
+  const boundaryDriftPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getBoundaryDriftPenalty(targetAnalysis, predictedAnalysis);
   const twoPaintUsabilityBonus = getTwoPaintUsabilityBonus(settings, components, spectralDistance);
   const vividTargetPenalty =
     settings.rankingMode === 'strict-closest-color' || targetAnalysis.saturationClassification !== 'vivid' || staysInTargetHueFamily
@@ -784,6 +1075,11 @@ export const scoreRecipe = (
     singlePaintPenalty +
     painterPlausibilityPenalty +
     yellowLightPlausibilityPenalty +
+    darkTargetValuePenalty +
+    mutedTargetCleanPenalty +
+    vividTargetMudPenalty +
+    neutralBalancePenalty +
+    boundaryDriftPenalty +
     vividTargetPenalty -
     naturalMixBonus -
     chromaticPathBonus -
@@ -814,6 +1110,11 @@ export const scoreRecipe = (
     painterPlausibilityPenalty,
     yellowLightPlausibilityPenalty,
     greenStructureBonus,
+    darkTargetValuePenalty,
+    mutedTargetCleanPenalty,
+    vividTargetMudPenalty,
+    neutralBalancePenalty,
+    boundaryDriftPenalty,
     hasRequiredHueConstructionPath: hasConstructionPath,
     staysInTargetHueFamily,
     finalScore,
@@ -858,6 +1159,32 @@ const isCandidateUsefulForTarget = (paints: Paint[], paintIds: string[], weights
 
   if (shouldHeavilyRestrictBlueForTarget(target) && blueShare > 0) {
     return false;
+  }
+
+  if (isDarkEarthWarmTarget(target)) {
+    const earthShare = weights.reduce((sum, weight, index) => (
+      isEarthPaint(group[index]) ? sum + weight : sum
+    ), 0);
+    const warmHueBuilderShare = weights.reduce((sum, weight, index) => (
+      isWarmHueBuilderPaint(group[index]) ? sum + weight : sum
+    ), 0);
+    const whiteLikeShare = weights.reduce((sum, weight, index) => (
+      group[index].isWhite || group[index].name.toLowerCase().includes('unbleached titanium') ? sum + weight : sum
+    ), 0);
+
+    if (earthShare === 0 || warmHueBuilderShare === 0 || whiteLikeShare > 0) {
+      return false;
+    }
+  }
+
+  if (isNearBlackChromaticTarget(target)) {
+    const blackShare = weights.reduce((sum, weight, index) => (group[index].isBlack ? sum + weight : sum), 0);
+    const chromaticShare = weights.reduce((sum, weight, index) => (
+      !group[index].isBlack && !group[index].isWhite && group[index].heuristics?.preferredRole !== 'neutralizer' ? sum + weight : sum
+    ), 0);
+    if (blackShare >= chromaticShare) {
+      return false;
+    }
   }
 
   const hueBuilderShare = weights.reduce((sum, weight, index) => {

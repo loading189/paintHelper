@@ -20,6 +20,9 @@ const balancedSettings: UserSettings = {
 const findRecipe = (recipes: ReturnType<typeof rankRecipes>, paintIds: string[]) =>
   recipes.find((recipe) => paintIds.every((paintId) => recipe.components.some((component) => component.paintId === paintId)));
 
+const recipeHasAnyPaint = (recipe: NonNullable<ReturnType<typeof rankRecipes>[number]> | undefined, paintIds: string[]) =>
+  paintIds.some((paintId) => recipe?.components.some((component) => component.paintId === paintId));
+
 describe('mixEngine', () => {
   it('generates discrete weight combinations', () => {
     expect(generateWeightCombinations(2, 25)).toEqual([
@@ -432,5 +435,169 @@ describe('mixEngine', () => {
     expect(whiteHeavy.earlyWhitePenalty).toBeGreaterThan(0);
     expect(hueFirst.earlyWhitePenalty).toBeLessThan(whiteHeavy.earlyWhitePenalty);
     expect(hueFirst.finalScore).toBeLessThan(whiteHeavy.finalScore);
+  });
+
+  it('keeps dark earth warm targets on red-yellow-earth structures instead of clean orange shortcuts', () => {
+    const cases = ['#1B1904', '#A6310D', '#511D04', '#8A4B2E', '#4D2F21', '#5E2A1F', '#5A4A24'];
+
+    cases.forEach((hex) => {
+      const top = rankRecipes(hex, starterPaints, {
+        ...defaultSettings,
+        weightStep: 5,
+        maxPaintsPerRecipe: 3,
+        rankingMode: 'painter-friendly-balanced',
+      }, 6)[0];
+
+      expect(top?.components.some((component) => component.paintId === 'paint-burnt-umber')).toBe(true);
+      expect(recipeHasAnyPaint(top, ['paint-cadmium-red', 'paint-alizarin-crimson'])).toBe(true);
+      expect(top?.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium')).toBe(true);
+      expect(recipeHasAnyPaint(top, ['paint-titanium-white', 'paint-unbleached-titanium'])).toBe(false);
+    });
+  });
+
+  it('penalizes dark warm recipes that are materially too light even when hue family is similar', () => {
+    const target = analyzeColor('#511D04');
+    const tooLight = analyzeColor('#9A5424');
+    const seated = analyzeColor('#57230A');
+    expect(target && tooLight && seated).toBeTruthy();
+
+    const orangeShortcut = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      tooLight!,
+      [
+        { paintId: 'paint-cadmium-red', percentage: 55, weight: 55 },
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 45, weight: 45 },
+      ],
+    );
+
+    const earthBuilt = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      seated!,
+      [
+        { paintId: 'paint-cadmium-red', percentage: 45, weight: 45 },
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 20, weight: 20 },
+        { paintId: 'paint-burnt-umber', percentage: 35, weight: 35 },
+      ],
+    );
+
+    expect(orangeShortcut.darkTargetValuePenalty).toBeGreaterThan(0);
+    expect(orangeShortcut.painterPlausibilityPenalty).toBeGreaterThan(earthBuilt.painterPlausibilityPenalty ?? 0);
+    expect(earthBuilt.finalScore).toBeLessThan(orangeShortcut.finalScore);
+  });
+
+  it('keeps boundary and muted edge classes structurally plausible across the palette', () => {
+    const targets = [
+      { hex: '#F3EE8A', mustHave: ['paint-cadmium-yellow-medium'], mustAvoid: ['paint-mars-black'] },
+      { hex: '#F1E1B9', mustHave: ['paint-cadmium-yellow-medium'], mustAvoid: ['paint-mars-black'] },
+      { hex: '#A2C56B', mustHave: ['paint-cadmium-yellow-medium'], mustAvoid: [] },
+      { hex: '#6E7741', mustHave: ['paint-burnt-umber'], mustAvoid: [] },
+      { hex: '#8FA196', mustHave: ['paint-ultramarine-blue'], mustAvoid: [] },
+      { hex: '#8298B4', mustHave: ['paint-ultramarine-blue'], mustAvoid: [] },
+      { hex: '#8F7E9F', mustHave: ['paint-alizarin-crimson'], mustAvoid: ['paint-cadmium-yellow-medium'] },
+      { hex: '#D2B6A2', mustHave: ['paint-unbleached-titanium'], mustAvoid: ['paint-mars-black'] },
+      { hex: '#8A8074', mustHave: ['paint-burnt-umber'], mustAvoid: [] },
+      { hex: '#7E8791', mustHave: ['paint-ultramarine-blue'], mustAvoid: [] },
+      { hex: '#1A1120', mustHave: ['paint-ultramarine-blue', 'paint-alizarin-crimson'], mustAvoid: [] },
+    ] as const;
+
+    targets.forEach(({ hex, mustHave, mustAvoid }) => {
+      const top = rankRecipes(hex, starterPaints, {
+        ...defaultSettings,
+        weightStep: 5,
+        maxPaintsPerRecipe: 3,
+        rankingMode: 'painter-friendly-balanced',
+      }, 6)[0];
+
+      expect(recipeHasAnyPaint(top, [...mustHave])).toBe(true);
+      expect(recipeHasAnyPaint(top, [...mustAvoid])).toBe(false);
+    });
+  });
+
+  it('scores boundary drifts, muddy vivids, and over-clean muted targets against painterly builds', () => {
+    const yellowGreenTarget = analyzeColor('#B7D538');
+    const yellowGreenGood = analyzeColor('#A9CA49');
+    const yellowGreenDrift = analyzeColor('#D39A31');
+    const vividOrangeTarget = analyzeColor('#EE7A1B');
+    const vividOrangeGood = analyzeColor('#E97A24');
+    const vividOrangeMuddy = analyzeColor('#9A6E45');
+    const mutedNeutralTarget = analyzeColor('#8A8074');
+    const mutedNeutralGood = analyzeColor('#8A8177');
+    const mutedNeutralClean = analyzeColor('#B48654');
+    expect(yellowGreenTarget && yellowGreenGood && yellowGreenDrift && vividOrangeTarget && vividOrangeGood && vividOrangeMuddy && mutedNeutralTarget && mutedNeutralGood && mutedNeutralClean).toBeTruthy();
+
+    const boundaryGood = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      yellowGreenTarget!,
+      yellowGreenGood!,
+      [
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 60, weight: 60 },
+        { paintId: 'paint-phthalo-blue', percentage: 10, weight: 10 },
+        { paintId: 'paint-titanium-white', percentage: 30, weight: 30 },
+      ],
+    );
+    const boundaryBad = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      yellowGreenTarget!,
+      yellowGreenDrift!,
+      [
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 60, weight: 60 },
+        { paintId: 'paint-cadmium-red', percentage: 40, weight: 40 },
+      ],
+    );
+
+    const vividGood = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      vividOrangeTarget!,
+      vividOrangeGood!,
+      [
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 50, weight: 50 },
+        { paintId: 'paint-cadmium-red', percentage: 50, weight: 50 },
+      ],
+    );
+    const vividBad = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      vividOrangeTarget!,
+      vividOrangeMuddy!,
+      [
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 45, weight: 45 },
+        { paintId: 'paint-cadmium-red', percentage: 25, weight: 25 },
+        { paintId: 'paint-burnt-umber', percentage: 30, weight: 30 },
+      ],
+    );
+
+    const mutedGood = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      mutedNeutralTarget!,
+      mutedNeutralGood!,
+      [
+        { paintId: 'paint-unbleached-titanium', percentage: 45, weight: 45 },
+        { paintId: 'paint-burnt-umber', percentage: 35, weight: 35 },
+        { paintId: 'paint-ultramarine-blue', percentage: 20, weight: 20 },
+      ],
+    );
+    const mutedBad = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      mutedNeutralTarget!,
+      mutedNeutralClean!,
+      [
+        { paintId: 'paint-cadmium-yellow-medium', percentage: 55, weight: 55 },
+        { paintId: 'paint-cadmium-red', percentage: 25, weight: 25 },
+        { paintId: 'paint-unbleached-titanium', percentage: 20, weight: 20 },
+      ],
+    );
+
+    expect(boundaryBad.boundaryDriftPenalty).toBeGreaterThan(boundaryGood.boundaryDriftPenalty ?? 0);
+    expect(vividBad.vividTargetMudPenalty).toBeGreaterThan(vividGood.vividTargetMudPenalty ?? 0);
+    expect(mutedBad.mutedTargetCleanPenalty).toBeGreaterThan(mutedGood.mutedTargetCleanPenalty ?? 0);
   });
 });
