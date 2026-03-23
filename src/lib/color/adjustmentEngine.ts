@@ -1,5 +1,5 @@
 import type { AdjustmentSuggestion, ColorAnalysis, Paint, RankedRecipe } from '../../types/models';
-import { isCoolMutedNeutralTarget, isDarkEarthWarmTarget, isLightWarmNeutralTarget, isNearBlackChromaticTarget } from './colorAnalysis';
+import { isCoolMutedNeutralTarget, isDarkEarthWarmTarget, isDarkNaturalGreenTarget, isLightWarmNeutralTarget, isNearBlackChromaticGreenTarget, isNearBlackChromaticTarget } from './colorAnalysis';
 
 const SMALL_VALUE_DELTA = 0.045;
 const SMALL_CHROMA_DELTA = 0.02;
@@ -49,7 +49,7 @@ const getValueLiftPaint = (paints: Paint[], target: ColorAnalysis): string => {
 };
 
 const getDarkeningPaint = (paints: Paint[], target: ColorAnalysis): string => {
-  if (isDarkEarthWarmTarget(target) || target.hueFamily === 'neutral' || target.saturationClassification === 'muted') {
+  if (isDarkEarthWarmTarget(target) || isDarkNaturalGreenTarget(target) || target.hueFamily === 'neutral' || target.saturationClassification === 'muted') {
     return findPaintName(paints, (paint) => paint.name.includes('Burnt Umber'), 'Burnt Umber');
   }
   return findPaintName(paints, (paint) => paint.isBlack, 'Mars Black');
@@ -162,9 +162,11 @@ export const generateAdjustmentSuggestions = (
   } else if (predicted.value > target.value + SMALL_VALUE_DELTA) {
     const detail = isDarkEarthWarmTarget(target)
       ? 'Dark earth warms usually deepen more plausibly with earth color first; keep black as a last resort.'
-      : darkeningName === 'Mars Black'
-        ? 'Use only a tiny touch so the hue stays readable.'
-        : 'Keep it in support, not as the base pile.';
+      : isDarkNaturalGreenTarget(target)
+        ? 'Dark natural greens usually need earth as part of the core mix; keep black only for the last value seat.'
+        : darkeningName === 'Mars Black'
+          ? 'Use only a tiny touch so the hue stays readable.'
+          : 'Keep it in support, not as the base pile.';
     suggestions.push(makeSuggestion('primary', 'darkness', 'Too light', `Lower value with a touch of ${darkeningName}. ${detail}`));
   }
 
@@ -183,7 +185,9 @@ export const generateAdjustmentSuggestions = (
         'Too saturated',
         isNearBlackChromaticTarget(target)
           ? `Mute with a little ${findPaintName(enabledPaints, (paint) => paint.name.includes('Burnt Umber'), 'Burnt Umber')} or a neighboring chromatic partner before collapsing into black.`
-          : hasBurntUmber
+          : isDarkNaturalGreenTarget(target)
+            ? `Naturalize with ${findPaintName(enabledPaints, (paint) => paint.name.includes('Burnt Umber'), 'Burnt Umber')} as part of the green structure before reaching for black.`
+            : hasBurntUmber
           ? `Mute naturally with ${findPaintName(enabledPaints, (paint) => paint.name.includes('Burnt Umber'), 'Burnt Umber')} before reaching for black.`
           : 'Mute the mix with the smallest possible neutralizing support paint from your palette.',
       ),
@@ -195,7 +199,9 @@ export const generateAdjustmentSuggestions = (
           'secondary',
           'chroma',
           'Too muted',
-          `Reinforce the green by nudging ${getYellowAdjustmentPaint(enabledPaints)} + ${getBlueAdjustmentPaint(enabledPaints, target)} before adding more support paint.`,
+          isDarkNaturalGreenTarget(target)
+            ? `Reinforce the yellow-blue green note first, then re-seat it with ${findPaintName(enabledPaints, (paint) => paint.name.includes('Burnt Umber'), 'Burnt Umber')} so the shadow stays natural.`
+            : `Reinforce the green by nudging ${getYellowAdjustmentPaint(enabledPaints)} + ${getBlueAdjustmentPaint(enabledPaints, target)} before adding more support paint.`,
         ),
       );
     } else if (target.hueFamily === 'orange') {
