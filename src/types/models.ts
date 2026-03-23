@@ -6,7 +6,7 @@ export type CommonUse = 'shadow' | 'neutralizing' | 'tinting' | 'warming' | 'coo
 export type ValueClassification = 'very dark' | 'dark' | 'mid' | 'light' | 'very light';
 export type HueFamily = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'violet' | 'neutral';
 export type SaturationClassification = 'neutral' | 'muted' | 'moderate' | 'vivid';
-export type RankingMode = 'strict-closest-color' | 'painter-friendly-balanced' | 'simpler-recipes-preferred';
+export type RankingMode = 'strict-closest-color' | 'spectral-first' | 'painter-friendly-balanced' | 'simpler-recipes-preferred' | 'full-heuristics-legacy';
 export type PreferredRole = 'base' | 'hue-builder' | 'support' | 'neutralizer' | 'lightener';
 export type RecipeQualityLabel =
   | 'Excellent spectral starting point'
@@ -111,6 +111,11 @@ export type RecipeScoreBreakdown = {
   hueDifference: number;
   saturationDifference: number;
   chromaDifference: number;
+  primaryScore: number;
+  regularizationPenalty: number;
+  regularizationBonus: number;
+  legacyHeuristicPenalty: number;
+  legacyHeuristicBonus: number;
   complexityPenalty: number;
   hueFamilyPenalty: number;
   constructionPenalty: number;

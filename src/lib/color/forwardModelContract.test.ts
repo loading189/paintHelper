@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
 import { starterPaints } from '../storage/seedData';
-import { resetDeveloperCalibration } from './developerCalibration';
+import { resetDeveloperCalibration, updateDeveloperCalibration } from './developerCalibration';
 import { predictSpectralMix } from './spectralMixing';
 
 const buildMix = (paintIds: string[], weights: number[]) =>
@@ -79,5 +79,30 @@ describe('forward model contract', () => {
 
     expect(second.hex).toBe(first.hex);
     expect(second.rgb).toEqual(first.rgb);
+  });
+
+  it('does not let inverse search tuning alter recipe to predicted output', () => {
+    const paintIds = ['paint-cadmium-yellow-medium', 'paint-ultramarine-blue', 'paint-burnt-umber'];
+    const weights = [45, 30, 25];
+    const before = buildMix(paintIds, weights);
+
+    updateDeveloperCalibration({
+      inverseSearch: {
+        darkTargets: {
+          minDarkShare: 35,
+          maxYellowShare: 35,
+          maxLightShare: 0,
+          dominantLightShareCap: 35,
+          dominantYellowShareCap: 35,
+          valuePenaltyScale: 2.2,
+          earthStructuralBonus: 0.12,
+          offHuePenalty: 0.32,
+        },
+      } as never,
+    });
+
+    const after = buildMix(paintIds, weights);
+    expect(after.hex).toBe(before.hex);
+    expect(after.oklab).toEqual(before.oklab);
   });
 });

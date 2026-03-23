@@ -104,9 +104,17 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
               <div className="grid gap-3 text-sm text-[color:var(--text-body)]">
                 <div className="mixer-detail-block">
                   <p className="font-semibold text-[color:var(--text-strong)]">Score summary</p>
-                  <p className="mt-2">Final score: {recipe.scoreBreakdown.finalScore.toFixed(3)}</p>
+                  <p className="mt-2">Mode: {recipe.scoreBreakdown.mode}</p>
+                  <p>Primary truth score: {recipe.scoreBreakdown.primaryScore.toFixed(3)}</p>
+                  <p>Regularization penalties: {recipe.scoreBreakdown.regularizationPenalty.toFixed(3)}</p>
+                  <p>Regularization bonuses: {recipe.scoreBreakdown.regularizationBonus.toFixed(3)}</p>
+                  {recipe.scoreBreakdown.legacyHeuristicPenalty > 0 || recipe.scoreBreakdown.legacyHeuristicBonus > 0 ? (
+                    <p>Legacy heuristic delta: {(recipe.scoreBreakdown.legacyHeuristicPenalty - recipe.scoreBreakdown.legacyHeuristicBonus).toFixed(3)}</p>
+                  ) : null}
+                  <p>Final score: {recipe.scoreBreakdown.finalScore.toFixed(3)}</p>
                   <p>Spectral distance: {recipe.scoreBreakdown.spectralDistance.toFixed(3)}</p>
                   <p>Value difference: {recipe.scoreBreakdown.valueDifference.toFixed(3)}</p>
+                  <p>Hue difference: {recipe.scoreBreakdown.hueDifference.toFixed(3)}</p>
                   <p>Chroma difference: {recipe.scoreBreakdown.chromaDifference.toFixed(3)}</p>
                 </div>
                 {recipe.whyThisRanked.length ? (

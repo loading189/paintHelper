@@ -1266,6 +1266,27 @@ const getTwoPaintUsabilityBonus = (settings: UserSettings, components: RecipeCom
   return spectralDistance <= 0.14 ? baseBonus : baseBonus * 0.5;
 };
 
+const getPrimaryTruthScore = (
+  mode: UserSettings['rankingMode'],
+  spectralDistance: number,
+  valueDifference: number,
+  hueDelta: number,
+  saturationDifference: number,
+  chromaDifference: number,
+): number => {
+  if (mode === 'strict-closest-color') {
+    return spectralDistance;
+  }
+
+  if (mode === 'full-heuristics-legacy') {
+    return spectralDistance * 0.92 + valueDifference * 0.42 + hueDelta * 0.28 + saturationDifference * 0.18 + chromaDifference * 0.16;
+  }
+
+  return spectralDistance * 0.9 + valueDifference * 0.26 + hueDelta * 0.14 + saturationDifference * 0.06 + chromaDifference * 0.08;
+};
+
+const sumNumbers = (values: number[]): number => values.reduce((sum, value) => sum + value, 0);
+
 export const scoreRecipe = (
   settings: UserSettings,
   paints: Paint[],
@@ -1281,62 +1302,164 @@ export const scoreRecipe = (
   const hasConstructionPath = hasTargetAwareConstructionPath(paints, components, targetAnalysis);
   const staysInTargetHueFamily = staysInBroadHueFamily(targetAnalysis, predictedAnalysis);
   const complexityPenalty = getComplexityPenalty(settings, components);
-  const hueFamilyPenalty = targetAnalysis.hueFamily === 'neutral' || staysInTargetHueFamily ? 0 : 0.18;
-  const constructionPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getConstructionPenalty(paints, components, targetAnalysis);
-  const supportPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getSupportPenalty(paints, components, targetAnalysis);
-  const dominancePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getDominancePenalty(paints, components, targetAnalysis);
-  const neutralizerPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getNeutralizerPenalty(paints, components, targetAnalysis);
-  const blackPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getBlackPenalty(settings, paints, components, targetAnalysis);
-  const whitePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getWhitePenalty(settings, paints, components, targetAnalysis);
-  const earlyWhitePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getEarlyWhitePenalty(paints, components, targetAnalysis);
-  const singlePaintPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getSinglePaintPenalty(settings, paints, components, targetAnalysis);
-  const naturalMixBonus = settings.rankingMode === 'strict-closest-color' ? 0 : getNaturalMixBonus(paints, components, targetAnalysis);
-  const chromaticPathBonus = settings.rankingMode === 'strict-closest-color' ? 0 : getChromaticPathBonus(paints, components, targetAnalysis);
-  const painterPlausibilityPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getPainterPlausibilityPenalty(paints, components, targetAnalysis);
-  const yellowLightPlausibilityPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getYellowLightPlausibilityPenalty(paints, components, targetAnalysis);
-  const greenStructureBonus = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenStructureBonus(paints, components, targetAnalysis);
-  const darkTargetValuePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getDarkTargetValuePenalty(targetAnalysis, predictedAnalysis);
-  const mutedTargetCleanPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getMutedTargetCleanPenalty(targetAnalysis, predictedAnalysis);
-  const vividTargetMudPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getVividTargetMudPenalty(targetAnalysis, predictedAnalysis);
-  const darkNaturalGreenPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getDarkNaturalGreenPenalty(paints, components, targetAnalysis, predictedAnalysis);
-  const neutralBalancePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getNeutralBalancePenalty(targetAnalysis, predictedAnalysis);
-  const boundaryDriftPenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getBoundaryDriftPenalty(targetAnalysis, predictedAnalysis);
-  const greenVividOffHuePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenVividOffHuePenalty(targetAnalysis, predictedAnalysis);
-  const greenHuePenalty = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenHuePenalty(targetAnalysis, predictedAnalysis);
+  const hueFamilyPenaltyBase = targetAnalysis.hueFamily === 'neutral' || staysInTargetHueFamily ? 0 : 0.18;
+  const constructionPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getConstructionPenalty(paints, components, targetAnalysis);
+  const supportPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getSupportPenalty(paints, components, targetAnalysis);
+  const dominancePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getDominancePenalty(paints, components, targetAnalysis);
+  const neutralizerPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getNeutralizerPenalty(paints, components, targetAnalysis);
+  const blackPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getBlackPenalty(settings, paints, components, targetAnalysis);
+  const whitePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getWhitePenalty(settings, paints, components, targetAnalysis);
+  const earlyWhitePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getEarlyWhitePenalty(paints, components, targetAnalysis);
+  const singlePaintPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getSinglePaintPenalty(settings, paints, components, targetAnalysis);
+  const naturalMixBonusBase = settings.rankingMode === 'strict-closest-color' ? 0 : getNaturalMixBonus(paints, components, targetAnalysis);
+  const chromaticPathBonusBase = settings.rankingMode === 'strict-closest-color' ? 0 : getChromaticPathBonus(paints, components, targetAnalysis);
+  const painterPlausibilityPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getPainterPlausibilityPenalty(paints, components, targetAnalysis);
+  const yellowLightPlausibilityPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getYellowLightPlausibilityPenalty(paints, components, targetAnalysis);
+  const greenStructureBonusBase = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenStructureBonus(paints, components, targetAnalysis);
+  const darkTargetValuePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getDarkTargetValuePenalty(targetAnalysis, predictedAnalysis);
+  const mutedTargetCleanPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getMutedTargetCleanPenalty(targetAnalysis, predictedAnalysis);
+  const vividTargetMudPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getVividTargetMudPenalty(targetAnalysis, predictedAnalysis);
+  const darkNaturalGreenPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getDarkNaturalGreenPenalty(paints, components, targetAnalysis, predictedAnalysis);
+  const neutralBalancePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getNeutralBalancePenalty(targetAnalysis, predictedAnalysis);
+  const boundaryDriftPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getBoundaryDriftPenalty(targetAnalysis, predictedAnalysis);
+  const greenVividOffHuePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenVividOffHuePenalty(targetAnalysis, predictedAnalysis);
+  const greenHuePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenHuePenalty(targetAnalysis, predictedAnalysis);
   const twoPaintUsabilityBonus = getTwoPaintUsabilityBonus(settings, components, spectralDistance);
-  const vividTargetPenalty =
+  const vividTargetPenaltyBase =
     settings.rankingMode === 'strict-closest-color' || targetAnalysis.saturationClassification !== 'vivid' || staysInTargetHueFamily
       ? 0
       : 0.16;
+  const primaryScore = getPrimaryTruthScore(
+    settings.rankingMode,
+    spectralDistance,
+    valueDifference,
+    hueDelta,
+    saturationDifference,
+    chromaDifference,
+  );
 
-  const base = spectralDistance * 0.92 + valueDifference * 0.42 + hueDelta * 0.28 + saturationDifference * 0.18 + chromaDifference * 0.16;
-  const finalScore =
-    base +
-    complexityPenalty +
-    hueFamilyPenalty +
-    constructionPenalty +
-    supportPenalty +
-    dominancePenalty +
-    neutralizerPenalty +
-    blackPenalty +
-    whitePenalty +
-    earlyWhitePenalty +
-    singlePaintPenalty +
-    painterPlausibilityPenalty +
-    yellowLightPlausibilityPenalty +
-    darkTargetValuePenalty +
-    mutedTargetCleanPenalty +
-    vividTargetMudPenalty +
-    darkNaturalGreenPenalty +
-    neutralBalancePenalty +
-    boundaryDriftPenalty +
-    greenVividOffHuePenalty +
-    greenHuePenalty +
-    vividTargetPenalty -
-    naturalMixBonus -
-    chromaticPathBonus -
-    greenStructureBonus -
-    twoPaintUsabilityBonus;
+  // Search-shaping belongs upstream in candidate generation/filtering. Final
+  // ranking should be truth-first: predicted-vs-target closeness, then only
+  // light regularization. The legacy mode below preserves the older heavier
+  // heuristic stack for ablation and comparison.
+  let hueFamilyPenalty = 0;
+  let constructionPenalty = 0;
+  let supportPenalty = 0;
+  let dominancePenalty = 0;
+  let neutralizerPenalty = 0;
+  let blackPenalty = 0;
+  let whitePenalty = 0;
+  let earlyWhitePenalty = 0;
+  let singlePaintPenalty = 0;
+  let naturalMixBonus = 0;
+  let chromaticPathBonus = 0;
+  let painterPlausibilityPenalty = 0;
+  let yellowLightPlausibilityPenalty = 0;
+  let greenStructureBonus = 0;
+  let darkTargetValuePenalty = 0;
+  let mutedTargetCleanPenalty = 0;
+  let vividTargetMudPenalty = 0;
+  let darkNaturalGreenPenalty = 0;
+  let neutralBalancePenalty = 0;
+  let boundaryDriftPenalty = 0;
+  let greenVividOffHuePenalty = 0;
+  let greenHuePenalty = 0;
+  let vividTargetPenalty = 0;
+  let regularizationPenalty = 0;
+  let regularizationBonus = 0;
+  let legacyHeuristicPenalty = 0;
+  let legacyHeuristicBonus = 0;
+
+  if (settings.rankingMode === 'full-heuristics-legacy') {
+    hueFamilyPenalty = hueFamilyPenaltyBase;
+    constructionPenalty = constructionPenaltyBase;
+    supportPenalty = supportPenaltyBase;
+    dominancePenalty = dominancePenaltyBase;
+    neutralizerPenalty = neutralizerPenaltyBase;
+    blackPenalty = blackPenaltyBase;
+    whitePenalty = whitePenaltyBase;
+    earlyWhitePenalty = earlyWhitePenaltyBase;
+    singlePaintPenalty = singlePaintPenaltyBase;
+    naturalMixBonus = naturalMixBonusBase;
+    chromaticPathBonus = chromaticPathBonusBase;
+    painterPlausibilityPenalty = painterPlausibilityPenaltyBase;
+    yellowLightPlausibilityPenalty = yellowLightPlausibilityPenaltyBase;
+    greenStructureBonus = greenStructureBonusBase;
+    darkTargetValuePenalty = darkTargetValuePenaltyBase;
+    mutedTargetCleanPenalty = mutedTargetCleanPenaltyBase;
+    vividTargetMudPenalty = vividTargetMudPenaltyBase;
+    darkNaturalGreenPenalty = darkNaturalGreenPenaltyBase;
+    neutralBalancePenalty = neutralBalancePenaltyBase;
+    boundaryDriftPenalty = boundaryDriftPenaltyBase;
+    greenVividOffHuePenalty = greenVividOffHuePenaltyBase;
+    greenHuePenalty = greenHuePenaltyBase;
+    vividTargetPenalty = vividTargetPenaltyBase;
+    regularizationPenalty = sumNumbers([
+      complexityPenalty,
+      hueFamilyPenalty,
+      supportPenalty,
+      dominancePenalty,
+      neutralizerPenalty,
+      blackPenalty,
+      whitePenalty,
+      earlyWhitePenalty,
+      singlePaintPenalty,
+      darkTargetValuePenalty,
+      mutedTargetCleanPenalty,
+      vividTargetMudPenalty,
+      neutralBalancePenalty,
+      boundaryDriftPenalty,
+      greenHuePenalty,
+    ]);
+    regularizationBonus = sumNumbers([naturalMixBonus, chromaticPathBonus, greenStructureBonus, twoPaintUsabilityBonus]);
+    legacyHeuristicPenalty = sumNumbers([
+      constructionPenalty,
+      painterPlausibilityPenalty,
+      yellowLightPlausibilityPenalty,
+      darkNaturalGreenPenalty,
+      greenVividOffHuePenalty,
+      vividTargetPenalty,
+    ]);
+    legacyHeuristicBonus = 0;
+  } else if (settings.rankingMode === 'painter-friendly-balanced' || settings.rankingMode === 'simpler-recipes-preferred') {
+    hueFamilyPenalty = hueFamilyPenaltyBase * 0.22;
+    supportPenalty = supportPenaltyBase * 0.3;
+    dominancePenalty = dominancePenaltyBase * 0.22;
+    neutralizerPenalty = neutralizerPenaltyBase * 0.24;
+    blackPenalty = blackPenaltyBase * 0.28;
+    whitePenalty = whitePenaltyBase * 0.25;
+    earlyWhitePenalty = earlyWhitePenaltyBase * 0.28;
+    singlePaintPenalty = singlePaintPenaltyBase;
+    naturalMixBonus = naturalMixBonusBase * 0.18;
+    chromaticPathBonus = chromaticPathBonusBase * 0.22;
+    greenStructureBonus = greenStructureBonusBase * 0.2;
+    darkTargetValuePenalty = darkTargetValuePenaltyBase * 0.24;
+    mutedTargetCleanPenalty = mutedTargetCleanPenaltyBase * 0.18;
+    vividTargetMudPenalty = vividTargetMudPenaltyBase * 0.18;
+    neutralBalancePenalty = neutralBalancePenaltyBase * 0.16;
+    boundaryDriftPenalty = boundaryDriftPenaltyBase * 0.24;
+    greenHuePenalty = greenHuePenaltyBase * 0.2;
+    regularizationPenalty = sumNumbers([
+      complexityPenalty,
+      hueFamilyPenalty,
+      supportPenalty,
+      dominancePenalty,
+      neutralizerPenalty,
+      blackPenalty,
+      whitePenalty,
+      earlyWhitePenalty,
+      singlePaintPenalty,
+      darkTargetValuePenalty,
+      mutedTargetCleanPenalty,
+      vividTargetMudPenalty,
+      neutralBalancePenalty,
+      boundaryDriftPenalty,
+      greenHuePenalty,
+    ]);
+    regularizationBonus = sumNumbers([naturalMixBonus, chromaticPathBonus, greenStructureBonus, twoPaintUsabilityBonus]);
+  }
+
+  const finalScore = primaryScore + regularizationPenalty + legacyHeuristicPenalty - regularizationBonus - legacyHeuristicBonus;
 
   return {
     mode: settings.rankingMode,
@@ -1345,6 +1468,11 @@ export const scoreRecipe = (
     hueDifference: hueDelta,
     saturationDifference,
     chromaDifference,
+    primaryScore,
+    regularizationPenalty,
+    regularizationBonus,
+    legacyHeuristicPenalty,
+    legacyHeuristicBonus,
     complexityPenalty,
     hueFamilyPenalty,
     constructionPenalty,
@@ -1596,6 +1724,177 @@ const buildVividGreenWeightSets = (group: Paint[], targetAnalysis: ColorAnalysis
   return [];
 };
 
+const buildYellowLightWeightSets = (group: Paint[], targetAnalysis: ColorAnalysis): number[][] => {
+  if (!isPainterFriendlyYellowLighteningTarget(targetAnalysis)) {
+    return [];
+  }
+
+  const yellowIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'yellow');
+  const whiteIndex = group.findIndex((paint) => paint.isWhite);
+  const warmLightenerIndex = group.findIndex((paint) => paint.name.toLowerCase().includes('unbleached titanium'));
+  const blueIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'blue');
+
+  if (yellowIndex < 0) {
+    return [];
+  }
+
+  if (group.length === 2) {
+    const lightenerIndex = whiteIndex >= 0 ? whiteIndex : warmLightenerIndex;
+    if (lightenerIndex < 0) {
+      return [];
+    }
+
+    return [
+      [75, 25],
+      [70, 30],
+      [65, 35],
+      [60, 40],
+    ].map(([yellow, lightener]) => {
+      const ordered = [0, 0];
+      ordered[yellowIndex] = yellow;
+      ordered[lightenerIndex] = lightener;
+      return ordered;
+    });
+  }
+
+  if (group.length === 3) {
+    const lightenerIndices = [whiteIndex, warmLightenerIndex].filter((index): index is number => index >= 0);
+    if (lightenerIndices.length === 0 || blueIndex >= 0) {
+      return [];
+    }
+
+    const [firstLightener, secondLightener] = lightenerIndices;
+    const supportIndex = secondLightener ?? group.findIndex((_, index) => index !== yellowIndex && index !== firstLightener);
+    if (firstLightener === undefined || supportIndex < 0) {
+      return [];
+    }
+
+    return [
+      { yellow: 55, primaryLightener: 30, supportLightener: 15 },
+      { yellow: 60, primaryLightener: 25, supportLightener: 15 },
+      { yellow: 50, primaryLightener: 35, supportLightener: 15 },
+    ].map(({ yellow, primaryLightener, supportLightener }) => {
+      const weights = [0, 0, 0];
+      weights[yellowIndex] = yellow;
+      weights[firstLightener] = primaryLightener;
+      weights[supportIndex] = supportLightener;
+      return weights;
+    });
+  }
+
+  return [];
+};
+
+const buildDarkEarthWarmWeightSets = (group: Paint[], targetAnalysis: ColorAnalysis): number[][] => {
+  if (!isDarkEarthWarmTarget(targetAnalysis) || group.length !== 3) {
+    return [];
+  }
+
+  const earthIndex = group.findIndex(isEarthPaint);
+  const yellowIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'yellow');
+  const redIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'red');
+
+  if (earthIndex < 0 || yellowIndex < 0 || redIndex < 0) {
+    return [];
+  }
+
+  return [
+    { earth: 35, yellow: 30, red: 35 },
+    { earth: 40, yellow: 25, red: 35 },
+    { earth: 30, yellow: 35, red: 35 },
+    { earth: 38, yellow: 32, red: 30 },
+  ].map(({ earth, yellow, red }) => {
+    const weights = [0, 0, 0];
+    weights[earthIndex] = earth;
+    weights[yellowIndex] = yellow;
+    weights[redIndex] = red;
+    return weights;
+  });
+};
+
+const buildOliveNearBlackWeightSets = (group: Paint[], targetAnalysis: ColorAnalysis): number[][] => {
+  if (!(isDarkNaturalGreenTarget(targetAnalysis) || (isOliveLikeTarget(targetAnalysis) && isDarkValueTarget(targetAnalysis))) || group.length !== 3) {
+    return [];
+  }
+
+  const earthIndex = group.findIndex(isEarthPaint);
+  const yellowIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'yellow');
+  const blackIndex = group.findIndex((paint) => paint.isBlack);
+  const blueIndex = group.findIndex((paint) => getPaintRoleFamily(paint) === 'blue');
+
+  if (earthIndex < 0 || yellowIndex < 0) {
+    return [];
+  }
+
+  if (blackIndex >= 0 && isNearBlackChromaticTarget(targetAnalysis)) {
+    return [
+      { earth: 45, yellow: 45, support: 10 },
+      { earth: 40, yellow: 50, support: 10 },
+      { earth: 50, yellow: 40, support: 10 },
+      { earth: 42, yellow: 46, support: 12 },
+    ].map(({ earth, yellow, support }) => {
+      const weights = [0, 0, 0];
+      weights[earthIndex] = earth;
+      weights[yellowIndex] = yellow;
+      weights[blackIndex] = support;
+      return weights;
+    });
+  }
+
+  if (blueIndex >= 0) {
+    return [
+      { earth: 35, yellow: 40, blue: 25 },
+      { earth: 40, yellow: 35, blue: 25 },
+      { earth: 30, yellow: 45, blue: 25 },
+    ].map(({ earth, yellow, blue }) => {
+      const weights = [0, 0, 0];
+      weights[earthIndex] = earth;
+      weights[yellowIndex] = yellow;
+      weights[blueIndex] = blue;
+      return weights;
+    });
+  }
+
+  return [];
+};
+
+const shouldRejectGroupForTarget = (group: Paint[], target: ColorAnalysis): boolean => {
+  const families = group.map(getPaintRoleFamily);
+  const blueCount = families.filter((family) => family === 'blue').length;
+  const lightenerCount = group.filter((paint) => paint.isWhite || paint.name.toLowerCase().includes('unbleached titanium')).length;
+  const earthCount = group.filter(isEarthPaint).length;
+  const blackCount = group.filter((paint) => paint.isBlack).length;
+
+  if (isPainterFriendlyYellowLighteningTarget(target)) {
+    if (!families.includes('yellow')) {
+      return true;
+    }
+    if (lightenerCount === 0) {
+      return true;
+    }
+    if (shouldHeavilyRestrictBlueForTarget(target) && blueCount > 0) {
+      return true;
+    }
+  }
+
+  if (isDarkEarthWarmTarget(target)) {
+    if (earthCount === 0 || !families.includes('yellow') || !families.includes('red')) {
+      return true;
+    }
+  }
+
+  if (isDarkNaturalGreenTarget(target)) {
+    if (earthCount === 0 || !families.includes('yellow')) {
+      return true;
+    }
+    if (!families.includes('blue') && !(isNearBlackChromaticTarget(target) && blackCount > 0)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 export const generateCandidateMixes = (paints: Paint[], maxPaintsPerRecipe: number, step: number, targetHex?: string): CandidateMix[] => {
   const inverseSearchTuning = getInverseSearchTuning();
   const enabledPaints = paints.filter((paint) => paint.isEnabled);
@@ -1606,9 +1905,19 @@ export const generateCandidateMixes = (paints: Paint[], maxPaintsPerRecipe: numb
     const groups = choosePaintGroups(enabledPaints, size);
 
     groups.forEach((group) => {
+      if (targetAnalysis && shouldRejectGroupForTarget(group, targetAnalysis)) {
+        return;
+      }
+
       const baseWeightSets = generateWeightCombinations(size, step);
       const targetAwareWeightSets = targetAnalysis
-        ? [...buildDarkTargetWeightSets(group, targetAnalysis), ...buildVividGreenWeightSets(group, targetAnalysis)]
+        ? [
+          ...buildDarkTargetWeightSets(group, targetAnalysis),
+          ...buildVividGreenWeightSets(group, targetAnalysis),
+          ...buildYellowLightWeightSets(group, targetAnalysis),
+          ...buildDarkEarthWarmWeightSets(group, targetAnalysis),
+          ...buildOliveNearBlackWeightSets(group, targetAnalysis),
+        ]
         : [];
       const weightSets = dedupeWeightSets([...baseWeightSets, ...targetAwareWeightSets]).filter((weights) => {
         if (targetAnalysis && !isCandidateUsefulForTarget(enabledPaints, group.map((paint) => paint.id), weights, targetAnalysis)) {
