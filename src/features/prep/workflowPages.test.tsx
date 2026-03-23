@@ -117,10 +117,11 @@ describe('workflow pages', () => {
     );
 
     expect(markup).toContain('Reference image');
-    expect(markup).toContain('Candidate colors');
+    expect(markup).toContain('Candidate Tray');
     expect(markup).toContain('Selected painting palette');
     expect(markup).toContain('Extract palette');
-    expect(markup).toContain('Generate recipe');
+    expect(markup).toContain('Refresh recipe');
+    expect(markup).not.toContain('Project notes');
   });
 
   it('renders Paint mode with the image and saved recipe guidance, not primary technical stats', () => {
@@ -133,5 +134,27 @@ describe('workflow pages', () => {
     expect(markup).toContain('Tree shadow');
     expect(markup).not.toContain('Spectral distance');
     expect(markup).not.toContain('Score breakdown');
+  });
+
+  it('shows a subtle Paint fallback when a selected palette color still lacks a recipe', () => {
+    const pendingMarkup = renderToStaticMarkup(
+      <ActivePaintingPage
+        session={{
+          ...session,
+          activeTargetIds: [],
+          targets: session.targets.map((target) => ({
+            ...target,
+            selectedRecipeId: undefined,
+            selectedRecipe: undefined,
+            recipeOptions: [],
+          })),
+        }}
+        onSessionChange={() => undefined}
+        onReopenInPrep={() => undefined}
+      />,
+    );
+
+    expect(pendingMarkup).toContain('Needs prep attention');
+    expect(pendingMarkup).toContain('Tree shadow');
   });
 });

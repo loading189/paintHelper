@@ -215,20 +215,6 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
           </div>
         </Card>
 
-        <details className="studio-disclosure prep-notes-disclosure">
-          <summary className="studio-disclosure-summary">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="studio-eyebrow">Project notes</p>
-                <p className="mt-1 text-sm text-[color:var(--text-muted)]">Collapsed by default to keep the image workspace clear.</p>
-              </div>
-              <span className="studio-chip">Optional</span>
-            </div>
-          </summary>
-          <div className="mt-4">
-            <textarea className="studio-textarea min-h-24" value={session.notes ?? ''} onChange={(event) => updateSession({ notes: event.target.value })} placeholder="Critical reminders for this painting." />
-          </div>
-        </details>
       </div>
 
       <div className="prep-sidebar-stack prep-sidebar-dense">
@@ -259,8 +245,8 @@ export const PaintingPrepPage = ({ session, paints, settings, onSessionChange, o
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button className="studio-button studio-button-primary studio-button-compact" type="button" onClick={() => generateRecipe(target.id)} disabled={enabledPaints.length === 0}>
-                    {target.selectedRecipe ? 'Regenerate recipe' : 'Generate recipe'}
+                  <button className="studio-button studio-button-secondary studio-button-compact" type="button" onClick={() => generateRecipe(target.id)} disabled={enabledPaints.length === 0}>
+                    {target.selectedRecipe ? 'Refresh recipe' : 'Preview recipe'}
                   </button>
                   {target.selectedRecipe ? <span className="studio-chip studio-chip-success">{target.selectedRecipe.practicalRatioText}</span> : null}
                 </div>

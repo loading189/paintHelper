@@ -90,6 +90,14 @@ export const buildRecipeGuidance = (
     lines.push('For muted targets, let the earth support do the softening before you reach for black.');
   }
 
+  const surprisingPaint = orderedPaints.find((paint) =>
+    paint.name.includes('Phthalo Blue') ||
+    (paint.name.includes('Ultramarine Blue') && (targetAnalysis.hueFamily === 'yellow' || targetAnalysis.hueFamily === 'orange')),
+  );
+  if (surprisingPaint) {
+    lines.push(`${surprisingPaint.name} is only here as a very small temperature correction, so add it last and in trace amounts.`);
+  }
+
   return [...new Set(lines)].slice(0, 4);
 };
 
