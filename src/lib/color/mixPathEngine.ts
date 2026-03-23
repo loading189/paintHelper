@@ -1,5 +1,5 @@
 import type { MixPathStep, Paint, RankedRecipe } from '../../types/models';
-import { isDarkEarthWarmTarget, isNearBlackChromaticTarget } from './colorAnalysis';
+import { isDarkEarthWarmTarget, isDarkNaturalGreenTarget, isNearBlackChromaticTarget } from './colorAnalysis';
 
 const sortComponents = (recipe: Pick<RankedRecipe, 'components'>) => [...recipe.components].sort((left, right) => right.percentage - left.percentage);
 
@@ -26,7 +26,14 @@ export const buildMixPath = (recipe: Pick<RankedRecipe, 'components' | 'targetAn
       return { role, paintId: paint?.id, paintName, instruction: `Start with ${paintName} as the base pile.` };
     }
     if (role === 'hue-build') {
-      return { role, paintId: paint?.id, paintName, instruction: `Introduce ${paintName} slowly until the ${recipe.targetAnalysis.hueFamily} family is established.` };
+      return {
+        role,
+        paintId: paint?.id,
+        paintName,
+        instruction: isDarkNaturalGreenTarget(recipe.targetAnalysis) && paintName.includes('Burnt Umber')
+          ? `Introduce ${paintName} once the yellow-blue path is visible so it becomes part of the dark green structure, not just a later correction.`
+          : `Introduce ${paintName} slowly until the ${recipe.targetAnalysis.hueFamily} family is established.`,
+      };
     }
     if (paint?.isWhite) {
       return { role, paintId: paint?.id, paintName, instruction: `Only then lift value with ${paintName} in small touches.` };
@@ -47,7 +54,7 @@ export const buildMixPath = (recipe: Pick<RankedRecipe, 'components' | 'targetAn
   });
 };
 
-export const buildStabilityWarnings = (recipe: Pick<RankedRecipe, 'components'>, paints: Paint[]): string[] => {
+export const buildStabilityWarnings = (recipe: Pick<RankedRecipe, 'components'> & { targetAnalysis?: RankedRecipe['targetAnalysis'] }, paints: Paint[]): string[] => {
   const warnings: string[] = [];
   sortComponents(recipe).forEach((component) => {
     const paint = findPaint(paints, component.paintId);
@@ -59,19 +66,23 @@ export const buildStabilityWarnings = (recipe: Pick<RankedRecipe, 'components'>,
       warnings.push(`${paint.name} will lift value fast and reduce chroma.`);
     }
     if (paint.heuristics?.preferredRole === 'neutralizer' || paint.name.includes('Burnt Umber')) {
-      warnings.push(`${paint.name} is acting mainly as a natural mute in this recipe.`);
+      warnings.push(recipe.targetAnalysis && isDarkNaturalGreenTarget(recipe.targetAnalysis) && paint.name.includes('Burnt Umber')
+        ? `${paint.name} is carrying part of the dark green structure, so small additions can shift both value and naturalism fast.`
+        : `${paint.name} is acting mainly as a natural mute in this recipe.`);
     }
   });
   return [...new Set(warnings)].slice(0, 3);
 };
 
-export const buildRoleNotes = (recipe: Pick<RankedRecipe, 'components'>, paints: Paint[]): string[] => {
+export const buildRoleNotes = (recipe: Pick<RankedRecipe, 'components'> & { targetAnalysis?: RankedRecipe['targetAnalysis'] }, paints: Paint[]): string[] => {
   const notes: string[] = [];
   sortComponents(recipe).forEach((component) => {
     const paint = findPaint(paints, component.paintId);
     if (!paint) return;
     if (paint.heuristics?.preferredRole === 'lightener' || paint.isWhite) {
       notes.push(`${paint.name} is handling value lift.`);
+    } else if (recipe.targetAnalysis && isDarkNaturalGreenTarget(recipe.targetAnalysis) && paint.name.includes('Burnt Umber')) {
+      notes.push(`${paint.name} is part of the dark green structure as well as the value control.`);
     } else if (paint.heuristics?.preferredRole === 'neutralizer' || paint.isBlack) {
       notes.push(`${paint.name} is supporting by muting or deepening the mixture.`);
     } else {

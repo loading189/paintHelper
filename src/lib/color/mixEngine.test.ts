@@ -517,6 +517,88 @@ describe('mixEngine', () => {
     });
   });
 
+
+  it('keeps dark natural green targets on earth-built shadow structures', () => {
+    const targets = [
+      '#0B1906',
+      '#3B4120',
+      '#485231',
+      '#23321D',
+      '#081108',
+      '#2B3416',
+      '#1A3024',
+      '#20301A',
+    ];
+
+    targets.forEach((hex) => {
+      const top = rankRecipes(hex, starterPaints, {
+        ...defaultSettings,
+        weightStep: 5,
+        maxPaintsPerRecipe: 3,
+        rankingMode: 'painter-friendly-balanced',
+      }, 6)[0];
+
+      expect(top?.components.some((component) => component.paintId === 'paint-cadmium-yellow-medium')).toBe(true);
+      expect(top?.components.some((component) => component.paintId === 'paint-ultramarine-blue' || component.paintId === 'paint-phthalo-blue')).toBe(true);
+      expect(top?.components.some((component) => component.paintId === 'paint-burnt-umber')).toBe(true);
+      expect(recipeHasAnyPaint(top, ['paint-titanium-white', 'paint-unbleached-titanium'])).toBe(false);
+    });
+  });
+
+  it('rejects bright chromatic green shortcuts for very dark natural greens', () => {
+    const target = analyzeColor('#0B1906');
+    const brightShortcutPredicted = analyzeColor('#A78D48');
+    const seatedNaturalPredicted = analyzeColor('#1A2611');
+    expect(target && brightShortcutPredicted && seatedNaturalPredicted).toBeTruthy();
+
+    const shortcutComponents = [
+      { paintId: 'paint-cadmium-yellow-medium', percentage: 70, weight: 70 },
+      { paintId: 'paint-alizarin-crimson', percentage: 20, weight: 20 },
+      { paintId: 'paint-phthalo-blue', percentage: 10, weight: 10 },
+    ];
+    const structuralComponents = [
+      { paintId: 'paint-cadmium-yellow-medium', percentage: 45, weight: 45 },
+      { paintId: 'paint-ultramarine-blue', percentage: 20, weight: 20 },
+      { paintId: 'paint-burnt-umber', percentage: 35, weight: 35 },
+    ];
+
+    expect(isPainterValidForTarget(starterPaints, shortcutComponents, target!)).toBe(false);
+    expect(isPainterValidForTarget(starterPaints, structuralComponents, target!)).toBe(true);
+
+    const shortcut = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      brightShortcutPredicted!,
+      shortcutComponents,
+    );
+    const structural = scoreRecipe(
+      { ...defaultSettings, rankingMode: 'painter-friendly-balanced' },
+      starterPaints,
+      target!,
+      seatedNaturalPredicted!,
+      structuralComponents,
+    );
+
+    expect(shortcut.darkTargetValuePenalty).toBeGreaterThan(structural.darkTargetValuePenalty ?? 0);
+    expect(shortcut.darkNaturalGreenPenalty).toBeGreaterThan(0);
+    expect(structural.naturalMixBonus).toBeGreaterThan(0);
+    expect(structural.finalScore).toBeLessThan(shortcut.finalScore);
+  });
+
+  it('treats structural earth as part of the build for dark natural green guidance', () => {
+    const top = rankRecipes('#0B1906', starterPaints, {
+      ...defaultSettings,
+      weightStep: 5,
+      maxPaintsPerRecipe: 3,
+      rankingMode: 'painter-friendly-balanced',
+    }, 4)[0];
+
+    expect(top?.mixStrategy.some((line) => line.includes('core mix') || line.includes('core build'))).toBe(true);
+    expect(top?.roleNotes?.some((line) => line.includes('dark green structure'))).toBe(true);
+    expect(top?.guidanceText.some((line) => line.includes('core green build'))).toBe(true);
+  });
+
   it('scores boundary drifts, muddy vivids, and over-clean muted targets against painterly builds', () => {
     const yellowGreenTarget = analyzeColor('#B7D538');
     const yellowGreenGood = analyzeColor('#A9CA49');

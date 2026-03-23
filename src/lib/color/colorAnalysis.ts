@@ -155,6 +155,29 @@ export const isNearBlackChromaticTarget = (target: ColorAnalysis): boolean =>
   target.hueFamily !== 'neutral' &&
   (isVeryDarkValueTarget(target) || (target.valueClassification === 'dark' && target.chroma >= 0.055));
 
+export const isDarkMutedGreenTarget = (target: ColorAnalysis): boolean =>
+  target.hueFamily === 'green' &&
+  isDarkValueTarget(target) &&
+  (target.saturationClassification === 'muted' || target.saturationClassification === 'moderate') &&
+  target.chroma >= 0.02;
+
+export const isOliveGreenTarget = (target: ColorAnalysis): boolean =>
+  target.hue !== null &&
+  target.hue >= 80 &&
+  target.hue <= 145 &&
+  !isLightValueTarget(target) &&
+  (target.saturationClassification === 'muted' || target.saturationClassification === 'moderate') &&
+  target.chroma >= 0.02;
+
+export const isNearBlackChromaticGreenTarget = (target: ColorAnalysis): boolean =>
+  isNearBlackChromaticTarget(target) &&
+  target.hue !== null &&
+  target.hue >= 85 &&
+  target.hue <= 165;
+
+export const isDarkNaturalGreenTarget = (target: ColorAnalysis): boolean =>
+  isDarkMutedGreenTarget(target) || isNearBlackChromaticGreenTarget(target) || (isOliveGreenTarget(target) && isDarkValueTarget(target));
+
 export const isLightWarmNeutralTarget = (target: ColorAnalysis): boolean =>
   target.hueFamily === 'neutral' &&
   isLightValueTarget(target) &&
@@ -192,7 +215,9 @@ export const generateTargetPaletteInsights = (target: ColorAnalysis, paints: Pai
   }
 
   if (target.hueFamily === 'green' && target.saturationClassification !== 'vivid') {
-    insights.push('Olive and natural greens usually start yellow + blue, then get pushed down with umber, black, or both.');
+    insights.push(isDarkNaturalGreenTarget(target)
+      ? 'Dark olive and shadow greens usually need yellow + blue with Burnt Umber as part of the core build, not only as a later correction.'
+      : 'Olive and natural greens usually start yellow + blue, then get pushed down with umber, black, or both.');
   }
 
   if (isDarkEarthWarmTarget(target)) {
@@ -224,7 +249,9 @@ export const generateTargetPaletteInsights = (target: ColorAnalysis, paints: Pai
   }
 
   if (isNearBlackChromaticTarget(target)) {
-    insights.push('This is a dark chromatic target, so keep the hue family visible before leaning on Mars Black.');
+    insights.push(isNearBlackChromaticGreenTarget(target)
+      ? 'This near-black green still wants a green-earth build first, with Mars Black limited to the last value seat.'
+      : 'This is a dark chromatic target, so keep the hue family visible before leaning on Mars Black.');
   }
 
   return [...new Set(insights)].slice(0, 4);

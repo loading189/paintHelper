@@ -1,5 +1,5 @@
 import type { ColorAnalysis, Paint, RankedRecipe, RecipeBadge, RecipeQualityLabel, RecipeScoreBreakdown } from '../../types/models';
-import { isDarkEarthWarmTarget, isLightWarmNeutralTarget, isNearBlackChromaticTarget } from './colorAnalysis';
+import { isDarkEarthWarmTarget, isDarkNaturalGreenTarget, isLightWarmNeutralTarget, isNearBlackChromaticGreenTarget, isNearBlackChromaticTarget } from './colorAnalysis';
 
 const getPaintMap = (paints: Paint[]) => new Map(paints.map((paint) => [paint.id, paint]));
 
@@ -41,7 +41,9 @@ export const buildRecipeWhyThisRanked = (
   if (scoreBreakdown.naturalMixBonus > 0) {
     const earthPaint = componentPaintIds.map((id) => paintMap.get(id)).find((paint) => paint?.heuristics?.naturalBias === 'earth');
     if (earthPaint) {
-      reasons.push(`Uses ${earthPaint.name} to naturalize the mix instead of flattening it with black.`);
+      reasons.push(isDarkNaturalGreenTarget(targetAnalysis)
+        ? `Uses ${earthPaint.name} as part of the core green structure so the shadow stays natural instead of going bright then muddy.`
+        : `Uses ${earthPaint.name} to naturalize the mix instead of flattening it with black.`);
     }
   }
   if (scoreBreakdown.darkTargetValuePenalty && scoreBreakdown.darkTargetValuePenalty > 0.08) {
@@ -57,7 +59,9 @@ export const buildRecipeWhyThisRanked = (
     reasons.push('Vivid targets need a visibly convincing chromatic result, not only a close number.');
   }
   if (scoreBreakdown.blackPenalty > 0 || scoreBreakdown.supportPenalty > 0) {
-    reasons.push('Support paints stay secondary so they do not take over the recipe.');
+    reasons.push(isDarkNaturalGreenTarget(targetAnalysis)
+      ? 'Black is being kept subordinate so the earth-green structure carries the color family.'
+      : 'Support paints stay secondary so they do not take over the recipe.');
   }
   if (Math.abs(predictedAnalysis.value - targetAnalysis.value) <= 0.05) {
     reasons.push('Value is already close enough that your next pass can stay focused on hue and chroma.');
@@ -92,11 +96,15 @@ export const buildRecipeGuidance = (
   } else if (predictedAnalysis.value > targetAnalysis.value + 0.04) {
     lines.push(isDarkEarthWarmTarget(targetAnalysis)
       ? 'The prediction runs light, so deepen it with earth support first and use black only if the warm dark still is not seated.'
-      : 'The prediction runs a touch light, so lower value with support paint only after checking hue.');
+      : isDarkNaturalGreenTarget(targetAnalysis)
+        ? 'The prediction runs light, so bring Burnt Umber into the core green build first; only use black as the last value seat if the dark still is not there.'
+        : 'The prediction runs a touch light, so lower value with support paint only after checking hue.');
   }
 
   if (targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'neutral') {
-    lines.push('For muted targets, let the earth support do the softening before you reach for black.');
+    lines.push(isDarkNaturalGreenTarget(targetAnalysis)
+      ? 'For dark natural greens, let the earth pigment do part of the hue-building and darkening before you reach for black.'
+      : 'For muted targets, let the earth support do the softening before you reach for black.');
   }
 
   if (isLightWarmNeutralTarget(targetAnalysis)) {
@@ -104,7 +112,9 @@ export const buildRecipeGuidance = (
   }
 
   if (isNearBlackChromaticTarget(targetAnalysis)) {
-    lines.push('Keep the hue identity visible in the dark. Mars Black should only finish the value, not build the color family.');
+    lines.push(isNearBlackChromaticGreenTarget(targetAnalysis)
+      ? 'Keep the green identity visible in the dark. Burnt Umber can help build the shadow structure; Mars Black should only finish the deepest value.'
+      : 'Keep the hue identity visible in the dark. Mars Black should only finish the value, not build the color family.');
   }
 
   const surprisingPaint = orderedPaints.find((paint) =>
@@ -135,8 +145,11 @@ export const buildMixStrategy = (
   if (targetAnalysis.hueFamily === 'green' && chromatic.length >= 2) {
     const yellow = chromatic.find((paint) => paint.name.includes('Yellow'));
     const blue = chromatic.find((paint) => paint.name.includes('Blue'));
+    const earth = orderedPaints.find((paint) => paint.heuristics?.naturalBias === 'earth' && !paint.isWhite && !paint.name.includes('Unbleached Titanium'));
     if (yellow && blue) {
-      lines.push(`Build the green with ${yellow.name} + ${blue.name} first, then bring in ${support?.name ?? 'support paint'} only if it is still needed.`);
+      lines.push(isDarkNaturalGreenTarget(targetAnalysis) && earth
+        ? `Build the green with ${yellow.name} + ${blue.name}, then seat the shadow with ${earth.name} as part of the core mix before you consider black.`
+        : `Build the green with ${yellow.name} + ${blue.name} first, then bring in ${support?.name ?? 'support paint'} only if it is still needed.`);
     }
   } else if (targetAnalysis.hueFamily === 'orange') {
     lines.push('Build orange from yellow and red first. Save white and earth colors for correction passes.');
@@ -156,7 +169,9 @@ export const buildMixStrategy = (
   if (targetAnalysis.valueClassification === 'very dark' || targetAnalysis.valueClassification === 'dark') {
     lines.push(isDarkEarthWarmTarget(targetAnalysis)
       ? 'Do not let a clean orange pile stand in for a dark earth. The earth component is part of the core build here.'
-      : 'Do not let dark support replace the hue path. Darken only after the family reads correctly.');
+      : isDarkNaturalGreenTarget(targetAnalysis)
+        ? 'Do not let a bright chromatic green stand in for a dark natural shadow. The earth component is part of the core build here.'
+        : 'Do not let dark support replace the hue path. Darken only after the family reads correctly.');
   } else if (targetAnalysis.valueClassification === 'light' || targetAnalysis.valueClassification === 'very light') {
     lines.push(isLightWarmNeutralTarget(targetAnalysis)
       ? 'Keep value lifts warm and incremental so the color stays believable instead of turning chalky or cold.'

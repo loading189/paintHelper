@@ -126,6 +126,26 @@ describe('adjustmentEngine', () => {
     expect(suggestions[0]).toBe('Lower value with a touch of Burnt Umber. Dark earth warms usually deepen more plausibly with earth color first; keep black as a last resort.');
   });
 
+
+
+  it('guides dark natural greens toward structural earth instead of after-the-fact repair', () => {
+    const target = analyzeColor('#0B1906');
+    const predicted = analyzeColor('#A78D48');
+    expect(target && predicted).toBeTruthy();
+
+    const suggestions = generateNextAdjustments(target!, predicted!, starterPaints, {
+      components: [
+        { paintId: 'paint-cadmium-yellow-medium', weight: 70, percentage: 70 },
+        { paintId: 'paint-alizarin-crimson', weight: 20, percentage: 20 },
+        { paintId: 'paint-phthalo-blue', weight: 10, percentage: 10 },
+      ],
+    });
+
+    expect(suggestions[0]).toBe('Lower value with a touch of Burnt Umber. Dark natural greens usually need earth as part of the core mix; keep black only for the last value seat.');
+    expect(suggestions[1]).toContain('Add a small touch more Ultramarine Blue to cool the green.');
+    expect(suggestions[2]).toContain('Naturalize with Burnt Umber as part of the green structure before reaching for black.');
+  });
+
   it('keeps near-black chromatic adjustment advice from collapsing straight into black', () => {
     const target = analyzeColor('#1A1120');
     const predicted = analyzeColor('#251F27');
