@@ -38,6 +38,8 @@ export const predictSpectralMix = (
   paints: Paint[],
   components: Pick<RecipeComponent, 'paintId' | 'weight'>[],
 ): SpectralMixResult => {
+  // Forward truth only: this function intentionally accepts no target color.
+  // It deterministically mixes the provided recipe and nothing else.
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
   const entries = components
     .map((component) => {

@@ -86,6 +86,7 @@ export const PaintingPrepPage = ({
               reference image.
             </p>
           </div>
+
           <button
             className="studio-button studio-button-primary"
             type="button"
@@ -212,23 +213,24 @@ export const PaintingPrepPage = ({
   };
 
   return (
-    <div className="prep-workspace-shell">
-      <div className="prep-workspace-grid">
+    <div className="prep-workspace-shell prep-workspace-shell-minimal">
+      <div className="prep-workspace-grid prep-workspace-grid-minimal">
         <section className="prep-main-column">
-          <Card className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
+          <Card className="p-4 sm:p-5 prep-reference-card-minimal">
+            <div className="prep-reference-topline">
               <div className="min-w-0">
                 <p className="studio-kicker">Reference</p>
-                <h2 className="mt-1 text-[1.02rem] font-semibold tracking-[-0.04em] text-[color:var(--text-strong)]">
-                  Sample from the painting and build the final palette.
+                <h2 className="prep-reference-title">
+                  Sample from the image and build the final palette.
                 </h2>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="prep-reference-meta">
                 <span className="studio-chip studio-chip-info">
                   {selectedPalette.length} selected
                 </span>
                 <span className="studio-chip">{candidateCount} candidates</span>
+
                 <label className="studio-button studio-button-secondary studio-button-compact cursor-pointer">
                   Upload
                   <input
@@ -243,7 +245,7 @@ export const PaintingPrepPage = ({
               </div>
             </div>
 
-            <div className="prep-image-stage mt-4">
+            <div className="prep-image-stage mt-4 prep-image-stage-minimal">
               <ReferenceSamplerCanvas
                 image={session.referenceImage}
                 sampleMode={sampleMode}
@@ -268,7 +270,7 @@ export const PaintingPrepPage = ({
               />
             </div>
 
-            <div className="prep-control-strip mt-4">
+            <div className="prep-control-strip mt-4 prep-control-strip-minimal">
               <div className="prep-control-group">
                 <span className="prep-control-label">Mode</span>
                 <div className="studio-segmented-control" role="group">
@@ -359,9 +361,9 @@ export const PaintingPrepPage = ({
           </Card>
         </section>
 
-        <aside className="prep-side-column">
-          <Card className="p-4 sm:p-5 prep-selected-card">
-            <div className="panel-heading-row">
+        <aside className="prep-side-column prep-side-column-minimal">
+          <Card className="p-4 sm:p-5 prep-selected-card prep-selected-card-minimal">
+            <div className="prep-sidebar-heading">
               <div>
                 <p className="studio-kicker">Selected palette</p>
                 <h3 className="panel-heading-title">Working colors</h3>
@@ -376,7 +378,7 @@ export const PaintingPrepPage = ({
                 selectedPalette.map((target) => (
                   <article
                     key={target.id}
-                    className="prep-target-card prep-target-card-selected"
+                    className="prep-target-card prep-target-card-selected prep-target-card-minimal"
                   >
                     <div className="prep-target-card__topline">
                       <div className="prep-target-card__identity">
@@ -386,7 +388,6 @@ export const PaintingPrepPage = ({
                         />
                         <div className="min-w-0">
                           <p className="prep-target-label">{target.label}</p>
-                          <p className="prep-target-hex">{target.targetHex}</p>
                         </div>
                       </div>
 
@@ -411,7 +412,7 @@ export const PaintingPrepPage = ({
 
                       {target.selectedRecipe ? (
                         <span className="studio-chip studio-chip-success">
-                          {target.selectedRecipe.practicalRatioText}
+                          Ready
                         </span>
                       ) : (
                         <span className="studio-chip studio-chip-muted">
@@ -425,16 +426,13 @@ export const PaintingPrepPage = ({
                         <SwatchComparisonPanel
                           targetHex={target.targetHex}
                           predictedHex={target.selectedRecipe.predictedHex}
-                          targetHelper="Target"
-                          predictedHelper="Recipe"
+                          targetHelper="Goal"
+                          predictedHelper="Actual"
                         />
 
-                        <div className="prep-ratio-panel studio-panel-strong">
-                          <p className="studio-kicker">Recipe</p>
-                          <p className="prep-ratio-hero">
-                            {target.selectedRecipe.practicalRatioText}
-                          </p>
-                          <p className="prep-ratio-copy">
+                        <div className="prep-ratio-panel studio-panel-strong prep-ratio-panel-minimal">
+                          <p className="studio-kicker">Mixture</p>
+                          <p className="prep-ratio-copy prep-ratio-copy-minimal">
                             {target.selectedRecipe.recipeText}
                           </p>
                         </div>
@@ -444,17 +442,17 @@ export const PaintingPrepPage = ({
                 ))
               ) : (
                 <p className="text-sm text-[color:var(--text-muted)]">
-                  Add colors from the candidate tray below.
+                  Add colors from the source tray.
                 </p>
               )}
             </div>
           </Card>
 
-          <Card className="p-4 sm:p-5 prep-candidate-card-shell">
-            <div className="panel-heading-row">
+          <Card className="p-4 sm:p-5 prep-candidate-card-shell prep-candidate-card-shell-minimal">
+            <div className="prep-sidebar-heading">
               <div>
-                <p className="studio-kicker">Candidate colors</p>
-                <h3 className="panel-heading-title">Source tray</h3>
+                <p className="studio-kicker">Candidate tray</p>
+                <h3 className="panel-heading-title">Source colors</h3>
               </div>
               <span className="studio-chip">{candidateCount}</span>
             </div>
@@ -464,10 +462,14 @@ export const PaintingPrepPage = ({
                 <p className="text-sm font-semibold text-[color:var(--text-strong)]">
                   Manual samples
                 </p>
+
                 <div className="mt-3 grid gap-3">
                   {sampledCandidates.length ? (
                     sampledCandidates.map((sample) => (
-                      <div key={sample.id} className="prep-candidate-card">
+                      <div
+                        key={sample.id}
+                        className="prep-candidate-card prep-candidate-card-minimal"
+                      >
                         <div className="flex items-center gap-3">
                           <span
                             className="prep-candidate-swatch"
@@ -476,9 +478,6 @@ export const PaintingPrepPage = ({
                           <div className="min-w-0 flex-1">
                             <p className="font-semibold text-[color:var(--text-strong)]">
                               {sample.name}
-                            </p>
-                            <p className="text-sm text-[color:var(--text-muted)]">
-                              {sample.hex}
                             </p>
                           </div>
                           <button
@@ -506,13 +505,14 @@ export const PaintingPrepPage = ({
                 <p className="text-sm font-semibold text-[color:var(--text-strong)]">
                   Extracted palette
                 </p>
+
                 <div className="mt-3 grid gap-3">
                   {extractedCandidates.length ? (
                     extractedCandidates.map((color) => (
                       <button
                         key={color.id}
                         type="button"
-                        className="prep-candidate-card prep-candidate-button"
+                        className="prep-candidate-card prep-candidate-card-minimal prep-candidate-button"
                         onClick={() =>
                           addCandidateToPalette(color, 'palette-extraction')
                         }
@@ -526,9 +526,6 @@ export const PaintingPrepPage = ({
                           <div className="min-w-0 text-left">
                             <p className="font-semibold text-[color:var(--text-strong)]">
                               {color.label}
-                            </p>
-                            <p className="text-sm text-[color:var(--text-muted)]">
-                              {color.hex}
                             </p>
                           </div>
                         </div>
