@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
 import { starterPaints } from '../storage/seedData';
+import { resetDeveloperCalibration } from './developerCalibration';
 import { predictSpectralMix } from './spectralMixing';
 
 const buildMix = (paintIds: string[], weights: number[]) =>
@@ -10,6 +11,10 @@ const buildMix = (paintIds: string[], weights: number[]) =>
   );
 
 describe('forward model contract', () => {
+  beforeEach(() => {
+    resetDeveloperCalibration();
+  });
+
   it('keeps a fixed recipe mapped to a fixed predicted swatch', () => {
     const recipePaintIds = ['paint-cadmium-yellow-medium', 'paint-ultramarine-blue', 'paint-burnt-umber'];
     const recipeWeights = [45, 30, 25];
@@ -19,6 +24,20 @@ describe('forward model contract', () => {
 
     expect(first.hex).toBe(second.hex);
     expect(first.oklab).toEqual(second.oklab);
+  });
+
+  it('treats normalized equivalent ratios as the same forward prediction', () => {
+    const normalized = buildMix(
+      ['paint-ultramarine-blue', 'paint-burnt-umber', 'paint-cadmium-yellow-medium'],
+      [3, 2, 2],
+    );
+    const scaled = buildMix(
+      ['paint-ultramarine-blue', 'paint-burnt-umber', 'paint-cadmium-yellow-medium'],
+      [30, 20, 20],
+    );
+
+    expect(normalized.hex).toBe(scaled.hex);
+    expect(normalized.oklch).toEqual(scaled.oklch);
   });
 
   it('stays deterministic when ratio display helpers run on the same recipe', () => {

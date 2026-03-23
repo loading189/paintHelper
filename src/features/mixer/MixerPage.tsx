@@ -6,6 +6,7 @@ import { normalizeHex } from '../../lib/color/colorMath';
 import type { Paint, RankedRecipe, UserSettings } from '../../types/models';
 import { PaintMixerLoading } from './PaintMixerLoading';
 import { RecipeCard } from './RecipeCard';
+import { DeveloperCalibrationPanel } from './DeveloperCalibrationPanel';
 import { canGenerateRecipes, createMixerDraftState, generateRecipesFromDraft, hasStaleResults, shouldShowInvalidHexMessage } from './mixerState';
 
 const DEFAULT_TARGET = '#7A8FB3';
@@ -86,6 +87,11 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
           </div>
         </div>
       </Card>
+
+      
+      {(import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV ? (
+        <DeveloperCalibrationPanel paints={paints} targetHex={draftNormalizedHex} />
+      ) : null}
 
       <div className="grid gap-5 mixer-layout">
         <div className="space-y-5 mixer-side-rail">

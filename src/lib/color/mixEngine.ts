@@ -32,7 +32,7 @@ import { assignRecipeBadges, buildMixStrategy, buildRecipeGuidance, buildRecipeW
 import { buildLayeringSuggestion, buildMixPath, buildRoleNotes, buildStabilityWarnings } from './mixPathEngine';
 import { predictSpectralMix, spectralDistanceBetweenHexes } from './spectralMixing';
 import { distributePercentages, formatRatio, practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
-import { inverseSearchTuning } from './inverseSearchTuning';
+import { getInverseSearchTuning } from './inverseSearchTuning';
 
 export type WeightCombination = number[];
 export type CandidateMix = { paintIds: string[]; weights: number[] };
@@ -448,6 +448,7 @@ const withDerivedStructureStats = (stats: RecipeStructureStats): RecipeStructure
 });
 
 const hasStructurallyPlausibleDarkValue = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): boolean => {
+  const inverseSearchTuning = getInverseSearchTuning();
   if (!isDarkValueTarget(targetAnalysis)) {
     return true;
   }
@@ -507,6 +508,7 @@ const hasStructurallyPlausibleDarkValue = (paints: Paint[], components: RecipeCo
 };
 
 export const isPainterValidForTarget = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): boolean => {
+  const inverseSearchTuning = getInverseSearchTuning();
   const stats = withDerivedStructureStats(getRecipeStructureStats(paints, components));
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
   const orderedPaints = components.map((component) => paintMap.get(component.paintId)).filter((paint): paint is Paint => Boolean(paint));
@@ -756,6 +758,7 @@ const getDominancePenalty = (paints: Paint[], components: RecipeComponent[], tar
 };
 
 const getNaturalMixBonus = (paints: Paint[], components: RecipeComponent[], targetAnalysis: ColorAnalysis): number => {
+  const inverseSearchTuning = getInverseSearchTuning();
   if (!(targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'neutral' || isDarkNaturalGreenTarget(targetAnalysis))) return 0;
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
   const hasEarth = components.some((component) => paintMap.get(component.paintId)?.heuristics?.naturalBias === 'earth');
@@ -840,6 +843,7 @@ const getGreenStructureBonus = (paints: Paint[], components: RecipeComponent[], 
 };
 
 const getDarkTargetValuePenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  const inverseSearchTuning = getInverseSearchTuning();
   if (!isDarkValueTarget(targetAnalysis) || predictedAnalysis.value <= targetAnalysis.value) {
     return 0;
   }
@@ -859,6 +863,7 @@ const getDarkTargetValuePenalty = (targetAnalysis: ColorAnalysis, predictedAnaly
 };
 
 const getMutedTargetCleanPenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  const inverseSearchTuning = getInverseSearchTuning();
   if (!(targetAnalysis.saturationClassification === 'muted' || targetAnalysis.saturationClassification === 'neutral' || isDarkNaturalGreenTarget(targetAnalysis))) {
     return 0;
   }
@@ -894,6 +899,7 @@ const getDarkNaturalGreenPenalty = (
   targetAnalysis: ColorAnalysis,
   predictedAnalysis: ColorAnalysis,
 ): number => {
+  const inverseSearchTuning = getInverseSearchTuning();
   if (!isDarkNaturalGreenTarget(targetAnalysis)) {
     return 0;
   }
@@ -926,6 +932,7 @@ const getDarkNaturalGreenPenalty = (
 };
 
 const getVividTargetMudPenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  const inverseSearchTuning = getInverseSearchTuning();
   if (targetAnalysis.saturationClassification !== 'vivid') {
     return 0;
   }
@@ -946,14 +953,16 @@ const getVividTargetMudPenalty = (targetAnalysis: ColorAnalysis, predictedAnalys
 };
 
 const getGreenVividOffHuePenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  const inverseSearchTuning = getInverseSearchTuning();
   if (!(targetAnalysis.hueFamily === 'green' && targetAnalysis.saturationClassification === 'vivid')) {
     return 0;
   }
 
-  return predictedAnalysis.hueFamily === 'green' ? 0 : inverseSearchTuning.greenTargets.vividOffHuePenalty;
+  return predictedAnalysis.hueFamily === 'green' ? 0 : Math.max(inverseSearchTuning.greenTargets.vividOffHuePenalty, inverseSearchTuning.darkTargets.offHuePenalty);
 };
 
 const getNeutralBalancePenalty = (targetAnalysis: ColorAnalysis, predictedAnalysis: ColorAnalysis): number => {
+  const inverseSearchTuning = getInverseSearchTuning();
   if (!(targetAnalysis.hueFamily === 'neutral' || isLightWarmNeutralTarget(targetAnalysis) || isCoolMutedNeutralTarget(targetAnalysis))) {
     return 0;
   }
@@ -1018,6 +1027,7 @@ const getPainterPlausibilityPenalty = (
   components: RecipeComponent[],
   targetAnalysis: ColorAnalysis,
 ): number => {
+  const inverseSearchTuning = getInverseSearchTuning();
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
   const stats = withDerivedStructureStats(getRecipeStructureStats(paints, components));
 
@@ -1486,6 +1496,7 @@ const dedupeWeightSets = (weightSets: number[][]): number[][] => {
 };
 
 const buildDarkTargetWeightSets = (group: Paint[], targetAnalysis: ColorAnalysis): number[][] => {
+  const inverseSearchTuning = getInverseSearchTuning();
   if (!inverseSearchTuning.ratioSearch.darkRatioFamiliesEnabled || !isDarkValueTarget(targetAnalysis)) {
     return [];
   }
@@ -1537,6 +1548,11 @@ const buildDarkTargetWeightSets = (group: Paint[], targetAnalysis: ColorAnalysis
       { dark: 50, anchor: 35, support: 15 },
       { dark: 50, anchor: 40, support: 10 },
       { dark: 45, anchor: 45, support: 10 },
+      { dark: 55, anchor: 30, support: 15 },
+      { dark: 55, anchor: 35, support: 10 },
+      { dark: 48, anchor: 42, support: 10 },
+      { dark: 42, anchor: 48, support: 10 },
+      { dark: 52, anchor: 38, support: 10 },
     ];
 
     darkCoreFamilies.forEach(({ dark, anchor, support }) => {
@@ -1581,6 +1597,7 @@ const buildVividGreenWeightSets = (group: Paint[], targetAnalysis: ColorAnalysis
 };
 
 export const generateCandidateMixes = (paints: Paint[], maxPaintsPerRecipe: number, step: number, targetHex?: string): CandidateMix[] => {
+  const inverseSearchTuning = getInverseSearchTuning();
   const enabledPaints = paints.filter((paint) => paint.isEnabled);
   const targetAnalysis = targetHex ? analyzeColor(targetHex) : null;
   const candidates: CandidateMix[] = [];
@@ -1629,6 +1646,13 @@ const compareRecipes = (left: RankedRecipeCandidate, right: RankedRecipeCandidat
   return left.recipeText.localeCompare(right.recipeText);
 };
 
+/**
+ * Inverse optimization entry point.
+ *
+ * Target data is allowed to generate, filter, and rank candidate recipes, but
+ * it must never rewrite the predicted swatch after forward mixing. The recipe
+ * swatch below always comes from recipe-side spectral mixing only.
+ */
 export const rankRecipes = (targetHex: string, paints: Paint[], settings: UserSettings, limit = 8): RankedRecipe[] => {
   const targetAnalysis = analyzeColor(targetHex);
   if (!targetAnalysis) {
