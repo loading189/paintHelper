@@ -161,6 +161,10 @@ const sanitizeSpectral = (
 const sanitizePaint = (paint: Paint): Paint => ({
   ...paint,
   hex: normalizeHex(paint.hex) ?? '#000000',
+  baseHex: paint.baseHex ? normalizeHex(paint.baseHex) ?? undefined : undefined,
+  tintingStrength: typeof paint.tintingStrength === 'number' ? paint.tintingStrength : 1,
+  isOnHand: typeof paint.isOnHand === 'boolean' ? paint.isOnHand : true,
+  isIdealLibrary: typeof paint.isIdealLibrary === 'boolean' ? paint.isIdealLibrary : false,
   heuristics: sanitizeHeuristics(paint.heuristics),
   spectral: sanitizeSpectral(paint.spectral),
 });
@@ -228,12 +232,17 @@ const sanitizeAdjustmentSuggestions = (
     : [];
 
 const defaultScoreBreakdown = (): RecipeScoreBreakdown => ({
-  mode: defaultSettings.rankingMode,
+  mode: (defaultSettings.rankingMode ?? 'spectral-first'),
   spectralDistance: 0,
   valueDifference: 0,
   hueDifference: 0,
   saturationDifference: 0,
   chromaDifference: 0,
+  primaryScore: 0,
+  regularizationPenalty: 0,
+  regularizationBonus: 0,
+  legacyHeuristicPenalty: 0,
+  legacyHeuristicBonus: 0,
   complexityPenalty: 0,
   hueFamilyPenalty: 0,
   constructionPenalty: 0,
@@ -262,7 +271,7 @@ const sanitizeScoreBreakdown = (
 
   const mode = rankingModes.includes(value.mode as RankingMode)
     ? (value.mode as RankingMode)
-    : defaultSettings.rankingMode;
+    : (defaultSettings.rankingMode ?? 'spectral-first');
 
   return {
     mode,
@@ -278,6 +287,16 @@ const sanitizeScoreBreakdown = (
         : 0,
     chromaDifference:
       typeof value.chromaDifference === 'number' ? value.chromaDifference : 0,
+    primaryScore:
+      typeof value.primaryScore === 'number' ? value.primaryScore : 0,
+    regularizationPenalty:
+      typeof value.regularizationPenalty === 'number' ? value.regularizationPenalty : 0,
+    regularizationBonus:
+      typeof value.regularizationBonus === 'number' ? value.regularizationBonus : 0,
+    legacyHeuristicPenalty:
+      typeof value.legacyHeuristicPenalty === 'number' ? value.legacyHeuristicPenalty : 0,
+    legacyHeuristicBonus:
+      typeof value.legacyHeuristicBonus === 'number' ? value.legacyHeuristicBonus : 0,
     complexityPenalty:
       typeof value.complexityPenalty === 'number' ? value.complexityPenalty : 0,
     hueFamilyPenalty:
@@ -711,9 +730,10 @@ export const sanitizeSettings = (
     settings?.showPercentages ?? defaultSettings.showPercentages,
   showPartsRatios:
     settings?.showPartsRatios ?? defaultSettings.showPartsRatios,
+  solveMode: settings?.solveMode === 'ideal' ? 'ideal' : 'on-hand',
   rankingMode: rankingModes.includes(settings?.rankingMode as RankingMode)
     ? (settings?.rankingMode as RankingMode)
-    : defaultSettings.rankingMode,
+    : 'spectral-first',
   singlePaintPenaltySettings: {
     discourageBlackOnlyMatches:
       settings?.singlePaintPenaltySettings?.discourageBlackOnlyMatches ??

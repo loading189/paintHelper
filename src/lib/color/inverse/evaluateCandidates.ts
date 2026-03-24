@@ -1,11 +1,11 @@
-import type { Paint, RankingMode, RecipeComponent, RecipeScoreBreakdown } from '../../../types/models';
+import type { Paint, RecipeComponent, RecipeScoreBreakdown } from '../../../types/models';
 import { analyzeColor, hueDifference } from '../colorAnalysis';
 import { predictSpectralMix, spectralDistanceBetweenHexes } from '../spectralMixing';
 import { practicalRatioFromWeights, simplifyRatio } from '../../utils/ratio';
 import type { CandidateTemplate, EvaluatedCandidate, TargetProfile } from './types';
 
 const buildScore = (
-  mode: RankingMode,
+  mode: "spectral-first",
   spectralDistance: number,
   valueDifference: number,
   hueDiff: number,
@@ -15,8 +15,8 @@ const buildScore = (
   ratioComplexity: number,
 ): RecipeScoreBreakdown => {
   const primaryScore = spectralDistance + valueDifference * 0.18 + hueDiff * 0.14 + chromaDifference * 0.08 + saturationDifference * 0.06;
-  const regularizationPenalty = mode === 'full-heuristics-legacy' ? 0 : (paintCount - 2) * 0.01 + ratioComplexity * 0.0015;
-  const finalScore = mode === 'full-heuristics-legacy' ? primaryScore + (paintCount - 1) * 0.03 : primaryScore + regularizationPenalty;
+  const regularizationPenalty = (paintCount - 2) * 0.01 + ratioComplexity * 0.0015;
+  const finalScore = primaryScore + regularizationPenalty;
 
   return {
     mode,
@@ -28,7 +28,7 @@ const buildScore = (
     primaryScore,
     regularizationPenalty,
     regularizationBonus: 0,
-    legacyHeuristicPenalty: mode === 'full-heuristics-legacy' ? (paintCount - 1) * 0.03 : 0,
+    legacyHeuristicPenalty: 0,
     legacyHeuristicBonus: 0,
     complexityPenalty: (paintCount - 1) * 0.01,
     hueFamilyPenalty: 0,
@@ -56,7 +56,7 @@ export const evaluateCandidate = (
   paints: Paint[],
   targetHex: string,
   targetAnalysis: NonNullable<ReturnType<typeof analyzeColor>>,
-  rankingMode: RankingMode,
+  _rankingMode: "spectral-first",
   _profile: TargetProfile,
 ): EvaluatedCandidate | null => {
   const recipe: RecipeComponent[] = template.paintIds.map((paintId, index) => ({ paintId, weight: weights[index], percentage: weights[index] }));
@@ -75,7 +75,7 @@ export const evaluateCandidate = (
   const practicalParts = practicalRatioFromWeights(weights, { idealMaxParts: weights.length === 3 ? 9 : 8, hardMaxParts: 12 });
   const ratioComplexity = practicalParts.reduce((sum, value) => sum + value, 0);
   const scoreBreakdown = buildScore(
-    rankingMode,
+    "spectral-first",
     targetGaps.spectralDistance,
     targetGaps.valueDifference,
     targetGaps.hueDifference,

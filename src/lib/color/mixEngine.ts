@@ -34,6 +34,8 @@ import { predictSpectralMix, spectralDistanceBetweenHexes } from './spectralMixi
 import { distributePercentages, formatRatio, practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
 import { getInverseSearchTuning } from './inverseSearchTuning';
 import { solveTarget } from './inverse/solveTarget';
+import { getIdealPalette, getOnHandPalette } from './paletteMode';
+import { solveWithPalettes } from './paletteSolver';
 
 export type WeightCombination = number[];
 export type CandidateMix = { paintIds: string[]; weights: number[] };
@@ -687,10 +689,10 @@ const isSupportPaintForTarget = (paint: Paint, targetAnalysis: ColorAnalysis): b
 };
 
 const getComplexityPenalty = (settings: UserSettings, components: RecipeComponent[]): number => {
-  if (settings.rankingMode === 'strict-closest-color') {
+  if ((settings.rankingMode ?? 'spectral-first') === 'strict-closest-color') {
     return 0;
   }
-  const perPaintPenalty = settings.rankingMode === 'simpler-recipes-preferred' ? 0.06 : 0.03;
+  const perPaintPenalty = (settings.rankingMode ?? 'spectral-first') === 'simpler-recipes-preferred' ? 0.06 : 0.03;
   return (components.length - 1) * perPaintPenalty;
 };
 
@@ -1259,11 +1261,11 @@ const getNeutralizerPenalty = (paints: Paint[], components: RecipeComponent[], t
 };
 
 const getTwoPaintUsabilityBonus = (settings: UserSettings, components: RecipeComponent[], spectralDistance: number): number => {
-  if (settings.rankingMode === 'strict-closest-color' || components.length !== 2) {
+  if ((settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' || components.length !== 2) {
     return 0;
   }
 
-  const baseBonus = settings.rankingMode === 'simpler-recipes-preferred' ? 0.03 : 0.016;
+  const baseBonus = (settings.rankingMode ?? 'spectral-first') === 'simpler-recipes-preferred' ? 0.03 : 0.016;
   return spectralDistance <= 0.14 ? baseBonus : baseBonus * 0.5;
 };
 
@@ -1304,34 +1306,34 @@ export const scoreRecipe = (
   const staysInTargetHueFamily = staysInBroadHueFamily(targetAnalysis, predictedAnalysis);
   const complexityPenalty = getComplexityPenalty(settings, components);
   const hueFamilyPenaltyBase = targetAnalysis.hueFamily === 'neutral' || staysInTargetHueFamily ? 0 : 0.18;
-  const constructionPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getConstructionPenalty(paints, components, targetAnalysis);
-  const supportPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getSupportPenalty(paints, components, targetAnalysis);
-  const dominancePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getDominancePenalty(paints, components, targetAnalysis);
-  const neutralizerPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getNeutralizerPenalty(paints, components, targetAnalysis);
-  const blackPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getBlackPenalty(settings, paints, components, targetAnalysis);
-  const whitePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getWhitePenalty(settings, paints, components, targetAnalysis);
-  const earlyWhitePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getEarlyWhitePenalty(paints, components, targetAnalysis);
-  const singlePaintPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getSinglePaintPenalty(settings, paints, components, targetAnalysis);
-  const naturalMixBonusBase = settings.rankingMode === 'strict-closest-color' ? 0 : getNaturalMixBonus(paints, components, targetAnalysis);
-  const chromaticPathBonusBase = settings.rankingMode === 'strict-closest-color' ? 0 : getChromaticPathBonus(paints, components, targetAnalysis);
-  const painterPlausibilityPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getPainterPlausibilityPenalty(paints, components, targetAnalysis);
-  const yellowLightPlausibilityPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getYellowLightPlausibilityPenalty(paints, components, targetAnalysis);
-  const greenStructureBonusBase = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenStructureBonus(paints, components, targetAnalysis);
-  const darkTargetValuePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getDarkTargetValuePenalty(targetAnalysis, predictedAnalysis);
-  const mutedTargetCleanPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getMutedTargetCleanPenalty(targetAnalysis, predictedAnalysis);
-  const vividTargetMudPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getVividTargetMudPenalty(targetAnalysis, predictedAnalysis);
-  const darkNaturalGreenPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getDarkNaturalGreenPenalty(paints, components, targetAnalysis, predictedAnalysis);
-  const neutralBalancePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getNeutralBalancePenalty(targetAnalysis, predictedAnalysis);
-  const boundaryDriftPenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getBoundaryDriftPenalty(targetAnalysis, predictedAnalysis);
-  const greenVividOffHuePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenVividOffHuePenalty(targetAnalysis, predictedAnalysis);
-  const greenHuePenaltyBase = settings.rankingMode === 'strict-closest-color' ? 0 : getGreenHuePenalty(targetAnalysis, predictedAnalysis);
+  const constructionPenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getConstructionPenalty(paints, components, targetAnalysis);
+  const supportPenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getSupportPenalty(paints, components, targetAnalysis);
+  const dominancePenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getDominancePenalty(paints, components, targetAnalysis);
+  const neutralizerPenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getNeutralizerPenalty(paints, components, targetAnalysis);
+  const blackPenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getBlackPenalty(settings, paints, components, targetAnalysis);
+  const whitePenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getWhitePenalty(settings, paints, components, targetAnalysis);
+  const earlyWhitePenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getEarlyWhitePenalty(paints, components, targetAnalysis);
+  const singlePaintPenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getSinglePaintPenalty(settings, paints, components, targetAnalysis);
+  const naturalMixBonusBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getNaturalMixBonus(paints, components, targetAnalysis);
+  const chromaticPathBonusBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getChromaticPathBonus(paints, components, targetAnalysis);
+  const painterPlausibilityPenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getPainterPlausibilityPenalty(paints, components, targetAnalysis);
+  const yellowLightPlausibilityPenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getYellowLightPlausibilityPenalty(paints, components, targetAnalysis);
+  const greenStructureBonusBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getGreenStructureBonus(paints, components, targetAnalysis);
+  const darkTargetValuePenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getDarkTargetValuePenalty(targetAnalysis, predictedAnalysis);
+  const mutedTargetCleanPenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getMutedTargetCleanPenalty(targetAnalysis, predictedAnalysis);
+  const vividTargetMudPenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getVividTargetMudPenalty(targetAnalysis, predictedAnalysis);
+  const darkNaturalGreenPenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getDarkNaturalGreenPenalty(paints, components, targetAnalysis, predictedAnalysis);
+  const neutralBalancePenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getNeutralBalancePenalty(targetAnalysis, predictedAnalysis);
+  const boundaryDriftPenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getBoundaryDriftPenalty(targetAnalysis, predictedAnalysis);
+  const greenVividOffHuePenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getGreenVividOffHuePenalty(targetAnalysis, predictedAnalysis);
+  const greenHuePenaltyBase = (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' ? 0 : getGreenHuePenalty(targetAnalysis, predictedAnalysis);
   const twoPaintUsabilityBonus = getTwoPaintUsabilityBonus(settings, components, spectralDistance);
   const vividTargetPenaltyBase =
-    settings.rankingMode === 'strict-closest-color' || targetAnalysis.saturationClassification !== 'vivid' || staysInTargetHueFamily
+    (settings.rankingMode ?? 'spectral-first') === 'strict-closest-color' || targetAnalysis.saturationClassification !== 'vivid' || staysInTargetHueFamily
       ? 0
       : 0.16;
   const primaryScore = getPrimaryTruthScore(
-    settings.rankingMode,
+    (settings.rankingMode ?? 'spectral-first'),
     spectralDistance,
     valueDifference,
     hueDelta,
@@ -1371,7 +1373,7 @@ export const scoreRecipe = (
   let legacyHeuristicPenalty = 0;
   let legacyHeuristicBonus = 0;
 
-  if (settings.rankingMode === 'full-heuristics-legacy') {
+  if ((settings.rankingMode ?? 'spectral-first') === 'full-heuristics-legacy') {
     hueFamilyPenalty = hueFamilyPenaltyBase;
     constructionPenalty = constructionPenaltyBase;
     supportPenalty = supportPenaltyBase;
@@ -1422,7 +1424,7 @@ export const scoreRecipe = (
       vividTargetPenalty,
     ]);
     legacyHeuristicBonus = 0;
-  } else if (settings.rankingMode === 'painter-friendly-balanced' || settings.rankingMode === 'simpler-recipes-preferred') {
+  } else if ((settings.rankingMode ?? 'spectral-first') === 'painter-friendly-balanced' || (settings.rankingMode ?? 'spectral-first') === 'simpler-recipes-preferred') {
     hueFamilyPenalty = hueFamilyPenaltyBase * 0.22;
     supportPenalty = supportPenaltyBase * 0.3;
     dominancePenalty = dominancePenaltyBase * 0.22;
@@ -1463,7 +1465,7 @@ export const scoreRecipe = (
   const finalScore = primaryScore + regularizationPenalty + legacyHeuristicPenalty - regularizationBonus - legacyHeuristicBonus;
 
   return {
-    mode: settings.rankingMode,
+    mode: (settings.rankingMode ?? 'spectral-first'),
     spectralDistance,
     valueDifference,
     hueDifference: hueDelta,
@@ -1914,7 +1916,7 @@ export const generateCandidateMixes = (paints: Paint[], maxPaintsPerRecipe: numb
   const solved = solveTarget(targetHex, paints, {
     ...({
       weightStep: step,
-      maxPaintsPerRecipe,
+      maxPaintsPerRecipe: Math.min(3, Math.max(1, maxPaintsPerRecipe)) as 1 | 2 | 3,
       rankingMode: 'spectral-first',
       showPercentages: true,
       showPartsRatios: true,
@@ -1950,7 +1952,8 @@ const compareRecipes = (left: RankedRecipeCandidate, right: RankedRecipeCandidat
  * swatch below always comes from recipe-side spectral mixing only.
  */
 export const rankRecipes = (targetHex: string, paints: Paint[], settings: UserSettings, limit = 8): RankedRecipe[] => {
-  const solved = solveTarget(targetHex, paints, settings, limit);
+  const palette = settings.solveMode === 'ideal' ? getIdealPalette(paints) : getOnHandPalette(paints);
+  const solved = solveTarget(targetHex, palette, { ...settings, rankingMode: 'spectral-first' }, limit);
   const enriched = solved.rankedRecipes.map((recipe) => ({
     ...recipe,
     qualityLabel: determineRecipeQuality(recipe.scoreBreakdown.finalScore),
@@ -1958,26 +1961,29 @@ export const rankRecipes = (targetHex: string, paints: Paint[], settings: UserSe
       recipe.scoreBreakdown,
       recipe.targetAnalysis,
       recipe.predictedAnalysis,
-      paints,
+      palette,
       recipe.components.map((component) => component.paintId),
     ),
     guidanceText: buildRecipeGuidance(
       recipe.scoreBreakdown,
       recipe.targetAnalysis,
       recipe.predictedAnalysis,
-      paints,
+      palette,
       recipe.components.map((component) => component.paintId),
       recipe.practicalRatioText,
     ),
-    nextAdjustments: generateNextAdjustments(recipe.targetAnalysis, recipe.predictedAnalysis, paints, recipe),
-    detailedAdjustments: generateAdjustmentSuggestions(recipe.targetAnalysis, recipe.predictedAnalysis, paints, recipe),
-    mixStrategy: buildMixStrategy(paints, recipe.components, recipe.targetAnalysis, recipe.practicalRatioText),
-    mixPath: buildMixPath(recipe, paints),
-    stabilityWarnings: buildStabilityWarnings(recipe, paints),
-    roleNotes: buildRoleNotes(recipe, paints),
-    achievability: assessAchievability(recipe, paints),
-    layeringSuggestion: buildLayeringSuggestion(recipe, paints),
+    nextAdjustments: generateNextAdjustments(recipe.targetAnalysis, recipe.predictedAnalysis, palette, recipe),
+    detailedAdjustments: generateAdjustmentSuggestions(recipe.targetAnalysis, recipe.predictedAnalysis, palette, recipe),
+    mixStrategy: buildMixStrategy(palette, recipe.components, recipe.targetAnalysis, recipe.practicalRatioText),
+    mixPath: buildMixPath(recipe, palette),
+    stabilityWarnings: buildStabilityWarnings(recipe, palette),
+    roleNotes: buildRoleNotes(recipe, palette),
+    achievability: assessAchievability(recipe, palette),
+    layeringSuggestion: buildLayeringSuggestion(recipe, palette),
   }));
 
   return assignRecipeBadges(enriched).slice(0, limit);
 };
+
+export const rankRecipesWithPalettes = (targetHex: string, paints: Paint[], settings: UserSettings, limit = 8) =>
+  solveWithPalettes(targetHex, paints, settings, limit);

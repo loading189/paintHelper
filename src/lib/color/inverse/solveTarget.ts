@@ -44,15 +44,15 @@ export const solveTarget = (targetHex: string, paints: Paint[], settings: UserSe
   templates.forEach((template) => {
     generateRatioLattice(template, profile).forEach((weights) => {
       if (rejectImplausibleCandidate(template, weights, paintsById, profile)) return;
-      const evaluated = evaluateCandidate(template, weights, enabledPaints, targetHex, targetAnalysis, settings.rankingMode, profile);
+      const evaluated = evaluateCandidate(template, weights, enabledPaints, targetHex, targetAnalysis, "spectral-first", profile);
       if (evaluated) firstPass.push(evaluated);
     });
   });
 
   const familyBeam = beamByFamily(firstPass, 8);
-  const refined = refineCandidates(familyBeam, enabledPaints, targetHex, targetAnalysis, settings.rankingMode, profile);
+  const refined = refineCandidates(familyBeam, enabledPaints, targetHex, targetAnalysis, "spectral-first", profile);
   const deduped = dedupePredictedBasins(refined);
-  const ranked = rankCandidates(deduped, settings.rankingMode);
+  const ranked = rankCandidates(deduped);
   const top = ranked.slice(0, Math.max(limit * 3, limit));
 
   const rankedRecipes: RankedRecipe[] = top.map((candidate, index) => ({

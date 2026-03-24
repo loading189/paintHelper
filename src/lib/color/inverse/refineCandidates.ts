@@ -1,4 +1,4 @@
-import type { Paint, RankingMode } from '../../../types/models';
+import type { Paint } from '../../../types/models';
 import type { ColorAnalysis } from '../../../types/models';
 import type { CandidateTemplate, EvaluatedCandidate, TargetProfile } from './types';
 import { evaluateCandidate } from './evaluateCandidates';
@@ -17,7 +17,7 @@ export const refineCandidates = (
   paints: Paint[],
   targetHex: string,
   targetAnalysis: ColorAnalysis,
-  rankingMode: RankingMode,
+  rankingMode: "spectral-first",
   profile: TargetProfile,
 ): EvaluatedCandidate[] => {
   const byFamily = new Map(seed.map((candidate) => [candidate.familyId, seed.filter((entry) => entry.familyId === candidate.familyId)]));
