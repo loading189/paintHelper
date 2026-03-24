@@ -40,7 +40,7 @@ const clamp = (value: number, min: number, max: number) =>
 
 export const toPainterValue = (luminance: number): number => {
   const normalized = clamp(luminance, 0, 1);
-  return clamp(Math.round(1 + normalized * 8), 1, 9);
+  return clamp(Math.round(9 - normalized * 8), 1, 9);
 };
 
 export const rgbToLuminance = (rgb: Rgb): number =>
@@ -241,7 +241,7 @@ export const extractVisibleClusters = ({
       const percent = total > 0 ? entry.count / total : 0;
       const hex = rgbToHex(entry.rgb);
       return {
-        id: createId('visible-color'),
+        id: hex,
         hex,
         count: entry.count,
         percent,
@@ -255,7 +255,11 @@ export const extractVisibleClusters = ({
       if (b.percent !== a.percent) return b.percent - a.percent;
       return a.hex.localeCompare(b.hex);
     })
-    .slice(0, maxColors);
+    .slice(0, maxColors)
+    .map((entry) => ({
+      ...entry,
+      id: createId(`visible-color-${entry.hex.replace('#', '')}`),
+    }));
 };
 
 export const classifyTemperature = (hex: string): 'warm' | 'neutral' | 'cool' => {
@@ -286,6 +290,12 @@ export const nearestColor = (
 
 export const quantizeValueGrouping = (luminance: number, groups: 3 | 5 | 9): number => {
   const clamped = clamp(luminance, 0, 1);
-  const index = Math.round(clamped * (groups - 1));
-  return groups === 9 ? clamp(1 + index, 1, 9) : index;
+
+  if (groups === 9) {
+    return toPainterValue(clamped);
+  }
+
+  const darkness = 1 - clamped;
+  const index = Math.round(darkness * (groups - 1));
+  return clamp(index, 0, groups - 1);
 };
