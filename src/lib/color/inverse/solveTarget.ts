@@ -2,7 +2,7 @@ import type { Paint, RankedRecipe, UserSettings } from '../../../types/models';
 import { analyzeColor } from '../colorAnalysis';
 import { formatRatio } from '../../utils/ratio';
 import { buildCandidateFamilies } from './buildCandidateFamilies';
-import { analyzeTargetProfile } from './analyzeTargetProfile';
+import { analyzeTargetProfile } from '../analyzeTargetProfile';
 import { generateRatioLattice } from './generateRatioLattice';
 import { rejectImplausibleCandidate } from './rejectImplausibleCandidates';
 import { evaluateCandidate } from './evaluateCandidates';
@@ -96,10 +96,20 @@ export const solveTarget = (
   logTargetProfileDebug(targetHex, targetAnalysis, profile);
 
   const enabledPaints = paints.filter((paint) => paint.isEnabled);
+  // Allow 4-paint exploration ONLY when it matters
+  const allowFourPaints =
+    (profile.isVeryDark || profile.isNearBlackChromatic) &&
+    !profile.isNearNeutral;
+
+  // Compute max paints dynamically
+  const maxPaintsForTarget = allowFourPaints
+    ? Math.max(settings.maxPaintsPerRecipe, 4)
+    : Math.max(settings.maxPaintsPerRecipe, 3);
+
   const templates = buildCandidateFamilies(
     enabledPaints,
     profile,
-    Math.max(settings.maxPaintsPerRecipe, 3)
+    maxPaintsForTarget
   );
   const paintsById = new Map(enabledPaints.map((paint) => [paint.id, paint]));
 

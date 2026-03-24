@@ -25,19 +25,24 @@ const DARK_THREE = [
 ];
 
 const DARK_GREEN_THREE = [
-  // strong chromatic anchor + supporting secondary + restrained darkener
   [4, 2, 1],
   [5, 2, 1],
   [6, 2, 1],
   [4, 3, 1],
   [5, 3, 1],
   [6, 1, 1],
+  [1, 3, 1],
+  [1, 4, 1],
+  [2, 3, 1],
 ];
 
 const DARK_FOUR = [
   [4, 2, 1, 1],
   [5, 2, 1, 1],
   [4, 3, 1, 1],
+  [1, 3, 1, 1],
+  [1, 4, 1, 1],
+  [2, 3, 1, 1],
 ];
 
 const BOUNDARY_TWO = [
@@ -88,10 +93,10 @@ export const generateRatioLattice = (
 
   const isOliveLike =
     profile.hueFamily === 'yellow' &&
-    (profile.isMuted || isDark);
+    (profile.isMuted || isDark || profile.isNearBoundary);
 
   const isDarkChromaticGreenLike =
-    isGreenLike &&
+    (isGreenLike || isOliveLike) &&
     isDark &&
     !profile.isNearNeutral;
 
@@ -113,16 +118,16 @@ export const generateRatioLattice = (
       [4, 2, 1],
       [5, 2, 1],
       [4, 3, 1],
+      [1, 3, 1],
+      [1, 4, 1],
     ];
   }
 
   if (profile.isVivid && !isDark) {
-    // Keep vivid exploration cleaner and less dominated by one component.
     ratios = ratios.filter((parts) => Math.max(...parts) <= 4);
   }
 
   if (profile.isVeryLight) {
-    // Avoid overcomplicated heavy-dark structures for very light targets.
     ratios = ratios.filter((parts) => {
       if (parts.length === 2) return true;
       return parts[0] <= 4 && parts[parts.length - 1] <= 2;

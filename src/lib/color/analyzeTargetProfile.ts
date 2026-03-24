@@ -1,4 +1,4 @@
-import type { ColorAnalysis } from '../../../types/models';
+import type { ColorAnalysis } from '../../types/models';
 import {
   isBlueVioletBoundaryTarget,
   isCoolMutedNeutralTarget,
@@ -11,8 +11,9 @@ import {
   isOliveGreenTarget,
   isVeryDarkValueTarget,
   isYellowGreenBoundaryTarget,
-} from '../colorAnalysis';
-import type { CandidateFamilyId, TargetProfile } from './types';
+} from './colorAnalysis';
+import { matchTargetCases } from './matchTargetCase';
+import type { CandidateFamilyId, TargetProfile } from './inverse/types';
 
 const unique = <T,>(values: T[]): T[] => [...new Set(values)];
 
@@ -35,18 +36,15 @@ export const analyzeTargetProfile = (target: ColorAnalysis): TargetProfile => {
     isBlueVioletBoundaryTarget(target) ||
     target.hueFamily === 'orange';
 
-  /**
-   * Important:
-   * Very dark colors naturally compress chroma, so a flat chroma threshold
-   * can incorrectly classify dark chromatic greens/yellows as "near neutral".
-   *
-   * We protect clearly chromatic dark targets from being downgraded too early.
-   */
+  const isDarkNaturalGreen = isDarkNaturalGreenTarget(target);
+  const isNearBlackChromatic = isNearBlackChromaticTarget(target);
+  const isDarkEarthWarm = isDarkEarthWarmTarget(target);
+
   const isDarkOliveCandidate =
     target.hueFamily === 'yellow' &&
     (isDark || isVeryDark) &&
     target.saturationClassification !== 'neutral' &&
-    target.chroma >= 0.03;
+    (target.chroma ?? 0) >= 0.03;
 
   const isClearlyChromaticDarkTarget =
     (
@@ -54,8 +52,8 @@ export const analyzeTargetProfile = (target: ColorAnalysis): TargetProfile => {
       target.hueFamily === 'yellow' ||
       target.hueFamily === 'blue' ||
       target.hueFamily === 'red' ||
-      isDarkNaturalGreenTarget(target) ||
-      isNearBlackChromaticTarget(target) ||
+      isDarkNaturalGreen ||
+      isNearBlackChromatic ||
       isDarkOliveCandidate
     ) &&
     (isDark || isVeryDark) &&
@@ -63,31 +61,27 @@ export const analyzeTargetProfile = (target: ColorAnalysis): TargetProfile => {
 
   const isNearNeutral =
     target.hueFamily === 'neutral' ||
-    (!isClearlyChromaticDarkTarget && target.chroma < 0.06);
+    (!isClearlyChromaticDarkTarget && (target.chroma ?? 0) < 0.06);
 
-  const isNearBlackChromatic = isNearBlackChromaticTarget(target);
-  const isDarkNaturalGreen = isDarkNaturalGreenTarget(target);
-  const isDarkEarthWarm = isDarkEarthWarmTarget(target);
-
-  /**
-   * Some dark/muted yellow targets behave more like olive construction
-   * problems than pure yellow/orange problems.
-   */
   const isDarkOliveLikeYellow =
     target.hueFamily === 'yellow' &&
     (isDark || isVeryDark) &&
     !isNearNeutral &&
-    (isMuted || target.chroma >= 0.08);
+    (isMuted || (target.chroma ?? 0) >= 0.08);
 
-  /**
-   * Very dark chromatic yellows should be allowed to explore green/chromatic-dark
-   * families rather than collapsing too quickly into earth/black routes.
-   */
   const isVeryDarkChromaticYellow =
     target.hueFamily === 'yellow' &&
     isVeryDark &&
     !isNearNeutral &&
-    target.chroma >= 0.08;
+    (target.chroma ?? 0) >= 0.08;
+
+  const isYellowGreenBoundaryMid =
+    target.hueFamily === 'yellow' &&
+    !isDark &&
+    !isVeryDark &&
+    !isVeryLight &&
+    !isNearNeutral &&
+    isYellowGreenBoundaryTarget(target);
 
   if (isVeryLight && target.hueFamily === 'yellow') {
     likelyFamilyIds.push('yellow-light-clean', 'yellow-light-warm');
@@ -95,6 +89,10 @@ export const analyzeTargetProfile = (target: ColorAnalysis): TargetProfile => {
 
   if (target.hueFamily === 'green') {
     likelyFamilyIds.push(isMuted ? 'yellow-green-earth' : 'yellow-green-clean');
+  }
+
+  if (isYellowGreenBoundaryMid) {
+    likelyFamilyIds.push('yellow-green-clean', 'yellow-green-earth');
   }
 
   if (isDarkOliveLikeYellow) {
@@ -117,7 +115,7 @@ export const analyzeTargetProfile = (target: ColorAnalysis): TargetProfile => {
     likelyFamilyIds.push('dark-earth-warm');
   }
 
-  if (isOliveGreenTarget(target) && isDark) {
+  if (isOliveGreenTarget(target) && (isDark || target.valueClassification === 'mid')) {
     likelyFamilyIds.push('olive-muted-dark');
   }
 
@@ -137,7 +135,7 @@ export const analyzeTargetProfile = (target: ColorAnalysis): TargetProfile => {
     likelyFamilyIds.push('light-warm-muted');
   }
 
-  return {
+  const preliminaryProfile: TargetProfile = {
     hueFamily: target.hueFamily,
     valueBand: target.valueClassification,
     saturationBand:
@@ -157,6 +155,16 @@ export const analyzeTargetProfile = (target: ColorAnalysis): TargetProfile => {
     isDarkEarthWarm,
     needsWhiteLikely: isLight || isVeryLight,
     needsDarkenerLikely: isDark || isVeryDark,
+    likelyFamilyIds: unique(likelyFamilyIds),
+  };
+
+  const matchedCases = matchTargetCases(target, preliminaryProfile, 3);
+  matchedCases.forEach((matchedCase) => {
+    likelyFamilyIds.push(...matchedCase.preferredCandidateFamilies);
+  });
+
+  return {
+    ...preliminaryProfile,
     likelyFamilyIds: unique(likelyFamilyIds),
   };
 };
