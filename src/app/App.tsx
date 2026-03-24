@@ -228,6 +228,8 @@ const App = () => {
         {view === 'paint' && (
           <ActivePaintingPage
             session={currentSession}
+            paints={state.paints}
+            settings={state.settings}
             onSessionChange={updateSession}
             onReopenInPrep={() => setView('prep')}
           />

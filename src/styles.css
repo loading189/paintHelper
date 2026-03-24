@@ -2318,3 +2318,95 @@ summary:focus-visible {
     width: 100%;
   }
 }
+.paint-workspace-helper {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(360px, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.workspace-controls-row {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr auto 88px;
+  gap: 0.5rem;
+  align-items: center;
+}
+.workspace-controls-row select,
+.workspace-controls-row input,
+.workspace-compare-grid input,
+.paint-workspace-helper textarea,
+.paint-workspace-helper aside select {
+  background: #10151d;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e7ecf7;
+  border-radius: 10px;
+  padding: 0.3rem 0.45rem;
+}
+.workspace-image-shell {
+  position: relative;
+  width: 100%;
+  min-height: 560px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #090d13;
+}
+.workspace-image-canvas {
+  width: 100%;
+  height: 560px;
+  display: block;
+  cursor: crosshair;
+}
+.workspace-overlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
+.paint-workspace-helper-rail {
+  display: grid;
+  gap: 0.9rem;
+}
+.workspace-swatch-list,
+.workspace-section-list {
+  display: grid;
+  gap: 0.45rem;
+}
+.workspace-swatch-item,
+.workspace-color-card {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem;
+  border-radius: 12px;
+  background: rgba(18, 24, 33, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.workspace-color-card.active {
+  border-color: rgba(142, 183, 255, 0.65);
+}
+.workspace-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.workspace-dot-lg { width: 28px; height: 28px; }
+.workspace-dot-xl { width: 54px; height: 54px; border-radius: 12px; }
+.workspace-row { display: flex; align-items: center; gap: 0.5rem; }
+.workspace-section-btn {
+  text-align: left;
+  border-radius: 10px;
+  padding: 0.4rem 0.55rem;
+  background: rgba(17,22,30,0.85);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.workspace-section-btn.active { border-color: rgba(142,183,255,.64); }
+.workspace-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+@media (max-width: 1200px) {
+  .paint-workspace-helper { grid-template-columns: 1fr; }
+  .workspace-image-shell { min-height: 460px; }
+  .workspace-image-canvas { height: 460px; }
+}
