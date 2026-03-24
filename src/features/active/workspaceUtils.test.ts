@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   fitViewport,
   getVisibleImageBounds,
+  isNearHex,
   nearestColor,
   quantizeValueGrouping,
   sampleImageAtPoint,
@@ -11,8 +12,8 @@ import {
 
 describe('workspace utils', () => {
   it('maps luminance to painter value (1 white, 9 black)', () => {
-    expect(toPainterValue(0)).toBe(1);
-    expect(toPainterValue(1)).toBe(9);
+    expect(toPainterValue(0)).toBe(9);
+    expect(toPainterValue(1)).toBe(1);
     expect(toPainterValue(0.5)).toBe(5);
   });
 
@@ -60,5 +61,10 @@ describe('workspace utils', () => {
       { id: 'b', hex: '#7F7F7F', label: 'Near gray' },
     ]);
     expect(match?.id).toBe('b');
+  });
+
+  it('supports near-color duplicate guards for used tray', () => {
+    expect(isNearHex('#101010', '#121212', 6)).toBe(true);
+    expect(isNearHex('#101010', '#555555', 6)).toBe(false);
   });
 });
