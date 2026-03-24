@@ -3,7 +3,7 @@ import { practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
 import { defaultSettings, starterPaints } from '../storage/seedData';
 import { resetDeveloperCalibration, updateDeveloperCalibration } from './developerCalibration';
 import { predictSpectralMix } from './spectralMixing';
-import { solveTarget } from './inverse/solveTarget';
+import { solveColorTarget } from './solvePipeline';
 
 const buildMix = (paintIds: string[], weights: number[]) =>
   predictSpectralMix(
@@ -101,7 +101,7 @@ describe('forward model contract', () => {
   });
 
   it('does not rewrite predicted output after candidate evaluation', () => {
-    const solved = solveTarget('#5E7A51', starterPaints, { ...defaultSettings, solveMode: 'on-hand' }, 4);
+    const solved = solveColorTarget('#5E7A51', starterPaints, { ...defaultSettings, solveMode: 'on-hand' }, 4);
     expect(solved.rankedRecipes.length).toBeGreaterThan(0);
 
     solved.rankedRecipes.forEach((recipe) => {
@@ -143,8 +143,8 @@ describe('forward model contract', () => {
     ] as const;
     const before = predictSpectralMix(starterPaints, [...components]);
 
-    solveTarget('#D6D2A2', starterPaints, { ...defaultSettings, solveMode: 'on-hand' }, 3);
-    solveTarget('#1F2616', starterPaints, { ...defaultSettings, solveMode: 'ideal' }, 3);
+    solveColorTarget('#D6D2A2', starterPaints, { ...defaultSettings, solveMode: 'on-hand' }, 3);
+    solveColorTarget('#1F2616', starterPaints, { ...defaultSettings, solveMode: 'ideal' }, 3);
 
     const after = predictSpectralMix(starterPaints, [...components]);
     expect(after.hex).toBe(before.hex);

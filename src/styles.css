@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Legacy shared component styles.
+   Theme primitives moved to src/styles/global.css and shell styles to src/styles/app-shell.css. */
 
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

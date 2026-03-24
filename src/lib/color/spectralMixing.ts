@@ -2,6 +2,7 @@ import type { Paint, RecipeComponent, RgbColor, SpectralMixResult, TintStrength 
 import { rgbToHex, normalizeHex, hexToRgb } from './colorMath';
 import { SpectralColor, spectralDeltaEOK, spectralMix } from '../vendor/spectral';
 import { getForwardCalibrationForPaint } from './developerCalibration';
+import { resolveRuntimePaints, type RuntimePaint } from './runtimeResolvers';
 import { canonicalizeRecipeComponents } from './recipeCanonicalization';
 
 const tintingStrengthMap: Record<TintStrength, number> = {
@@ -89,7 +90,7 @@ const getCalibratedPaintHex = (paint: Paint): string => {
   return rgbToHex(hslToRgb([hue, saturation, lightness]));
 };
 
-const createSpectralPaintColor = (paint: Paint): SpectralColor => {
+const createSpectralPaintColor = (paint: Paint | RuntimePaint): SpectralColor => {
   const color = new SpectralColor(getCalibratedPaintHex(paint));
   color.tintingStrength = getPaintTintingStrength(paint);
   return color;
@@ -112,7 +113,8 @@ export const predictSpectralMix = (
   // forward-pigment calibration as recipe-side input before spectral mixing.
   // No target may directly modify the predicted swatch after this point.
   const canonicalComponents = canonicalizeRecipeComponents(components);
-  const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
+  const runtimePaints = resolveRuntimePaints(paints);
+  const paintMap = new Map(runtimePaints.map((paint) => [paint.id, paint]));
   const entries = canonicalComponents
     .map((component) => {
       const paint = paintMap.get(component.paintId);

@@ -1,0 +1,26 @@
+.mixer-layout {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.mixer-hero-panel {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.mixer-hero-ratio {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.mixer-recent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.mixer-recent-swatch {
+  height: 0.85rem;
+  width: 0.85rem;
+  border-radius: 999px;
+}

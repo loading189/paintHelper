@@ -33,8 +33,8 @@ import { buildLayeringSuggestion, buildMixPath, buildRoleNotes, buildStabilityWa
 import { predictSpectralMix, spectralDistanceBetweenHexes } from './spectralMixing';
 import { distributePercentages, formatRatio, practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
 import { getInverseSearchTuning } from './inverseSearchTuning';
-import { solveTarget } from './inverse/solveTarget';
-import { getIdealPalette, getOnHandPalette } from './paletteMode';
+import { solveColorTarget } from './solvePipeline';
+import { getOnHandPalette, getIdealPalette } from './paletteMode';
 import { solveWithPalettes } from './paletteSolver';
 
 export type WeightCombination = number[];
@@ -1913,11 +1913,12 @@ export const generateCandidateMixes = (paints: Paint[], maxPaintsPerRecipe: numb
     return candidates;
   }
 
-  const solved = solveTarget(targetHex, paints, {
+  const solved = solveColorTarget(targetHex, paints, {
     ...({
       weightStep: step,
       maxPaintsPerRecipe: Math.min(3, Math.max(1, maxPaintsPerRecipe)) as 1 | 2 | 3,
       rankingMode: 'spectral-first',
+      solveMode: 'on-hand',
       showPercentages: true,
       showPartsRatios: true,
       singlePaintPenaltySettings: {
@@ -1952,8 +1953,8 @@ const compareRecipes = (left: RankedRecipeCandidate, right: RankedRecipeCandidat
  * swatch below always comes from recipe-side spectral mixing only.
  */
 export const rankRecipes = (targetHex: string, paints: Paint[], settings: UserSettings, limit = 8): RankedRecipe[] => {
-  const palette = settings.solveMode === 'ideal' ? getIdealPalette(paints) : getOnHandPalette(paints);
-  const solved = solveTarget(targetHex, palette, { ...settings, rankingMode: 'spectral-first' }, limit);
+  const solved = solveColorTarget(targetHex, paints, { ...settings, rankingMode: 'spectral-first' }, limit);
+  const palette = solved.solverConfig.solveMode === 'ideal' ? getIdealPalette(solved.runtimePaints) : getOnHandPalette(solved.runtimePaints);
   const enriched = solved.rankedRecipes.map((recipe) => ({
     ...recipe,
     qualityLabel: determineRecipeQuality(recipe.scoreBreakdown.finalScore),
