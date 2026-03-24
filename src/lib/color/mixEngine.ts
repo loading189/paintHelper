@@ -33,6 +33,7 @@ import { buildLayeringSuggestion, buildMixPath, buildRoleNotes, buildStabilityWa
 import { predictSpectralMix, spectralDistanceBetweenHexes } from './spectralMixing';
 import { distributePercentages, formatRatio, practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
 import { getInverseSearchTuning } from './inverseSearchTuning';
+import { solveTarget } from './inverse/solveTarget';
 
 export type WeightCombination = number[];
 export type CandidateMix = { paintIds: string[]; weights: number[] };
@@ -1896,53 +1897,39 @@ const shouldRejectGroupForTarget = (group: Paint[], target: ColorAnalysis): bool
 };
 
 export const generateCandidateMixes = (paints: Paint[], maxPaintsPerRecipe: number, step: number, targetHex?: string): CandidateMix[] => {
-  const inverseSearchTuning = getInverseSearchTuning();
-  const enabledPaints = paints.filter((paint) => paint.isEnabled);
-  const targetAnalysis = targetHex ? analyzeColor(targetHex) : null;
-  const candidates: CandidateMix[] = [];
-
-  for (let size = 1; size <= Math.min(maxPaintsPerRecipe, inverseSearchTuning.ratioSearch.maxComponents, enabledPaints.length); size += 1) {
-    const groups = choosePaintGroups(enabledPaints, size);
-
-    groups.forEach((group) => {
-      if (targetAnalysis && shouldRejectGroupForTarget(group, targetAnalysis)) {
-        return;
-      }
-
-      const baseWeightSets = generateWeightCombinations(size, step);
-      const targetAwareWeightSets = targetAnalysis
-        ? [
-          ...buildDarkTargetWeightSets(group, targetAnalysis),
-          ...buildVividGreenWeightSets(group, targetAnalysis),
-          ...buildYellowLightWeightSets(group, targetAnalysis),
-          ...buildDarkEarthWarmWeightSets(group, targetAnalysis),
-          ...buildOliveNearBlackWeightSets(group, targetAnalysis),
-        ]
-        : [];
-      const weightSets = dedupeWeightSets([...baseWeightSets, ...targetAwareWeightSets]).filter((weights) => {
-        if (targetAnalysis && !isCandidateUsefulForTarget(enabledPaints, group.map((paint) => paint.id), weights, targetAnalysis)) {
-          return false;
-        }
-        const strongCount = group.filter(isStrongPaint).length;
-        const allowDarkStructuredThreePaintBuild =
-          targetAnalysis &&
-          isDarkValueTarget(targetAnalysis) &&
-          group.some((paint) => isDarkCapablePaint(paint, targetAnalysis)) &&
-          weights.some((weight, index) => weight >= 30 && isDarkCapablePaint(group[index], targetAnalysis));
-
-        if (size === 3 && strongCount >= 2 && weights.filter((weight) => weight >= 30).length >= 2 && !allowDarkStructuredThreePaintBuild) {
-          return false;
-        }
-        return true;
+  if (!targetHex) {
+    const enabledPaints = paints.filter((paint) => paint.isEnabled);
+    const candidates: CandidateMix[] = [];
+    for (let size = 1; size <= Math.min(maxPaintsPerRecipe, enabledPaints.length); size += 1) {
+      const groups = choosePaintGroups(enabledPaints, size);
+      groups.forEach((group) => {
+        generateWeightCombinations(size, step).forEach((weights) => {
+          candidates.push({ paintIds: group.map((paint) => paint.id), weights });
+        });
       });
-
-      weightSets.forEach((weights) => {
-        candidates.push({ paintIds: group.map((paint) => paint.id), weights });
-      });
-    });
+    }
+    return candidates;
   }
 
-  return candidates;
+  const solved = solveTarget(targetHex, paints, {
+    ...({
+      weightStep: step,
+      maxPaintsPerRecipe,
+      rankingMode: 'spectral-first',
+      showPercentages: true,
+      showPartsRatios: true,
+      singlePaintPenaltySettings: {
+        discourageBlackOnlyMatches: true,
+        discourageWhiteOnlyMatches: true,
+        favorMultiPaintMixesWhenClose: true,
+      },
+    } satisfies UserSettings),
+  }, 200);
+
+  return solved.candidates.map((candidate) => ({
+    paintIds: candidate.recipe.map((component) => component.paintId),
+    weights: candidate.recipe.map((component) => component.weight),
+  }));
 };
 
 const compareRecipes = (left: RankedRecipeCandidate, right: RankedRecipeCandidate): number => {
@@ -1963,89 +1950,25 @@ const compareRecipes = (left: RankedRecipeCandidate, right: RankedRecipeCandidat
  * swatch below always comes from recipe-side spectral mixing only.
  */
 export const rankRecipes = (targetHex: string, paints: Paint[], settings: UserSettings, limit = 8): RankedRecipe[] => {
-  const targetAnalysis = analyzeColor(targetHex);
-  if (!targetAnalysis) {
-    return [];
-  }
-
-  const candidateMixes = generateCandidateMixes(paints, settings.maxPaintsPerRecipe, settings.weightStep, targetHex);
-  const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
-  const seenSignatures = new Set<string>();
-  const ranked: RankedRecipeCandidate[] = [];
-
-  candidateMixes.forEach((candidate) => {
-    const entries = buildOrderedEntries(candidate.paintIds, candidate.weights);
-    const orderedWeights = entries.map((entry) => entry.weight);
-    const components = buildComponents(entries);
-    const exactParts = simplifyRatio(orderedWeights);
-    const exactPercentages = distributePercentages(orderedWeights);
-    const practicalParts = practicalRatioFromWeights(orderedWeights, { idealMaxParts: orderedWeights.length === 3 ? 9 : 8, hardMaxParts: 12 });
-    const practicalPercentages = distributePercentages(practicalParts);
-    // Forward-model contract: the predicted swatch comes only from the
-    // recipe's actual paints + normalized weights. Target data may filter or
-    // rank recipes, but it must never alter this mixed result after the fact.
-    const mix = predictSpectralMix(paints, components);
-    const predictedAnalysis = analyzeColor(mix.hex);
-    if (!predictedAnalysis) {
-      return;
-    }
-    if (settings.rankingMode !== 'strict-closest-color' && !isPainterValidForTarget(paints, components, targetAnalysis)) {
-      return;
-    }
-
-    const scoreBreakdown = scoreRecipe(settings, paints, targetAnalysis, predictedAnalysis, components);
-    const paintNames = entries.map((entry) => paintMap.get(entry.paintId)?.name ?? entry.paintId);
-    const signature = recipeSignature(components);
-    const detailedAdjustments = generateAdjustmentSuggestions(targetAnalysis, predictedAnalysis, paints, { components });
-    const recipe: RankedRecipeCandidate = {
-      id: `recipe-${targetAnalysis.normalizedHex.slice(1)}-${signature}`,
-      predictedHex: mix.hex,
-      distanceScore: scoreBreakdown.spectralDistance,
-      components,
-      exactParts,
-      exactPercentages,
-      exactRatioText: formatRatio(exactParts),
-      practicalParts,
-      practicalPercentages,
-      practicalRatioText: formatRatio(practicalParts),
-      parts: practicalParts,
-      ratioText: formatRatio(practicalParts),
-      recipeText: buildRecipeText(paintNames, practicalParts),
-      scoreBreakdown,
-      qualityLabel: determineRecipeQuality(scoreBreakdown.finalScore),
-      badges: [],
-      guidanceText: [],
-      nextAdjustments: detailedAdjustments.map((suggestion) => suggestion.detail),
-      detailedAdjustments,
-      targetAnalysis,
-      predictedAnalysis,
-      whyThisRanked: [],
-      mixStrategy: [],
-      mixPath: buildMixPath({ components, targetAnalysis, predictedAnalysis }, paints),
-      stabilityWarnings: buildStabilityWarnings({ components }, paints),
-      roleNotes: buildRoleNotes({ components }, paints),
-      achievability: assessAchievability({ scoreBreakdown, targetAnalysis, predictedAnalysis }, paints),
-      layeringSuggestion: buildLayeringSuggestion({ targetAnalysis, scoreBreakdown }, paints),
-    };
-
-    if (seenSignatures.has(signature)) {
-      return;
-    }
-    seenSignatures.add(signature);
-    ranked.push(recipe);
-  });
-
-  ranked.sort(compareRecipes);
-
-  const deduped = ranked.filter((recipe, index, list) => {
-    const earlier = list.slice(0, index);
-    return !earlier.some((other) => recipe.predictedHex === other.predictedHex && componentOverlap(recipe.components, other.components) === recipe.components.length && other.components.length <= recipe.components.length);
-  });
-
-  const enriched = deduped.slice(0, Math.max(limit * 3, limit)).map((recipe) => ({
+  const solved = solveTarget(targetHex, paints, settings, limit);
+  const enriched = solved.rankedRecipes.map((recipe) => ({
     ...recipe,
-    whyThisRanked: buildRecipeWhyThisRanked(recipe.scoreBreakdown, recipe.targetAnalysis, recipe.predictedAnalysis, paints, recipe.components.map((component) => component.paintId)),
-    guidanceText: buildRecipeGuidance(recipe.scoreBreakdown, recipe.targetAnalysis, recipe.predictedAnalysis, paints, recipe.components.map((component) => component.paintId), recipe.practicalRatioText),
+    qualityLabel: determineRecipeQuality(recipe.scoreBreakdown.finalScore),
+    whyThisRanked: buildRecipeWhyThisRanked(
+      recipe.scoreBreakdown,
+      recipe.targetAnalysis,
+      recipe.predictedAnalysis,
+      paints,
+      recipe.components.map((component) => component.paintId),
+    ),
+    guidanceText: buildRecipeGuidance(
+      recipe.scoreBreakdown,
+      recipe.targetAnalysis,
+      recipe.predictedAnalysis,
+      paints,
+      recipe.components.map((component) => component.paintId),
+      recipe.practicalRatioText,
+    ),
     nextAdjustments: generateNextAdjustments(recipe.targetAnalysis, recipe.predictedAnalysis, paints, recipe),
     detailedAdjustments: generateAdjustmentSuggestions(recipe.targetAnalysis, recipe.predictedAnalysis, paints, recipe),
     mixStrategy: buildMixStrategy(paints, recipe.components, recipe.targetAnalysis, recipe.practicalRatioText),
