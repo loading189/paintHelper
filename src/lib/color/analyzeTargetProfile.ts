@@ -1,96 +1,170 @@
 import type { ColorAnalysis } from '../../types/models';
-import type { TargetProfile } from './inverse/types';
 import {
-  TARGET_CASE_LIBRARY,
-  type TargetCaseDefinition,
-  type TargetCaseId,
-} from './targetCaseLibrary';
+  isBlueVioletBoundaryTarget,
+  isCoolMutedNeutralTarget,
+  isDarkEarthWarmTarget,
+  isDarkNaturalGreenTarget,
+  isDarkValueTarget,
+  isLightValueTarget,
+  isNearBlackChromaticGreenTarget,
+  isNearBlackChromaticTarget,
+  isOliveGreenTarget,
+  isVeryDarkValueTarget,
+  isYellowGreenBoundaryTarget,
+} from './colorAnalysis';
+import { matchTargetCases } from './matchTargetCase';
+import type { CandidateFamilyId, TargetProfile } from './inverse/types';
 
-export type MatchedTargetCase = {
-  id: TargetCaseId;
-  label: string;
-  score: number;
-  preferredCandidateFamilies: TargetCaseDefinition['preferredCandidateFamilies'];
-};
+const unique = <T,>(values: T[]): T[] => [...new Set(values)];
 
-const saturationBandMatches = (
-  targetBand: ColorAnalysis['saturationClassification'],
-  allowed?: Array<'muted' | 'moderate' | 'vivid'>
-): boolean => {
-  if (!allowed || allowed.length === 0) return true;
-  if (targetBand === 'neutral') return allowed.includes('muted');
-  return allowed.includes(targetBand);
-};
+export const analyzeTargetProfile = (target: ColorAnalysis): TargetProfile => {
+  const likelyFamilyIds: CandidateFamilyId[] = ['general-hue-build'];
 
-const hueInRange = (hue: number | null | undefined, minHue?: number, maxHue?: number): boolean => {
-  if (hue == null) return true;
-  if (minHue === undefined && maxHue === undefined) return true;
-  if (minHue === undefined) return hue <= (maxHue as number);
-  if (maxHue === undefined) return hue >= minHue;
-  return hue >= minHue && hue <= maxHue;
-};
+  const isVeryDark = isVeryDarkValueTarget(target);
+  const isDark = isDarkValueTarget(target);
+  const isLight = isLightValueTarget(target);
+  const isVeryLight = target.valueClassification === 'very light';
 
-const matchesCase = (
-  target: ColorAnalysis,
-  profile: TargetProfile,
-  definition: TargetCaseDefinition
-): boolean => {
-  if (!definition.primaryHueFamilies.includes(target.hueFamily)) return false;
-  if (!hueInRange(target.hue, definition.minHue, definition.maxHue)) return false;
+  const isMuted =
+    target.saturationClassification === 'muted' ||
+    target.saturationClassification === 'neutral';
 
-  if (definition.minValue !== undefined && target.value < definition.minValue) return false;
-  if (definition.maxValue !== undefined && target.value > definition.maxValue) return false;
+  const isVivid = target.saturationClassification === 'vivid';
 
-  if (definition.minChroma !== undefined && target.chroma < definition.minChroma) return false;
-  if (definition.maxChroma !== undefined && target.chroma > definition.maxChroma) return false;
+  const isNearBoundary =
+    isYellowGreenBoundaryTarget(target) ||
+    isBlueVioletBoundaryTarget(target) ||
+    target.hueFamily === 'orange';
 
-  if (!saturationBandMatches(target.saturationClassification, definition.saturationBands)) {
-    return false;
+  const isDarkNaturalGreen = isDarkNaturalGreenTarget(target);
+  const isNearBlackChromatic = isNearBlackChromaticTarget(target);
+  const isDarkEarthWarm = isDarkEarthWarmTarget(target);
+
+  const isDarkOliveCandidate =
+    target.hueFamily === 'yellow' &&
+    (isDark || isVeryDark) &&
+    target.saturationClassification !== 'neutral' &&
+    (target.chroma ?? 0) >= 0.03;
+
+  const isClearlyChromaticDarkTarget =
+    (
+      target.hueFamily === 'green' ||
+      target.hueFamily === 'yellow' ||
+      target.hueFamily === 'blue' ||
+      target.hueFamily === 'red' ||
+      isDarkNaturalGreen ||
+      isNearBlackChromatic ||
+      isDarkOliveCandidate
+    ) &&
+    (isDark || isVeryDark) &&
+    target.saturationClassification !== 'neutral';
+
+  const isNearNeutral =
+    target.hueFamily === 'neutral' ||
+    (!isClearlyChromaticDarkTarget && (target.chroma ?? 0) < 0.06);
+
+  const isDarkOliveLikeYellow =
+    target.hueFamily === 'yellow' &&
+    (isDark || isVeryDark) &&
+    !isNearNeutral &&
+    (isMuted || (target.chroma ?? 0) >= 0.08);
+
+  const isVeryDarkChromaticYellow =
+    target.hueFamily === 'yellow' &&
+    isVeryDark &&
+    !isNearNeutral &&
+    (target.chroma ?? 0) >= 0.08;
+
+  const isYellowGreenBoundaryMid =
+    target.hueFamily === 'yellow' &&
+    !isDark &&
+    !isVeryDark &&
+    !isVeryLight &&
+    !isNearNeutral &&
+    isYellowGreenBoundaryTarget(target);
+
+  if (isVeryLight && target.hueFamily === 'yellow') {
+    likelyFamilyIds.push('yellow-light-clean', 'yellow-light-warm');
   }
 
-  if (definition.requireNearBoundary && !profile.isNearBoundary) return false;
-  if (definition.requireNearNeutral && !profile.isNearNeutral) return false;
-  if (definition.requireDarkNaturalGreen && !profile.isDarkNaturalGreen) return false;
-  if (definition.requireNearBlackChromatic && !profile.isNearBlackChromatic) return false;
+  if (target.hueFamily === 'green') {
+    likelyFamilyIds.push(isMuted ? 'yellow-green-earth' : 'yellow-green-clean');
+  }
 
-  return true;
-};
+  if (isYellowGreenBoundaryMid) {
+    likelyFamilyIds.push('yellow-green-clean', 'yellow-green-earth');
+  }
 
-const scoreCase = (
-  target: ColorAnalysis,
-  profile: TargetProfile,
-  definition: TargetCaseDefinition
-): number => {
-  let score = 0;
+  if (isDarkOliveLikeYellow) {
+    likelyFamilyIds.push('yellow-green-earth', 'olive-muted-dark');
+  }
 
-  if (definition.primaryHueFamilies.includes(target.hueFamily)) score += 3;
-  if (hueInRange(target.hue, definition.minHue, definition.maxHue)) score += 2;
-  if (saturationBandMatches(target.saturationClassification, definition.saturationBands)) score += 2;
+  if (isDarkNaturalGreen) {
+    likelyFamilyIds.push('dark-natural-green-earth');
+  }
 
-  if (definition.minValue !== undefined || definition.maxValue !== undefined) score += 1;
-  if (definition.minChroma !== undefined || definition.maxChroma !== undefined) score += 1;
+  if (isNearBlackChromaticGreenTarget(target)) {
+    likelyFamilyIds.push('near-black-chromatic-green');
+  }
 
-  if (definition.requireNearBoundary && profile.isNearBoundary) score += 2;
-  if (definition.requireNearNeutral && profile.isNearNeutral) score += 2;
-  if (definition.requireDarkNaturalGreen && profile.isDarkNaturalGreen) score += 3;
-  if (definition.requireNearBlackChromatic && profile.isNearBlackChromatic) score += 3;
+  if (isVeryDarkChromaticYellow) {
+    likelyFamilyIds.push('near-black-chromatic-green');
+  }
 
-  return score;
-};
+  if (isDarkEarthWarm) {
+    likelyFamilyIds.push('dark-earth-warm');
+  }
 
-export const matchTargetCases = (
-  target: ColorAnalysis,
-  profile: TargetProfile,
-  limit = 3
-): MatchedTargetCase[] => {
-  return TARGET_CASE_LIBRARY
-    .filter((definition) => matchesCase(target, profile, definition))
-    .map((definition) => ({
-      id: definition.id,
-      label: definition.label,
-      score: scoreCase(target, profile, definition),
-      preferredCandidateFamilies: definition.preferredCandidateFamilies,
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+  if (isOliveGreenTarget(target) && (isDark || target.valueClassification === 'mid')) {
+    likelyFamilyIds.push('olive-muted-dark');
+  }
+
+  if (isCoolMutedNeutralTarget(target)) {
+    likelyFamilyIds.push('cool-muted-neutral');
+  }
+
+  if (isBlueVioletBoundaryTarget(target)) {
+    likelyFamilyIds.push('blue-violet-boundary');
+  }
+
+  if (isNearBlackChromatic || (isDark && !isNearNeutral)) {
+    likelyFamilyIds.push('deep-chromatic-dark');
+  }
+
+  if (isLight && target.hueFamily === 'orange' && isMuted) {
+    likelyFamilyIds.push('light-warm-muted');
+  }
+
+  const preliminaryProfile: TargetProfile = {
+    hueFamily: target.hueFamily,
+    valueBand: target.valueClassification,
+    saturationBand:
+      target.saturationClassification === 'neutral'
+        ? 'muted'
+        : target.saturationClassification,
+    isDark,
+    isVeryDark,
+    isLight,
+    isVeryLight,
+    isMuted,
+    isVivid,
+    isNearBoundary,
+    isNearNeutral,
+    isNearBlackChromatic,
+    isDarkNaturalGreen,
+    isDarkEarthWarm,
+    needsWhiteLikely: isLight || isVeryLight,
+    needsDarkenerLikely: isDark || isVeryDark,
+    likelyFamilyIds: unique(likelyFamilyIds),
+  };
+
+  const matchedCases = matchTargetCases(target, preliminaryProfile, 3);
+  matchedCases.forEach((matchedCase) => {
+    likelyFamilyIds.push(...matchedCase.preferredCandidateFamilies);
+  });
+
+  return {
+    ...preliminaryProfile,
+    likelyFamilyIds: unique(likelyFamilyIds),
+  };
 };
