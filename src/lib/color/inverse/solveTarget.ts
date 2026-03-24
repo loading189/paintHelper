@@ -1,4 +1,4 @@
-import type { Paint, RankedRecipe, UserSettings } from '../../../types/models';
+import type { Paint, RankedRecipe } from '../../../types/models';
 import { analyzeColor } from '../colorAnalysis';
 import { formatRatio } from '../../utils/ratio';
 import { buildCandidateFamilies } from './buildCandidateFamilies';
@@ -11,6 +11,7 @@ import { dedupePredictedBasins } from './dedupePredictedBasins';
 import { rankCandidates } from './rankCandidates';
 import { explainCandidate } from './explainCandidate';
 import type { CandidateFamilyId, EvaluatedCandidate, SolveTargetResult } from './types';
+import type { SolverRuntimeConfig } from '../runtimeResolvers';
 
 const beamByFamily = (
   candidates: EvaluatedCandidate[],
@@ -31,17 +32,15 @@ const beamByFamily = (
   );
 };
 
-// Set to true temporarily while debugging target routing.
-const DEBUG_SOLVER_TARGETS = true;
-
 const logTargetProfileDebug = (
   targetHex: string,
   targetAnalysis: NonNullable<ReturnType<typeof analyzeColor>>,
-  profile: ReturnType<typeof analyzeTargetProfile>
+  profile: ReturnType<typeof analyzeTargetProfile>,
+  config: SolverRuntimeConfig,
 ) => {
-  if (!DEBUG_SOLVER_TARGETS) return;
+  if (!config.traceEnabled) return;
 
-  console.log('DEBUG TARGET PROFILE', targetHex, {
+  console.log('TRACE SOLVER TARGET PROFILE', targetHex, {
     analysis: {
       normalizedHex: targetAnalysis.normalizedHex,
       hueFamily: targetAnalysis.hueFamily,
@@ -74,7 +73,7 @@ const logTargetProfileDebug = (
 export const solveTarget = (
   targetHex: string,
   paints: Paint[],
-  settings: UserSettings,
+  config: SolverRuntimeConfig,
   limit = 8
 ): SolveTargetResult => {
   const targetAnalysis = analyzeColor(targetHex);
@@ -93,23 +92,21 @@ export const solveTarget = (
   }
 
   const profile = analyzeTargetProfile(targetAnalysis);
-  logTargetProfileDebug(targetHex, targetAnalysis, profile);
+  logTargetProfileDebug(targetHex, targetAnalysis, profile, config);
 
   const enabledPaints = paints.filter((paint) => paint.isEnabled);
-  // Allow 4-paint exploration ONLY when it matters
   const allowFourPaints =
     (profile.isVeryDark || profile.isNearBlackChromatic) &&
     !profile.isNearNeutral;
 
-  // Compute max paints dynamically
   const maxPaintsForTarget = allowFourPaints
-    ? Math.max(settings.maxPaintsPerRecipe, 4)
-    : Math.max(settings.maxPaintsPerRecipe, 3);
+    ? Math.max(config.maxPaintsPerRecipe, 4)
+    : Math.max(config.maxPaintsPerRecipe, 3);
 
   const templates = buildCandidateFamilies(
     enabledPaints,
     profile,
-    maxPaintsForTarget
+    Math.min(maxPaintsForTarget, config.inverseTuning.ratioSearch.maxComponents)
   );
   const paintsById = new Map(enabledPaints.map((paint) => [paint.id, paint]));
 

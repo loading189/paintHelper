@@ -1,3 +1,4 @@
+import '../../styles/pages/mixer.css';
 import { useEffect, useMemo, useState } from 'react';
 import { Card } from '../../components/Card';
 import { SwatchComparisonPanel } from '../../components/SwatchComparisonPanel';

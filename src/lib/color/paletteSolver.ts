@@ -1,8 +1,7 @@
 import type { Paint, PaletteComparison, RankedRecipe, UserSettings } from '../../types/models';
 import { analyzeColor, hueDifference } from './colorAnalysis';
 import { spectralDistanceBetweenHexes } from './spectralMixing';
-import { solveTarget } from './inverse/solveTarget';
-import { getIdealPalette, getOnHandPalette } from './paletteMode';
+import { solveColorTarget } from './solvePipeline';
 
 export type SolveWithPalettesResult = {
   idealResult: RankedRecipe | null;
@@ -18,9 +17,9 @@ const emptyGap = {
   targetToIdealDistance: Number.POSITIVE_INFINITY,
 };
 
-const computeMissingPaintIds = (ideal: RankedRecipe | null, onHandPalette: Paint[]): string[] => {
+const computeMissingPaintIds = (ideal: RankedRecipe | null, onHandPaints: Paint[]): string[] => {
   if (!ideal) return [];
-  const onHandIds = new Set(onHandPalette.map((paint) => paint.id));
+  const onHandIds = new Set(onHandPaints.filter((paint) => paint.isOnHand ?? true).map((paint) => paint.id));
   return ideal.components.map((component) => component.paintId).filter((id) => !onHandIds.has(id));
 };
 
@@ -34,34 +33,21 @@ const computeLimitingFactors = (
   const target = analyzeColor(targetHex);
   if (!target) return factors;
 
-  if (ideal && ideal.distanceScore > 0.2) {
-    factors.push('inherently difficult target');
-  }
-  if (ideal && onHand && ideal.distanceScore <= 0.2 && onHand.distanceScore > 0.2) {
-    factors.push('limited by palette');
-  }
-  if (target.saturationClassification === 'vivid' && onHand && onHand.predictedAnalysis.chroma < target.chroma - 0.025) {
-    factors.push('on-hand chroma ceiling');
-  }
-  if (missingPaintIds.length) {
-    factors.push('missing key hue builders');
-  }
-  if (!factors.length && onHand && onHand.distanceScore <= 0.2) {
-    factors.push('strong');
-  }
+  if (ideal && ideal.distanceScore > 0.2) factors.push('inherently difficult target');
+  if (ideal && onHand && ideal.distanceScore <= 0.2 && onHand.distanceScore > 0.2) factors.push('limited by palette');
+  if (target.saturationClassification === 'vivid' && onHand && onHand.predictedAnalysis.chroma < target.chroma - 0.025) factors.push('on-hand chroma ceiling');
+  if (missingPaintIds.length) factors.push('missing key hue builders');
+  if (!factors.length && onHand && onHand.distanceScore <= 0.2) factors.push('strong');
 
   return factors;
 };
 
 export const solveWithPalettes = (targetHex: string, paints: Paint[], settings: UserSettings, limit = 8): SolveWithPalettesResult => {
-  const onHandPalette = getOnHandPalette(paints);
-  const idealPalette = getIdealPalette(paints);
-
   const solveSettings: UserSettings = { ...settings, rankingMode: 'spectral-first' };
-  const idealResult = solveTarget(targetHex, idealPalette, solveSettings, limit).rankedRecipes[0] ?? null;
-  const onHandResult = solveTarget(targetHex, onHandPalette, solveSettings, limit).rankedRecipes[0] ?? null;
+  const idealResult = solveColorTarget(targetHex, paints, { ...solveSettings, solveMode: 'ideal' }, limit).rankedRecipes[0] ?? null;
+  const onHandResult = solveColorTarget(targetHex, paints, { ...solveSettings, solveMode: 'on-hand' }, limit).rankedRecipes[0] ?? null;
 
-  const missingPaintIds = computeMissingPaintIds(idealResult, onHandPalette);
+  const missingPaintIds = computeMissingPaintIds(idealResult, paints);
 
   const gap = idealResult && onHandResult
     ? {

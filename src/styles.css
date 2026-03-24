@@ -1,3 +1,5 @@
+/* Legacy shared component styles.
+   Theme primitives moved to src/styles/global.css and shell styles to src/styles/app-shell.css. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

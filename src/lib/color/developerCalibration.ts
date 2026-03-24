@@ -135,6 +135,11 @@ export const updateDeveloperCalibration = (patch: Partial<DeveloperCalibration>)
 };
 
 export const getForwardCalibrationForPaint = (paint: Paint): PaintForwardCalibration => {
+  const runtimeCalibration = (paint as Paint & { runtime?: { forwardCalibration?: PaintForwardCalibration } }).runtime?.forwardCalibration;
+  if (runtimeCalibration) {
+    return runtimeCalibration;
+  }
+
   const calibration = getDeveloperCalibration().forwardPigments.paints[paint.id];
   return calibration
     ? calibration

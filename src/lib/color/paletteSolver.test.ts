@@ -3,7 +3,7 @@ import { predictSpectralMix } from './spectralMixing';
 import { starterPaints, defaultSettings } from '../storage/seedData';
 import { solveWithPalettes } from './paletteSolver';
 import { getIdealPalette, getOnHandPalette } from './paletteMode';
-import { solveTarget } from './inverse/solveTarget';
+import { solveColorTarget } from './solvePipeline';
 
 describe('palette solver architecture', () => {
   it('keeps forward model invariant for the same recipe across modes', () => {
@@ -54,8 +54,8 @@ describe('palette solver architecture', () => {
 
   it('keeps solver behavior identical for same palette input', () => {
     const palette = getOnHandPalette(starterPaints);
-    const first = solveTarget('#809860', palette, { ...defaultSettings, solveMode: 'on-hand' }, 1).rankedRecipes[0];
-    const second = solveTarget('#809860', palette, { ...defaultSettings, solveMode: 'ideal' }, 1).rankedRecipes[0];
+    const first = solveColorTarget('#809860', palette, { ...defaultSettings, solveMode: 'on-hand' }, 1).rankedRecipes[0];
+    const second = solveColorTarget('#809860', palette, { ...defaultSettings, solveMode: 'on-hand' }, 1).rankedRecipes[0];
 
     expect(first?.predictedHex).toBe(second?.predictedHex);
     expect(first?.scoreBreakdown.spectralDistance).toBe(second?.scoreBreakdown.spectralDistance);
