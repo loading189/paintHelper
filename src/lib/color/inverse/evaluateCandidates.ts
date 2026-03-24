@@ -2,6 +2,7 @@ import type { Paint, RecipeComponent, RecipeScoreBreakdown } from '../../../type
 import { analyzeColor, hueDifference } from '../colorAnalysis';
 import { predictSpectralMix, spectralDistanceBetweenHexes } from '../spectralMixing';
 import { practicalRatioFromWeights, simplifyRatio } from '../../utils/ratio';
+import { canonicalizeRecipeComponents } from '../recipeCanonicalization';
 import type { CandidateTemplate, EvaluatedCandidate, TargetProfile } from './types';
 
 const buildScore = (
@@ -59,7 +60,10 @@ export const evaluateCandidate = (
   _rankingMode: "spectral-first",
   _profile: TargetProfile,
 ): EvaluatedCandidate | null => {
-  const recipe: RecipeComponent[] = template.paintIds.map((paintId, index) => ({ paintId, weight: weights[index], percentage: weights[index] }));
+  if (template.paintIds.length !== weights.length) return null;
+  const recipe: RecipeComponent[] = canonicalizeRecipeComponents(
+    template.paintIds.map((paintId, index) => ({ paintId, weight: weights[index] })),
+  ).map((component) => ({ ...component, percentage: component.weight }));
   const mix = predictSpectralMix(paints, recipe);
   const predictedAnalysis = analyzeColor(mix.hex);
   if (!predictedAnalysis) return null;

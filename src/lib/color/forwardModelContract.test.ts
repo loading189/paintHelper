@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { practicalRatioFromWeights, simplifyRatio } from '../utils/ratio';
-import { starterPaints } from '../storage/seedData';
+import { defaultSettings, starterPaints } from '../storage/seedData';
 import { resetDeveloperCalibration, updateDeveloperCalibration } from './developerCalibration';
 import { predictSpectralMix } from './spectralMixing';
+import { solveTarget } from './inverse/solveTarget';
 
 const buildMix = (paintIds: string[], weights: number[]) =>
   predictSpectralMix(
@@ -81,6 +82,34 @@ describe('forward model contract', () => {
     expect(second.rgb).toEqual(first.rgb);
   });
 
+  it('normalizes duplicate paint entries before forward prediction', () => {
+    const duplicated = predictSpectralMix(starterPaints, [
+      { paintId: 'paint-ultramarine-blue', weight: 25 },
+      { paintId: 'paint-burnt-umber', weight: 30 },
+      { paintId: 'paint-ultramarine-blue', weight: 15 },
+      { paintId: 'paint-cadmium-yellow-medium', weight: 30 },
+    ]);
+
+    const canonical = predictSpectralMix(starterPaints, [
+      { paintId: 'paint-burnt-umber', weight: 30 },
+      { paintId: 'paint-cadmium-yellow-medium', weight: 30 },
+      { paintId: 'paint-ultramarine-blue', weight: 40 },
+    ]);
+
+    expect(duplicated.hex).toBe(canonical.hex);
+    expect(duplicated.oklab).toEqual(canonical.oklab);
+  });
+
+  it('does not rewrite predicted output after candidate evaluation', () => {
+    const solved = solveTarget('#5E7A51', starterPaints, { ...defaultSettings, solveMode: 'on-hand' }, 4);
+    expect(solved.rankedRecipes.length).toBeGreaterThan(0);
+
+    solved.rankedRecipes.forEach((recipe) => {
+      const recomputed = predictSpectralMix(starterPaints, recipe.components);
+      expect(recipe.predictedHex).toBe(recomputed.hex);
+    });
+  });
+
   it('does not let inverse search tuning alter recipe to predicted output', () => {
     const paintIds = ['paint-cadmium-yellow-medium', 'paint-ultramarine-blue', 'paint-burnt-umber'];
     const weights = [45, 30, 25];
@@ -104,5 +133,21 @@ describe('forward model contract', () => {
     const after = buildMix(paintIds, weights);
     expect(after.hex).toBe(before.hex);
     expect(after.oklab).toEqual(before.oklab);
+  });
+
+  it('keeps a fixed recipe prediction unchanged across target and solve-mode solves', () => {
+    const components = [
+      { paintId: 'paint-cadmium-yellow-medium', weight: 45 },
+      { paintId: 'paint-ultramarine-blue', weight: 35 },
+      { paintId: 'paint-burnt-umber', weight: 20 },
+    ] as const;
+    const before = predictSpectralMix(starterPaints, [...components]);
+
+    solveTarget('#D6D2A2', starterPaints, { ...defaultSettings, solveMode: 'on-hand' }, 3);
+    solveTarget('#1F2616', starterPaints, { ...defaultSettings, solveMode: 'ideal' }, 3);
+
+    const after = predictSpectralMix(starterPaints, [...components]);
+    expect(after.hex).toBe(before.hex);
+    expect(after.oklch).toEqual(before.oklch);
   });
 });

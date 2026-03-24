@@ -60,4 +60,12 @@ describe('palette solver architecture', () => {
     expect(first?.predictedHex).toBe(second?.predictedHex);
     expect(first?.scoreBreakdown.spectralDistance).toBe(second?.scoreBreakdown.spectralDistance);
   });
+
+  it('returns identical dual-palette winners when on-hand and ideal palettes are the same', () => {
+    const identicalPalette = starterPaints.map((paint) => ({ ...paint, isOnHand: true, isIdealLibrary: false }));
+    const solved = solveWithPalettes('#809860', identicalPalette, { ...defaultSettings, solveMode: 'ideal' }, 1);
+
+    expect(solved.idealResult?.predictedHex).toBe(solved.onHandResult?.predictedHex);
+    expect(solved.idealResult?.practicalRatioText).toBe(solved.onHandResult?.practicalRatioText);
+  });
 });
