@@ -308,6 +308,7 @@ export type PaintingSession = {
 
 export type RankedRecipe = {
   id: string;
+  familyId?: string;
   predictedHex: string;
   distanceScore: number;
   components: RecipeComponent[];
