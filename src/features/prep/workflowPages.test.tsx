@@ -131,12 +131,12 @@ describe('workflow pages', () => {
 
   it('renders Paint mode with the image and saved recipe guidance, not primary technical stats', () => {
     const markup = renderToStaticMarkup(
-      <ActivePaintingPage session={session} onSessionChange={() => undefined} onReopenInPrep={() => undefined} />,
+      <ActivePaintingPage session={session} paints={starterPaints} settings={defaultSettings} onSessionChange={() => undefined} onReopenInPrep={() => undefined} />,
     );
 
-    expect(markup).toContain('Painting image');
-    expect(markup).toContain('Practical ratio');
-    expect(markup).toContain('Tree shadow');
+    expect(markup).toContain('Painting helper workspace');
+    expect(markup).toContain('Target / predicted / actual');
+    expect(markup).toContain('Visible viewport colors');
     expect(markup).not.toContain('Spectral distance');
     expect(markup).not.toContain('Score breakdown');
   });
@@ -154,12 +154,14 @@ describe('workflow pages', () => {
             recipeOptions: [],
           })),
         }}
+        paints={starterPaints}
+        settings={defaultSettings}
         onSessionChange={() => undefined}
         onReopenInPrep={() => undefined}
       />,
     );
 
-    expect(pendingMarkup).toContain('Needs prep attention');
+    expect(pendingMarkup).toContain('Section palette');
     expect(pendingMarkup).toContain('Tree shadow');
   });
 });
