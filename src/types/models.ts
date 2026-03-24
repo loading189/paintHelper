@@ -7,6 +7,7 @@ export type ValueClassification = 'very dark' | 'dark' | 'mid' | 'light' | 'very
 export type HueFamily = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'violet' | 'neutral';
 export type SaturationClassification = 'neutral' | 'muted' | 'moderate' | 'vivid';
 export type RankingMode = 'strict-closest-color' | 'spectral-first' | 'painter-friendly-balanced' | 'simpler-recipes-preferred' | 'full-heuristics-legacy';
+export type SolveMode = 'on-hand' | 'ideal';
 export type PreferredRole = 'base' | 'hue-builder' | 'support' | 'neutralizer' | 'lightener';
 export type RecipeQualityLabel =
   | 'Excellent spectral starting point'
@@ -55,9 +56,17 @@ export type Paint = {
   name: string;
   brand?: string;
   hex: string;
+  baseHex?: string;
   notes?: string;
   isWhite: boolean;
   isBlack: boolean;
+  tintingStrength?: number;
+  darknessBias?: number;
+  chromaBias?: number;
+  earthStrengthBias?: number;
+  whiteLiftBias?: number;
+  isOnHand?: boolean;
+  isIdealLibrary?: boolean;
   isEnabled: boolean;
   opacity?: Opacity;
   temperatureBias?: TemperatureBias;
@@ -219,7 +228,8 @@ export type UserSettings = {
   maxPaintsPerRecipe: 1 | 2 | 3;
   showPercentages: boolean;
   showPartsRatios: boolean;
-  rankingMode: RankingMode;
+  solveMode?: SolveMode;
+  rankingMode?: RankingMode;
   singlePaintPenaltySettings: SinglePaintPenaltySettings;
 };
 
@@ -338,6 +348,23 @@ export type RankedRecipe = {
   achievability: AchievabilityInsight | AchievabilitySignal;
   layeringSuggestion?: string;
   glazingSuggestion?: string;
+};
+
+
+export type PaletteGapMetrics = {
+  spectralDistance: number;
+  valueDelta: number;
+  chromaDelta: number;
+  hueDelta: number;
+  targetToIdealDistance: number;
+};
+
+export type PaletteComparison = {
+  ideal: RankedRecipe | null;
+  onHand: RankedRecipe | null;
+  gap: PaletteGapMetrics;
+  limitingFactors: string[];
+  missingPaintIds: string[];
 };
 
 export type AppState = {

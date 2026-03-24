@@ -1,46 +1,34 @@
 import type { AchievabilityInsight, Paint, RankedRecipe } from '../../types/models';
 
+const CLOSE_DISTANCE = 0.18;
+
 export const assessAchievability = (
   recipe: Pick<RankedRecipe, 'scoreBreakdown' | 'targetAnalysis' | 'predictedAnalysis'>,
   paints: Paint[],
 ): AchievabilityInsight => {
-  const enabledPaints = paints.filter((paint) => paint.isEnabled);
-  const hasWarmLightener = enabledPaints.some((paint) => paint.name.includes('Unbleached Titanium'));
   const spectralGap = recipe.scoreBreakdown.spectralDistance;
-  const valueGap = Math.abs(recipe.targetAnalysis.value - recipe.predictedAnalysis.value);
-  const chromaShortfall = Math.max(0, recipe.targetAnalysis.chroma - recipe.predictedAnalysis.chroma);
+  const onHandCount = paints.filter((paint) => paint.isOnHand).length;
+  const hasIdealLibrary = paints.some((paint) => paint.isIdealLibrary);
 
-  if (spectralGap <= 0.18 && valueGap <= 0.12) {
+  if (spectralGap <= CLOSE_DISTANCE) {
     return {
       level: 'strong',
-      headline: 'Strongly achievable with current palette',
-      detail: 'The palette can land close enough spectrally and by value to use this recipe directly as a studio start.',
+      headline: 'Strongly achievable with this palette',
+      detail: 'Predicted spectral and value gaps are already close enough for a practical studio start.',
     };
   }
 
-  if (recipe.targetAnalysis.saturationClassification === 'vivid' && chromaShortfall > 0.03) {
+  if (hasIdealLibrary && onHandCount > 0) {
     return {
       level: 'limited',
-      headline: 'Closest achievable with current palette',
-      detail: 'The target pushes chroma beyond current palette reach, so expect a believable but slightly restrained result.',
-    };
-  }
-
-  if (
-    (recipe.targetAnalysis.valueClassification === 'light' || recipe.targetAnalysis.valueClassification === 'very light') &&
-    recipe.targetAnalysis.hueFamily === 'orange' &&
-    !hasWarmLightener
-  ) {
-    return {
-      level: 'limited',
-      headline: 'Warm-light range is constrained',
-      detail: 'Warm highlight handling is palette-limited; keep hue construction first and accept a modest chroma/value compromise.',
+      headline: 'Limited by available paints',
+      detail: 'The solver path is stable, but this palette boundary is keeping the best match farther than ideal.',
     };
   }
 
   return {
-    level: 'workable',
-    headline: 'Workable with refinement',
-    detail: 'Palette limits are manageable, but reaching the target cleanly will likely need staged hue/value adjustments.',
+    level: 'limited',
+    headline: 'Inherently difficult target',
+    detail: 'Even with a realistic expanded palette this target is still spectrally hard and will require compromise.',
   };
 };

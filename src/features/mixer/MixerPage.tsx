@@ -11,12 +11,9 @@ import { canGenerateRecipes, createMixerDraftState, generateRecipesFromDraft, ha
 
 const DEFAULT_TARGET = '#7A8FB3';
 
-const rankingModeLabels: Record<UserSettings['rankingMode'], string> = {
-  'strict-closest-color': 'Strict closest',
-  'spectral-first': 'Spectral first',
-  'painter-friendly-balanced': 'Painter friendly',
-  'simpler-recipes-preferred': 'Simpler recipes',
-  'full-heuristics-legacy': 'Full heuristics',
+const solveModeLabels: Record<NonNullable<UserSettings['solveMode']>, string> = {
+  'on-hand': 'On-hand paints',
+  ideal: 'Ideal palette',
 };
 
 type MixerPageProps = {
@@ -36,6 +33,7 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
   const previewAnalysis = draftNormalizedHex ? analyzeColor(draftNormalizedHex) : null;
   const enabledPaints = paints.filter((paint) => paint.isEnabled);
   const recipes = mixerState.recipes;
+  const paletteComparison = mixerState.comparison;
   const topRecipe = recipes[0] ?? null;
   const resultsAreStale = hasStaleResults(mixerState.draftHex, mixerState.generatedHex);
   const showInvalidHexMessage = shouldShowInvalidHexMessage(mixerState.draftHex, mixerState.touched);
@@ -80,11 +78,11 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
           <div>
             <p className="studio-eyebrow">Mixer</p>
             <h2 className="workspace-mode-title">Precision color utility</h2>
-            <p className="workspace-mode-copy">A quieter matching workspace with swatch comparison, painter-friendly ratios, and optional technical detail tucked behind disclosure.</p>
+            <p className="workspace-mode-copy">A spectral-first workspace that compares what you can mix now versus what a fuller ideal palette could achieve.</p>
           </div>
           <div className="workspace-mode-meta">
             <div className="studio-mini-stat"><span>Active paints</span><strong>{enabledPaints.length}</strong></div>
-            <div className="studio-mini-stat"><span>Profile</span><strong>{rankingModeLabels[settings.rankingMode]}</strong></div>
+            <div className="studio-mini-stat"><span>Solve context</span><strong>{solveModeLabels[settings.solveMode ?? 'on-hand']}</strong></div>
             <div className="studio-mini-stat"><span>Top ratio</span><strong>{topRecipe?.practicalRatioText ?? 'Pending'}</strong></div>
           </div>
         </div>
@@ -122,6 +120,15 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
                 predictedHelper={topRecipe ? topRecipe.practicalRatioText : 'Generate recipes'}
               />
 
+              {paletteComparison ? (
+                <div className="studio-panel mt-2">
+                  <p className="text-sm font-semibold text-[color:var(--text-strong)]">Palette gap</p>
+                  <p className="text-xs text-[color:var(--text-muted)]">
+                    ΔE ideal↔on-hand: {Number.isFinite(paletteComparison.gap.spectralDistance) ? paletteComparison.gap.spectralDistance.toFixed(3) : 'n/a'}
+                    {paletteComparison.missingPaintIds.length ? ` · Missing: ${paletteComparison.missingPaintIds.length}` : ''}
+                  </p>
+                </div>
+              ) : null}
               {topRecipe ? (
                 <div className="studio-panel studio-panel-strong mixer-hero-panel">
                   <p className="studio-eyebrow">Best working mix</p>
@@ -132,13 +139,13 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
               ) : null}
 
               <label>
-                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Ranking mode</span>
-                <select className="studio-select" value={settings.rankingMode} onChange={(event) => onSettingsChange({ ...settings, rankingMode: event.target.value as UserSettings['rankingMode'] })}>
-                  {Object.entries(rankingModeLabels).map(([value, label]) => (
+                <span className="mb-2 block text-[13px] font-semibold text-[color:var(--text-strong)]">Solve context</span>
+                <select className="studio-select" value={settings.solveMode ?? 'on-hand'} onChange={(event) => onSettingsChange({ ...settings, solveMode: event.target.value as UserSettings['solveMode'] })}>
+                  {Object.entries(solveModeLabels).map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
-                <span className="mt-2 block text-xs text-[color:var(--text-muted)]">Compare spectral-only, spectral-first with light regularization, and legacy full heuristics without changing the forward recipe → predicted contract.</span>
+                <span className="mt-2 block text-xs text-[color:var(--text-muted)]">On-hand only uses paints you own. Ideal unions your paints with a curated professional acrylic library.</span>
               </label>
 
               <button className="studio-button studio-button-primary w-full" type="button" disabled={generateDisabled} onClick={() => void handleGenerate()}>

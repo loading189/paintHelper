@@ -63,7 +63,7 @@ const App = () => {
       createdAt: new Date().toISOString(),
       savedName: `Match ${targetHex}`,
       notes: '',
-      rankingMode: state.settings.rankingMode,
+      rankingMode: state.settings.rankingMode ?? "spectral-first",
       qualityLabel: recipe.qualityLabel,
       guidanceText: recipe.guidanceText,
       nextAdjustments: recipe.nextAdjustments,

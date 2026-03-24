@@ -1,12 +1,13 @@
-import { rankRecipes } from '../../lib/color/mixEngine';
+import { rankRecipesWithPalettes } from '../../lib/color/mixEngine';
 import { normalizeHex } from '../../lib/color/colorMath';
-import type { Paint, RankedRecipe, UserSettings } from '../../types/models';
+import type { Paint, PaletteComparison, RankedRecipe, UserSettings } from '../../types/models';
 
 export const MIN_GENERATION_DURATION_MS = 400;
 
 export type MixerGeneratedState = {
   generatedHex: string | null;
   recipes: RankedRecipe[];
+  comparison: PaletteComparison | null;
 };
 
 export type MixerDraftState = MixerGeneratedState & {
@@ -19,6 +20,7 @@ export const createMixerDraftState = (draftHex: string): MixerDraftState => ({
   draftHex,
   generatedHex: null,
   recipes: [],
+  comparison: null,
   touched: false,
   isGenerating: false,
 });
@@ -62,7 +64,10 @@ export const generateRecipesFromDraft = async (
   const wait = options.wait ?? ((durationMs: number) => new Promise<void>((resolve) => setTimeout(resolve, durationMs)));
   const now = options.now ?? (() => Date.now());
   const startedAt = now();
-  const recipes = rankRecipes(normalizedHex, paints, settings, options.limit);
+  const solved = rankRecipesWithPalettes(normalizedHex, paints, settings, options.limit);
+  const recipes = settings.solveMode === 'ideal'
+    ? solved.idealResult ? [solved.idealResult] : []
+    : solved.onHandResult ? [solved.onHandResult] : [];
   const elapsed = now() - startedAt;
   const remaining = minimumDurationMs - elapsed;
 
@@ -73,5 +78,6 @@ export const generateRecipesFromDraft = async (
   return {
     generatedHex: normalizedHex,
     recipes,
+    comparison: solved.comparison,
   };
 };
