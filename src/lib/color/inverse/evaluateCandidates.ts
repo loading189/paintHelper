@@ -16,10 +16,11 @@ const buildScore = (
   ratioComplexity: number,
   constructionPenalty: number,
   hueFamilyPenalty: number,
+  valueWeight: number,
 ): RecipeScoreBreakdown => {
   const primaryScore =
     spectralDistance +
-    valueDifference * 0.18 +
+    valueDifference * valueWeight +
     hueDiff * 0.14 +
     chromaDifference * 0.08 +
     saturationDifference * 0.06;
@@ -84,7 +85,9 @@ const getWeightShare = (
   return matched / total;
 };
 
-const getPaintHueRole = (paint: Paint): 'yellow' | 'green' | 'blue' | 'red' | 'violet' | 'earth' | 'black' | 'white' | 'other' => {
+const getPaintHueRole = (
+  paint: Paint,
+): 'yellow' | 'green' | 'blue' | 'red' | 'violet' | 'earth' | 'black' | 'white' | 'other' => {
   const name = paint.name.toLowerCase();
 
   if (paint.isBlack) return 'black';
@@ -140,11 +143,37 @@ const getConstructionPenalty = (
     (paint) => paint.isWhite || paint.name.toLowerCase().includes('unbleached titanium'),
   );
 
+  const yellowShare = getWeightShare(
+    recipe,
+    paintsById,
+    (paint) => getPaintHueRole(paint) === 'yellow',
+  );
+
+  const greenShare = getWeightShare(
+    recipe,
+    paintsById,
+    (paint) => getPaintHueRole(paint) === 'green',
+  );
+
+  const blueShare = getWeightShare(
+    recipe,
+    paintsById,
+    (paint) => getPaintHueRole(paint) === 'blue',
+  );
+
+  const redShare = getWeightShare(
+    recipe,
+    paintsById,
+    (paint) => getPaintHueRole(paint) === 'red',
+  );
+
   const hasYellow = hasHueRole(recipe, paintsById, 'yellow');
   const hasGreen = hasHueRole(recipe, paintsById, 'green');
   const hasBlue = hasHueRole(recipe, paintsById, 'blue');
+  const hasRed = hasHueRole(recipe, paintsById, 'red');
 
   const hasGreenPath = hasGreen || (hasYellow && hasBlue);
+  const hasWarmPath = hasRed && hasYellow;
   const darkenerShare = earthShare + blackShare;
 
   let penalty = 0;
@@ -156,7 +185,12 @@ const getConstructionPenalty = (
 
   const isDarkOliveLikeTarget =
     profile.hueFamily === 'yellow' &&
-    (profile.isDark || profile.isVeryDark || profile.isMuted) &&
+    (profile.isDark || profile.isVeryDark || profile.isMuted || profile.isNearBoundary) &&
+    !profile.isNearNeutral;
+
+  const isDarkWarmChromaticTarget =
+    (profile.hueFamily === 'orange' || profile.hueFamily === 'red') &&
+    (profile.isDark || profile.isVeryDark) &&
     !profile.isNearNeutral;
 
   if (isDarkChromaticGreenTarget) {
@@ -195,6 +229,47 @@ const getConstructionPenalty = (
     if (darkenerShare > 0.6) {
       penalty += 0.04;
     }
+
+    // Prevent dark olive targets from drifting into cool blue-gray.
+    if (blueShare > 0.5) {
+      penalty += 0.03;
+    }
+
+    // Retain enough yellow to keep an olive / yellow-green read.
+    if (yellowShare < 0.2) {
+      penalty += 0.03;
+    }
+
+    // Prevent black + blue from overwhelming the olive structure.
+    if (blackShare > 0.2 && blueShare > 0.45) {
+      penalty += 0.02;
+    }
+  }
+
+  if (isDarkWarmChromaticTarget) {
+    if (!hasWarmPath) {
+      penalty += 0.08;
+    }
+
+    // Too much earth + black means we collapsed into brown-black too early.
+    if (earthShare + blackShare > 0.7) {
+      penalty += 0.05;
+    }
+
+    // Keep a meaningful red core for deep orange/red targets.
+    if (redShare < 0.2) {
+      penalty += 0.04;
+    }
+
+    // Orange should usually retain some yellow support.
+    if (profile.hueFamily === 'orange' && yellowShare < 0.12) {
+      penalty += 0.03;
+    }
+
+    // Avoid low-chroma brown collapse for warm dark chromatic targets.
+    if (predictedAnalysis.chroma < targetAnalysis.chroma * 0.6) {
+      penalty += 0.03;
+    }
   }
 
   return penalty;
@@ -212,7 +287,12 @@ const getHueFamilyPenalty = (
   const isDarkChromaticTarget =
     (profile.isDark || profile.isVeryDark) &&
     !profile.isNearNeutral &&
-    (profile.hueFamily === 'green' || profile.hueFamily === 'yellow');
+    (
+      profile.hueFamily === 'green' ||
+      profile.hueFamily === 'yellow' ||
+      profile.hueFamily === 'orange' ||
+      profile.hueFamily === 'red'
+    );
 
   if (isDarkChromaticTarget && hueDiff > 0.16) {
     penalty += 0.03;
@@ -227,6 +307,18 @@ const getHueFamilyPenalty = (
   }
 
   return penalty;
+};
+
+const getValueWeight = (profile: TargetProfile): number => {
+  if (profile.isVeryDark && !profile.isNearNeutral) {
+    return 0.28;
+  }
+
+  if (profile.isDark && !profile.isNearNeutral) {
+    return 0.23;
+  }
+
+  return 0.18;
 };
 
 export const evaluateCandidate = (
@@ -284,6 +376,8 @@ export const evaluateCandidate = (
     profile,
   );
 
+  const valueWeight = getValueWeight(profile);
+
   const scoreBreakdown = buildScore(
     'spectral-first',
     targetGaps.spectralDistance,
@@ -295,6 +389,7 @@ export const evaluateCandidate = (
     ratioComplexity,
     constructionPenalty,
     hueFamilyPenalty,
+    valueWeight,
   );
 
   const hasEarth = recipe.some(

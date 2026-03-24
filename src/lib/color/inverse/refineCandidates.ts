@@ -65,7 +65,6 @@ export const refineCandidates = (
 
       const roles = currentPaints.map(getPaintRole);
 
-      // Base generic refinement: nudge each component up/down.
       candidate.recipe.forEach((_, index) => {
         [1, -1].forEach((delta) => {
           const mutatedWeights = mutate(currentWeights, index, delta);
@@ -90,9 +89,12 @@ export const refineCandidates = (
         });
       });
 
-      // New: targeted refinement for dark chromatic green / olive-like targets.
       const isDarkChromaticGreenTarget =
-        (profile.hueFamily === 'green' || profile.isDarkNaturalGreen) &&
+        (
+          profile.hueFamily === 'green' ||
+          profile.isDarkNaturalGreen ||
+          (profile.hueFamily === 'yellow' && profile.isNearBoundary)
+        ) &&
         (profile.isDark || profile.isVeryDark) &&
         !profile.isNearNeutral;
 
@@ -100,22 +102,22 @@ export const refineCandidates = (
         roles.forEach((role, index) => {
           const deltas: number[] = [];
 
-          // Strengthen the green-building core.
           if (role === 'blue' || role === 'green') {
-            deltas.push(2, 1);
+            deltas.push(3, 2, 1);
           }
 
-          // Often reduce yellow slightly once a dark green path is established.
           if (role === 'yellow') {
-            deltas.push(-1);
+            deltas.push(-2, -1);
           }
 
-          // Keep darkeners supportive, not dominant.
-          if (role === 'earth' || role === 'black') {
+          if (role === 'earth') {
             deltas.push(-1, 1);
           }
 
-          // Lighteners should be pushed out of this target class.
+          if (role === 'black') {
+            deltas.push(1);
+          }
+
           if (role === 'white') {
             deltas.push(-2, -1);
           }

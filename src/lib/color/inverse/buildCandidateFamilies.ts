@@ -27,10 +27,11 @@ const pick = (paints: Paint[], predicate: (paint: Paint) => boolean): Paint[] =>
 const buildTemplates = (
   familyId: CandidateFamilyId,
   groups: Paint[][]
-): CandidateTemplate[] => groups.map((group) => ({
-  familyId,
-  paintIds: group.map((paint) => paint.id),
-}));
+): CandidateTemplate[] =>
+  groups.map((group) => ({
+    familyId,
+    paintIds: group.map((paint) => paint.id),
+  }));
 
 const pair = (left: Paint[], right: Paint[]): Paint[][] =>
   left.flatMap((l) =>
@@ -85,6 +86,10 @@ export const buildCandidateFamilies = (
   );
 
   const templates: CandidateTemplate[] = [];
+  const allowDarkFourPaint =
+    maxPaints >= 4 &&
+    (profile.isVeryDark || profile.isNearBlackChromatic) &&
+    !profile.isNearNeutral;
 
   for (const familyId of profile.likelyFamilyIds) {
     switch (familyId) {
@@ -105,11 +110,21 @@ export const buildCandidateFamilies = (
           templates.push(...buildTemplates(familyId, triads(yellows, blues, whites)));
           templates.push(...buildTemplates(familyId, triads(yellows, greens, whites)));
         }
+
+        if (allowDarkFourPaint && blacks.length > 0) {
+          templates.push(...buildTemplates(familyId, quads(yellows, blues, earths, blacks)));
+          templates.push(...buildTemplates(familyId, quads(yellows, greens, earths, blacks)));
+        }
         break;
 
       case 'yellow-green-earth':
         templates.push(...buildTemplates(familyId, triads(yellows, blues, earths)));
         templates.push(...buildTemplates(familyId, triads(yellows, greens, earths)));
+
+        if (allowDarkFourPaint && blacks.length > 0) {
+          templates.push(...buildTemplates(familyId, quads(yellows, blues, earths, blacks)));
+          templates.push(...buildTemplates(familyId, quads(yellows, greens, earths, blacks)));
+        }
         break;
 
       case 'dark-natural-green-earth':
@@ -117,7 +132,7 @@ export const buildCandidateFamilies = (
         templates.push(...buildTemplates(familyId, triads(yellows, blues, earths)));
         templates.push(...buildTemplates(familyId, triads(yellows, greens, earths)));
 
-        if (maxPaints >= 4 && blacks.length > 0) {
+        if (allowDarkFourPaint && blacks.length > 0) {
           templates.push(...buildTemplates(familyId, quads(yellows, blues, earths, blacks)));
           templates.push(...buildTemplates(familyId, quads(yellows, greens, earths, blacks)));
         }
@@ -132,7 +147,7 @@ export const buildCandidateFamilies = (
           templates.push(...buildTemplates(familyId, triads(yellows, greens, earths)));
         }
 
-        if (maxPaints >= 4 && earths.length > 0) {
+        if (allowDarkFourPaint && earths.length > 0 && blacks.length > 0) {
           templates.push(...buildTemplates(familyId, quads(yellows, blues, earths, blacks)));
           templates.push(...buildTemplates(familyId, quads(yellows, greens, earths, blacks)));
         }
@@ -168,13 +183,18 @@ export const buildCandidateFamilies = (
                 ...pair(yellows, blues),
                 ...pair(yellows, greens),
               ]
-            : profile.hueFamily === 'orange'
-              ? pair(yellows, reds)
-              : profile.hueFamily === 'violet'
-                ? [...pair(blues, reds), ...pair(blues, violets)]
-                : profile.hueFamily === 'blue'
-                  ? pair(blues, earths.length > 0 ? earths : whites)
-                  : pair(chromatics, whites.length > 0 ? whites : earths);
+            : profile.hueFamily === 'yellow' && profile.isNearBoundary
+              ? [
+                  ...pair(yellows, blues),
+                  ...pair(yellows, greens),
+                ]
+              : profile.hueFamily === 'orange'
+                ? pair(yellows, reds)
+                : profile.hueFamily === 'violet'
+                  ? [...pair(blues, reds), ...pair(blues, violets)]
+                  : profile.hueFamily === 'blue'
+                    ? pair(blues, earths.length > 0 ? earths : whites)
+                    : pair(chromatics, whites.length > 0 ? whites : earths);
 
         templates.push(...buildTemplates(familyId, anchors));
         break;
