@@ -2,7 +2,7 @@ import type { Paint, RankedRecipe, UserSettings } from '../../../types/models';
 import { analyzeColor } from '../colorAnalysis';
 import { formatRatio } from '../../utils/ratio';
 import { buildCandidateFamilies } from './buildCandidateFamilies';
-import { analyzeTargetProfile } from './analyzeTargetProfile';
+import { analyzeTargetProfile } from '../analyzeTargetProfile';
 import { generateRatioLattice } from './generateRatioLattice';
 import { rejectImplausibleCandidate } from './rejectImplausibleCandidates';
 import { evaluateCandidate } from './evaluateCandidates';
