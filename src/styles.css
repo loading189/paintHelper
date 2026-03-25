@@ -2430,7 +2430,6 @@ summary:focus-visible {
   padding: 0.58rem;
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
   gap: 0.45rem;
 }
 
