@@ -22,6 +22,8 @@ import { normalizeHex } from '../color/colorMath';
 import { defaultSettings, starterPaints } from './seedData';
 import { createId } from '../utils/id';
 
+// Editable user/session draft state only (projects, current painting workflow, UI choices).
+// Locked mixer configurations live in configRegistry.ts under a separate storage key.
 const STORAGE_KEY = 'paint-mix-matcher-state';
 
 const rankingModes: RankingMode[] = [

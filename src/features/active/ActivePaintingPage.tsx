@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '../../components/Card';
 import { solveColorTarget } from '../../lib/color/solvePipeline';
 import { createId } from '../../lib/utils/id';
 import type { Paint, PaintingSession, RankedRecipe, UserSettings } from '../../types/models';
-import { FloatingColorWheel, type FloatingWheelPosition, type WheelColorNode, type WheelMode } from './FloatingColorWheel';
+import {
+  FloatingColorWheel,
+  type FloatingWheelPosition,
+  type WheelColorNode,
+  type WheelMode,
+} from './FloatingColorWheel';
 import { RecipePanel } from './RecipePanel';
 import { UsedColorsTray, type UsedTrayColor } from './UsedColorsTray';
 import { WorkspaceImagePanel } from './WorkspaceImagePanel';
 import {
-  fitViewport,
   isNearHex,
   toPainterValue,
   type DisplayMode,
@@ -50,9 +54,7 @@ export const ActivePaintingPage = ({
   session,
   paints,
   settings,
-  onSessionChange,
 }: ActivePaintingPageProps) => {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedColor, setSelectedColor] = useState<SelectedColor | null>(null);
   const [wheelMode, setWheelMode] = useState<WheelMode>('painting');
   const [wheelExpanded, setWheelExpanded] = useState(false);
@@ -132,41 +134,10 @@ export const ActivePaintingPage = ({
     });
   };
 
-  const updateSession = (patch: Partial<PaintingSession>) => {
-    if (!session) return;
-    onSessionChange({
-      ...session,
-      ...patch,
-      updatedAt: new Date().toISOString(),
-    });
-  };
-
-  const handleUpload = async (file: File | undefined) => {
-    if (!file || !session) return;
-
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-
-    updateSession({
-      referenceImage: {
-        id: createId('reference-image'),
-        name: file.name,
-        mimeType: file.type,
-        dataUrl,
-        addedAt: new Date().toISOString(),
-      },
-    });
-  };
-
   return (
     <div className="paint-cockpit-layout">
       <section className="paint-cockpit-main">
         <Card className="paint-cockpit-stage-card">
-
           <div className="paint-cockpit-stage">
             <WorkspaceImagePanel
               image={session.referenceImage}
@@ -236,6 +207,9 @@ export const ActivePaintingPage = ({
             source: 'used-tray',
             label: entry.label,
           })
+        }
+        onDelete={(colorId) =>
+          setUsedColors((prev) => prev.filter((entry) => entry.id !== colorId))
         }
       />
     </div>

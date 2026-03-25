@@ -2629,15 +2629,26 @@ summary:focus-visible {
 .paint-used-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   background: rgba(19, 24, 34, 0.85);
   color: var(--text-body);
-  padding: 0.26rem 0.55rem 0.26rem 0.3rem;
+  padding: 0.2rem 0.24rem 0.2rem 0.24rem;
   font-size: 0.72rem;
   white-space: nowrap;
   animation: chip-slide-in 240ms ease-out;
+}
+
+.paint-used-chip__select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  padding: 0.06rem 0.36rem 0.06rem 0.06rem;
+  cursor: pointer;
 }
 
 .paint-used-chip.active {
@@ -2650,6 +2661,24 @@ summary:focus-visible {
   height: 16px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.paint-used-chip__delete {
+  border: 0;
+  border-radius: 999px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 0.45rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(231, 213, 227, 0.85);
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.paint-used-chip__delete.is-armed {
+  background: rgba(183, 87, 118, 0.22);
+  color: #ffdfe7;
 }
 
 .workspace-stage-hud {

@@ -671,9 +671,10 @@
 /* Stage 2 sidebar attachment fix */
 .stageTwoLayout {
   position: relative;
+  isolation: isolate;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
-  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 27vw, 360px);
+  gap: clamp(1rem, 2vw, 1.8rem);
   align-items: stretch;
   min-height: 0;
 }
@@ -685,15 +686,18 @@
   display: grid;
   gap: 0.75rem;
   align-items: center;
+  overflow: hidden;
+  padding-right: 0.8rem;
 }
 
 .stageTwoSide {
   position: relative;
-  z-index: 20;
+  z-index: 30;
   display: flex;
   align-items: stretch;
-  justify-content: center;
+  justify-content: flex-end;
   min-height: 100%;
+  padding-left: 0.35rem;
 }
 
 .circleCluster {
@@ -790,10 +794,11 @@
 
 .arcLayer {
   position: absolute;
-  inset: -7rem -2.25rem -3rem -7rem;
+  inset: -6.5rem 1.5rem -3rem -6.75rem;
   pointer-events: none;
   z-index: 4;
-  overflow: visible;
+  overflow: hidden;
+  border-radius: 2rem;
 }
 
 .arcPaint {
@@ -895,6 +900,14 @@
   min-height: 100%;
   border-radius: 1.8rem;
   padding: 1rem;
+  background:
+    linear-gradient(180deg, rgba(28, 20, 40, 0.82), rgba(22, 16, 33, 0.9)),
+    radial-gradient(circle at top, rgba(243, 144, 223, 0.16), transparent 56%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.06),
+    0 18px 38px rgba(0, 0, 0, 0.24),
+    -12px 0 34px rgba(187, 132, 255, 0.08);
 }
 
 .sideTuningTop {
@@ -1145,8 +1158,14 @@
     grid-template-columns: 1fr;
   }
 
+  .stageTwoCenter {
+    overflow: visible;
+    padding-right: 0;
+  }
+
   .stageTwoSide {
     width: 100%;
+    padding-left: 0;
   }
 
   .sideTuningPanel,

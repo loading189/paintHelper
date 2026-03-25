@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import MixerPage  from '../features/mixer/MixerPage';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import MixerPage from '../features/mixer/MixerPage';
 import { ActivePaintingPage } from '../features/active/ActivePaintingPage';
 import { PaintsPage } from '../features/paints/PaintsPage';
 import { SessionsPage } from '../features/sessions/SessionsPage';
 import { loadAppState, saveAppState } from '../lib/storage/localState';
 import { createPaintingSession, createStarterSessionState, prepareSessionForPainting } from '../features/sessions/sessionState';
-import type { MixRecipe, Paint, RankedRecipe, UserSettings, WorkspaceView } from '../types/models';
+import { createLockedConfigDraft, saveLockedConfiguration } from '../lib/storage/configRegistry';
+import type { Paint, WorkspaceView } from '../types/models';
 import { createId } from '../lib/utils/id';
 
 const navItems: Array<{ id: WorkspaceView; label: string }> = [
@@ -20,6 +21,7 @@ const App = () => {
   const [state, setState] = useState(loadAppState);
   const [saveMessage, setSaveMessage] = useState('');
   const [isPreparingSave, setIsPreparingSave] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     saveAppState(state);
@@ -51,59 +53,6 @@ const App = () => {
     });
   };
 
-  const saveRecipe = (recipe: RankedRecipe, targetHex: string) => {
-    const saved: MixRecipe = {
-      id: createId('recipe'),
-      targetHex,
-      predictedHex: recipe.predictedHex,
-      distanceScore: recipe.distanceScore,
-      components: recipe.components,
-      createdAt: new Date().toISOString(),
-      savedName: `Match ${targetHex}`,
-      notes: '',
-      rankingMode: state.settings.rankingMode ?? "spectral-first",
-      qualityLabel: recipe.qualityLabel,
-      guidanceText: recipe.guidanceText,
-      nextAdjustments: recipe.nextAdjustments,
-      detailedAdjustments: recipe.detailedAdjustments,
-      scoreBreakdown: recipe.scoreBreakdown,
-      exactParts: recipe.exactParts,
-      exactPercentages: recipe.exactPercentages,
-      exactRatioText: recipe.exactRatioText,
-      practicalParts: recipe.practicalParts,
-      practicalPercentages: recipe.practicalPercentages,
-      practicalRatioText: recipe.practicalRatioText,
-      recipeText: recipe.recipeText,
-      mixPath: recipe.mixPath,
-      stabilityWarnings: recipe.stabilityWarnings,
-      roleNotes: recipe.roleNotes,
-      achievability:
-        'headline' in recipe.achievability
-          ? recipe.achievability
-          : {
-              level: 'workable',
-              headline: recipe.achievability.summary,
-              detail: recipe.achievability.detail,
-            },
-      layeringSuggestion: recipe.layeringSuggestion,
-    };
-
-    setState((c) => ({ ...c, recipes: [saved, ...c.recipes] }));
-  };
-
-  const setSettings = (settings: UserSettings) =>
-    setState((c) => ({ ...c, settings }));
-
-  const addRecentColor = (hex: string) => {
-    setState((current) => ({
-      ...current,
-      recentTargetColors: [
-        { hex, usedAt: new Date().toISOString() },
-        ...current.recentTargetColors.filter((entry) => entry.hex !== hex),
-      ].slice(0, 8),
-    }));
-  };
-
   const createProject = () => {
     setState((current) =>
       createStarterSessionState(current, `Painting ${current.sessions.length + 1}`),
@@ -133,26 +82,56 @@ const App = () => {
 
     updateSession(prepared);
 
+    // Locked config registry is intentionally separate from editable app/session state.
+    // Browser-only mode stores immutable-ish versions in localStorage and supports export/import.
+    const lockedDraft = createLockedConfigDraft({
+      configName: `${prepared.title} mixer config`,
+      paints: state.paints,
+      settings: state.settings,
+    });
+    saveLockedConfiguration(lockedDraft, 'new-version');
+
     setTimeout(() => {
       setIsPreparingSave(false);
       setSaveMessage('Ready for Paint');
     }, 300);
   };
 
+  const handleHeaderUpload = async (file: File | undefined) => {
+    if (!file || !currentSession) {
+      return;
+    }
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+    updateSession({
+      ...currentSession,
+      referenceImage: {
+        id: createId('reference-image'),
+        name: file.name,
+        mimeType: file.type,
+        dataUrl,
+        addedAt: new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   return (
     <div className="studio-app-shell">
-      {/* BACKGROUND */}
       <div className="studio-bg" />
 
-      {/* HEADER */}
       <header className="studio-header">
-        {/* LEFT */}
         <div className="studio-brand">
           <div className="studio-dot" />
           <span>Paint Mix Matcher</span>
         </div>
 
-        {/* CENTER NAV */}
         <nav className="studio-nav">
           {navItems.map((item) => (
             <button
@@ -167,7 +146,6 @@ const App = () => {
           ))}
         </nav>
 
-        {/* RIGHT */}
         <div className="studio-actions">
           {currentSession ? (
             <>
@@ -182,6 +160,25 @@ const App = () => {
                   })
                 }
               />
+
+              {view === 'paint' ? (
+                <>
+                  <button
+                    className="studio-button studio-button-secondary"
+                    type="button"
+                    onClick={() => uploadInputRef.current?.click()}
+                  >
+                    Upload
+                  </button>
+                  <input
+                    ref={uploadInputRef}
+                    className="hidden"
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => void handleHeaderUpload(event.target.files?.[0])}
+                  />
+                </>
+              ) : null}
 
               <button
                 className="studio-save-btn"
@@ -211,7 +208,6 @@ const App = () => {
         </div>
       </header>
 
-      {/* MAIN */}
       <main className="studio-main">
         {view === 'paint' && (
           <ActivePaintingPage
@@ -222,16 +218,7 @@ const App = () => {
           />
         )}
 
-        {view === 'mixer' && (
-          <MixerPage
-            paints={state.paints}
-            settings={state.settings}
-            recentColors={state.recentTargetColors.map((c) => c.hex)}
-            onSettingsChange={setSettings}
-            onRecentColor={addRecentColor}
-            onSaveRecipe={saveRecipe}
-          />
-        )}
+        {view === 'mixer' && <MixerPage />}
 
         {view === 'projects' && (
           <SessionsPage
