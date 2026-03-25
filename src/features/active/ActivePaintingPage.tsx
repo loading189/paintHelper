@@ -138,10 +138,6 @@ export const ActivePaintingPage = ({
       <section className="paint-cockpit-main">
         <Card className="paint-cockpit-stage-card">
           <div className="paint-cockpit-stage-header">
-            <div>
-              <p className="studio-kicker">Living painting cockpit</p>
-              <h2 className="paint-cockpit-title">Pick color → get recipe → mark used</h2>
-            </div>
             <div className="paint-cockpit-actions-row">
               <button className="studio-button studio-button-secondary" onClick={onReopenInPrep}>Open Prep</button>
               <button
