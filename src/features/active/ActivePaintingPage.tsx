@@ -11,6 +11,8 @@ import {
   fitViewport,
   isNearHex,
   toPainterValue,
+  type DisplayMode,
+  type GuideMode,
   type ViewportState,
   type VisibleColorCluster,
 } from './workspaceUtils';
@@ -58,6 +60,8 @@ export const ActivePaintingPage = ({
   const [wheelPosition, setWheelPosition] = useState<FloatingWheelPosition>({ x: 48, y: 90 });
   const [usedColors, setUsedColors] = useState<UsedColor[]>([]);
   const [viewport, setViewport] = useState<ViewportState | null>(null);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('color');
+  const [guideMode, setGuideMode] = useState<GuideMode>('quadrants');
   const [visibleColors, setVisibleColors] = useState<VisibleColorCluster[]>([]);
   const [paintingDominants, setPaintingDominants] = useState<VisibleColorCluster[]>([]);
   const [currentRecipe, setCurrentRecipe] = useState<RankedRecipe | null>(null);
@@ -176,8 +180,12 @@ export const ActivePaintingPage = ({
           <div className="paint-cockpit-stage">
             <WorkspaceImagePanel
               image={session.referenceImage}
+              displayMode={displayMode}
+              guideMode={guideMode}
               viewport={viewport}
               onViewportChange={setViewport}
+              onDisplayModeChange={setDisplayMode}
+              onGuideModeChange={setGuideMode}
               onVisibleColorsChange={setVisibleColors}
               onPaintingDominantsChange={setPaintingDominants}
               onSample={({ hex, value, point }) =>

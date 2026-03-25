@@ -30,6 +30,8 @@ type Props = {
   image?: ReferenceImageMeta;
   displayMode?: DisplayMode;
   guideMode?: GuideMode;
+  onDisplayModeChange?: (mode: DisplayMode) => void;
+  onGuideModeChange?: (mode: GuideMode) => void;
   sampleRadius?: number;
   visibleLimit?: number;
   pinnedHexes?: Set<string>;
@@ -41,12 +43,24 @@ type Props = {
   onHover?: (hover: HoverInfo | null) => void;
 };
 
-const formatDisplayMode = (mode: DisplayMode) => mode.replace(/-/g, ' ');
+const displayModes: Array<{ value: DisplayMode; label: string }> = [
+  { value: 'color', label: 'Color' },
+  { value: 'grayscale', label: 'Value' },
+  { value: 'high-contrast-grayscale', label: 'Contrast' },
+];
+
+const guideModes: Array<{ value: GuideMode; label: string }> = [
+  { value: 'off', label: 'Guides Off' },
+  { value: 'quadrants', label: 'Quadrants' },
+  { value: 'grid-3', label: '3×3 Grid' },
+];
 
 export const WorkspaceImagePanel = ({
   image,
   displayMode = 'color',
   guideMode = 'off',
+  onDisplayModeChange,
+  onGuideModeChange,
   sampleRadius = 2,
   visibleLimit = 10,
   pinnedHexes,
@@ -194,21 +208,22 @@ export const WorkspaceImagePanel = ({
 
   const guides = useMemo(() => {
     if (!viewport || guideMode === 'off') {
-      return [] as Array<{ x1: number; y1: number; x2: number; y2: number }>;
+      return [] as Array<{ x1: number; y1: number; x2: number; y2: number; major: boolean }>;
     }
 
-    const lines: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+    const lines: Array<{ x1: number; y1: number; x2: number; y2: number; major: boolean }> = [];
     const divisions = guideMode === 'quadrants' ? 2 : guideMode === 'grid-3' ? 3 : 4;
 
     for (let i = 1; i < divisions; i += 1) {
       const ratio = i / divisions;
       const vStart = imageToScreenPoint({ x: viewport.imageWidth * ratio, y: 0 }, viewport);
       const vEnd = imageToScreenPoint({ x: viewport.imageWidth * ratio, y: viewport.imageHeight }, viewport);
-      lines.push({ x1: vStart.x, y1: vStart.y, x2: vEnd.x, y2: vEnd.y });
+      const major = Math.abs(ratio - 0.5) < 0.001;
+      lines.push({ x1: vStart.x, y1: vStart.y, x2: vEnd.x, y2: vEnd.y, major });
 
       const hStart = imageToScreenPoint({ x: 0, y: viewport.imageHeight * ratio }, viewport);
       const hEnd = imageToScreenPoint({ x: viewport.imageWidth, y: viewport.imageHeight * ratio }, viewport);
-      lines.push({ x1: hStart.x, y1: hStart.y, x2: hEnd.x, y2: hEnd.y });
+      lines.push({ x1: hStart.x, y1: hStart.y, x2: hEnd.x, y2: hEnd.y, major });
     }
 
     return lines;
@@ -315,9 +330,9 @@ export const WorkspaceImagePanel = ({
               y1={line.y1}
               x2={line.x2}
               y2={line.y2}
-              stroke="rgba(255,255,255,0.26)"
-              strokeWidth={1}
-              strokeDasharray={guideMode === 'quadrants' ? '0' : '5 7'}
+              stroke={line.major ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.3)'}
+              strokeWidth={line.major ? 1.3 : 1}
+              strokeDasharray={guideMode === 'quadrants' ? '0' : line.major ? '0' : '5 8'}
             />
           ))}
 
@@ -331,9 +346,35 @@ export const WorkspaceImagePanel = ({
       ) : null}
 
       <div className="workspace-stage-hud workspace-stage-hud--top">
-        <div className="workspace-stage-pill">
-          <span className="workspace-stage-pill__label">Mode</span>
-          <span className="workspace-stage-pill__value">{formatDisplayMode(displayMode)}</span>
+        <div className="workspace-stage-control-group">
+          <span className="workspace-stage-control-label">Filter</span>
+          <div className="workspace-stage-segmented">
+            {displayModes.map((entry) => (
+              <button
+                key={entry.value}
+                className={`workspace-stage-segment ${displayMode === entry.value ? 'active' : ''}`}
+                onClick={() => onDisplayModeChange?.(entry.value)}
+                type="button"
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="workspace-stage-control-group">
+          <span className="workspace-stage-control-label">Guides</span>
+          <div className="workspace-stage-segmented">
+            {guideModes.map((entry) => (
+              <button
+                key={entry.value}
+                className={`workspace-stage-segment ${guideMode === entry.value ? 'active' : ''}`}
+                onClick={() => onGuideModeChange?.(entry.value)}
+                type="button"
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
         </div>
         {viewport ? (
           <div className="workspace-stage-pill">

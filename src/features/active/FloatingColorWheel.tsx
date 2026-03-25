@@ -42,12 +42,16 @@ export const FloatingColorWheel = ({
 }: Props) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+  const dragDistanceRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     const onMoveDoc = (event: MouseEvent) => {
       if (!dragRef.current) return;
-      setIsDragging(true);
+      dragDistanceRef.current += Math.abs(event.movementX) + Math.abs(event.movementY);
+      if (dragDistanceRef.current > 3) {
+        setIsDragging(true);
+      }
       onMove({
         x: Math.max(12, event.clientX - dragRef.current.dx),
         y: Math.max(12, event.clientY - dragRef.current.dy),
@@ -56,6 +60,7 @@ export const FloatingColorWheel = ({
 
     const onUp = () => {
       dragRef.current = null;
+      dragDistanceRef.current = 0;
       setTimeout(() => setIsDragging(false), 0);
     };
 
@@ -86,6 +91,7 @@ export const FloatingColorWheel = ({
             dx: event.clientX - rect.left,
             dy: event.clientY - rect.top,
           };
+          dragDistanceRef.current = 0;
         }}
         onClick={() => {
           if (isDragging) return;
@@ -113,21 +119,23 @@ export const FloatingColorWheel = ({
           <div className="floating-wheel-ring">
             {ringNodes.map((node, index) => {
               const angle = (Math.PI * 2 * index) / Math.max(1, ringNodes.length) - Math.PI / 2;
-              const radius = 76;
+              const radius = 98;
               const x = Math.cos(angle) * radius;
               const y = Math.sin(angle) * radius;
-              const size = 18 + Math.round((node.weight ?? 0.08) * 34);
+              const visualSize = 36 + Math.round((node.weight ?? 0.08) * 10);
+              const hitSize = Math.max(46, visualSize + 8);
 
               return (
                 <button
                   key={node.id}
                   className={`floating-wheel-node ${selectedHex === node.hex ? 'active' : ''}`}
                   style={{
-                    backgroundColor: node.hex,
-                    width: size,
-                    height: size,
+                    '--node-color': node.hex,
+                    '--node-visual-size': `${visualSize}px`,
+                    width: hitSize,
+                    height: hitSize,
                     transform: `translate(${x}px, ${y}px)`,
-                  }}
+                  } as CSSProperties}
                   title={`${node.label ?? node.hex} · V${node.value}`}
                   onClick={() => onSelectColor(node)}
                 />
