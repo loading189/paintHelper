@@ -2345,14 +2345,15 @@ summary:focus-visible {
 .workspace-image-shell {
   position: relative;
   width: 100%;
-  min-height: 560px;
+  min-height: 100%;
+  height: 100%;
   border-radius: 14px;
   overflow: hidden;
   background: #090d13;
 }
 .workspace-image-canvas {
   width: 100%;
-  height: 560px;
+  height: 100%;
   display: block;
   cursor: crosshair;
 }
@@ -2408,39 +2409,41 @@ summary:focus-visible {
 @media (max-width: 1200px) {
   .paint-workspace-helper { grid-template-columns: 1fr; }
   .workspace-image-shell { min-height: 460px; }
-  .workspace-image-canvas { height: 460px; }
+  .workspace-image-canvas { min-height: 460px; }
 }
 
 .paint-cockpit-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 340px);
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
   grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas:
     'stage recipe'
     'tray tray';
-  gap: 0.95rem;
-  min-height: calc(100vh - 130px);
+  gap: 0.7rem;
+  min-height: calc(100vh - 102px);
 }
 
 .paint-cockpit-main { grid-area: stage; min-width: 0; }
-.paint-cockpit-right-rail { grid-area: recipe; padding: 0.8rem; }
+.paint-cockpit-right-rail { grid-area: recipe; padding: 0.68rem; }
 
 .paint-cockpit-stage-card {
-  padding: 0.8rem;
+  padding: 0.58rem;
   height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.45rem;
 }
 
 .paint-cockpit-stage-header {
   display: flex;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.55rem;
   align-items: flex-start;
-  margin-bottom: 0.7rem;
 }
 
 .paint-cockpit-title {
-  margin: 0.2rem 0 0;
-  font-size: 1.02rem;
+  margin: 0.12rem 0 0;
+  font-size: 0.95rem;
   color: var(--text-strong);
 }
 
@@ -2452,7 +2455,8 @@ summary:focus-visible {
 
 .paint-cockpit-stage {
   position: relative;
-  min-height: 70vh;
+  min-height: 0;
+  height: 100%;
 }
 
 .floating-wheel {
@@ -2470,7 +2474,12 @@ summary:focus-visible {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.46);
   display: grid;
   place-items: center;
-  animation: wheel-breathe 2.8s ease-in-out infinite;
+  animation: wheel-breathe 3.4s ease-in-out infinite;
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.floating-wheel-orb:hover {
+  transform: translateY(-1px) scale(1.03);
 }
 
 .floating-wheel-orb.has-color {
@@ -2488,15 +2497,15 @@ summary:focus-visible {
 .floating-wheel-panel {
   position: absolute;
   top: 68px;
-  left: -72px;
-  width: 210px;
-  padding: 0.65rem;
+  left: -114px;
+  width: 292px;
+  padding: 0.72rem;
   border-radius: 16px;
   background: rgba(11, 15, 22, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.11);
   backdrop-filter: blur(12px);
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42);
-  animation: wheel-bloom 190ms ease-out;
+  animation: wheel-bloom 240ms cubic-bezier(0.2, 0.85, 0.22, 1);
 }
 
 .floating-wheel-modes { display: flex; gap: 0.3rem; margin-bottom: 0.55rem; }
@@ -2516,7 +2525,7 @@ summary:focus-visible {
 
 .floating-wheel-ring {
   position: relative;
-  height: 180px;
+  height: 244px;
   display: grid;
   place-items: center;
 }
@@ -2525,15 +2534,40 @@ summary:focus-visible {
   position: absolute;
   left: 50%;
   top: 50%;
-  margin-left: -10px;
-  margin-top: -10px;
+  margin-left: -23px;
+  margin-top: -23px;
+  background: transparent;
+  border: none;
+  display: grid;
+  place-items: center;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  padding: 0;
+  transition: transform 180ms ease, filter 180ms ease;
 }
 
-.floating-wheel-node:hover { transform: scale(1.08) !important; }
-.floating-wheel-node.active { border-color: rgba(255, 255, 255, 0.95); box-shadow: 0 0 0 2px rgba(10, 13, 18, 0.85), 0 0 18px rgba(255, 255, 255, 0.24); }
+.floating-wheel-node::before {
+  content: '';
+  width: var(--node-visual-size, 40px);
+  height: var(--node-visual-size, 40px);
+  border-radius: 999px;
+  border: 1.2px solid rgba(255, 255, 255, 0.35);
+  background: var(--node-color, #8ea2bb);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.46);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.floating-wheel-node:hover::before {
+  transform: scale(1.08);
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.52);
+}
+
+.floating-wheel-node.active::before {
+  border-color: rgba(255, 255, 255, 0.97);
+  box-shadow:
+    0 0 0 3px rgba(8, 11, 18, 0.9),
+    0 0 0 5px color-mix(in srgb, var(--node-color, #a9b8d6) 78%, white),
+    0 0 26px color-mix(in srgb, var(--node-color, #a9b8d6) 40%, transparent);
+}
 
 .paint-cockpit-recipe-panel { display: grid; gap: 0.8rem; }
 .paint-cockpit-target {
@@ -2543,6 +2577,7 @@ summary:focus-visible {
   padding: 0.55rem;
   border-radius: 12px;
   background: rgba(13, 18, 25, 0.88);
+  transition: background-color 180ms ease, border-color 180ms ease;
 }
 .paint-cockpit-target__swatch {
   width: 52px;
@@ -2574,7 +2609,7 @@ summary:focus-visible {
   grid-area: tray;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
-  padding: 0.6rem 0.7rem;
+  padding: 0.45rem 0.65rem;
   background: linear-gradient(180deg, rgba(13, 18, 24, 0.9), rgba(10, 13, 19, 0.84));
 }
 
@@ -2603,7 +2638,7 @@ summary:focus-visible {
   padding: 0.26rem 0.55rem 0.26rem 0.3rem;
   font-size: 0.72rem;
   white-space: nowrap;
-  animation: chip-slide-in 220ms ease-out;
+  animation: chip-slide-in 240ms ease-out;
 }
 
 .paint-used-chip.active {
@@ -2616,6 +2651,86 @@ summary:focus-visible {
   height: 16px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.workspace-stage-hud {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  pointer-events: none;
+}
+
+.workspace-stage-hud--top {
+  top: 10px;
+  left: 10px;
+  right: 10px;
+}
+
+.workspace-stage-pill,
+.workspace-stage-control-group {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 16, 24, 0.78);
+  backdrop-filter: blur(8px);
+  min-height: 32px;
+  padding: 0.2rem 0.32rem;
+}
+
+.workspace-stage-pill {
+  color: var(--text-muted);
+  padding: 0.22rem 0.52rem;
+}
+
+.workspace-stage-pill__label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.workspace-stage-pill__value {
+  color: var(--text-body);
+  font-size: 0.72rem;
+}
+
+.workspace-stage-control-label {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-left: 0.25rem;
+}
+
+.workspace-stage-segmented {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.workspace-stage-segment {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: transparent;
+  padding: 0.2rem 0.48rem;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.workspace-stage-segment:hover {
+  color: var(--text-body);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.workspace-stage-segment.active {
+  color: var(--text-strong);
+  border-color: rgba(157, 190, 247, 0.62);
+  background: rgba(120, 149, 209, 0.24);
 }
 
 @keyframes wheel-breathe {
