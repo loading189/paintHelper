@@ -2,6 +2,7 @@ import type { Paint } from '../../../types/models';
 import type { ColorAnalysis } from '../../../types/models';
 import type { CandidateTemplate, EvaluatedCandidate, TargetProfile } from './types';
 import { evaluateCandidate } from './evaluateCandidates';
+import type { InverseSearchCalibration } from '../developerCalibration';
 
 const mutate = (weights: number[], index: number, delta: number): number[] => {
   const next = [...weights];
@@ -34,6 +35,7 @@ export const refineCandidates = (
   targetAnalysis: ColorAnalysis,
   rankingMode: 'spectral-first',
   profile: TargetProfile,
+  tuning: InverseSearchCalibration,
 ): EvaluatedCandidate[] => {
   const paintsById = new Map(paints.map((paint) => [paint.id, paint]));
   const byFamily = new Map(
@@ -80,7 +82,8 @@ export const refineCandidates = (
             targetHex,
             targetAnalysis,
             rankingMode,
-            profile
+            profile,
+            tuning
           );
 
           if (evaluated && evaluated.structure.paintCount <= 4) {
@@ -136,7 +139,8 @@ export const refineCandidates = (
               targetHex,
               targetAnalysis,
               rankingMode,
-              profile
+              profile,
+              tuning
             );
 
             if (evaluated && evaluated.structure.paintCount <= 4) {

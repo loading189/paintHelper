@@ -125,7 +125,8 @@ export const solveTarget = (
         targetHex,
         targetAnalysis,
         'spectral-first',
-        profile
+        profile,
+        config.inverseTuning
       );
 
       if (evaluated) {
@@ -134,16 +135,17 @@ export const solveTarget = (
     });
   });
 
-  const familyBeam = beamByFamily(firstPass, 8);
+  const familyBeam = beamByFamily(firstPass, config.inverseTuning.global.familyBeamWidth);
   const refined = refineCandidates(
     familyBeam,
     enabledPaints,
     targetHex,
     targetAnalysis,
     'spectral-first',
-    profile
+    profile,
+    config.inverseTuning
   );
-  const deduped = dedupePredictedBasins(refined);
+  const deduped = dedupePredictedBasins(refined, config.inverseTuning.global.dedupeBasinThreshold);
   const ranked = rankCandidates(deduped);
   const top = ranked.slice(0, Math.max(limit * 3, limit));
 
@@ -171,7 +173,7 @@ export const solveTarget = (
       .join(' + '),
     scoreBreakdown: candidate.scoreBreakdown,
     qualityLabel:
-      candidate.scoreBreakdown.spectralDistance < 0.18
+      candidate.scoreBreakdown.spectralDistance < config.inverseTuning.global.excellentMatchThreshold
         ? 'Excellent spectral starting point'
         : 'Strong starting point',
     badges: [],
@@ -185,9 +187,9 @@ export const solveTarget = (
     mixPath: [],
     achievability: {
       level:
-        candidate.scoreBreakdown.spectralDistance < 0.18
+        candidate.scoreBreakdown.spectralDistance < config.inverseTuning.global.excellentMatchThreshold
           ? 'strong'
-          : candidate.scoreBreakdown.spectralDistance < 0.34
+          : candidate.scoreBreakdown.spectralDistance < config.inverseTuning.global.workableMatchThreshold
             ? 'workable'
             : 'limited',
       headline: 'Spectral achievability estimate',

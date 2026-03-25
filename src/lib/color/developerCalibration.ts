@@ -32,6 +32,16 @@ export type InverseSearchCalibration = {
     darkRatioFamiliesEnabled: boolean;
     neighborhoodRadius: number;
   };
+  global: {
+    familyBeamWidth: number;
+    dedupeBasinThreshold: number;
+    excellentMatchThreshold: number;
+    workableMatchThreshold: number;
+    practicalRatioHardMaxParts: number;
+    practicalRatioIdealMaxParts2: number;
+    practicalRatioIdealMaxParts3: number;
+    practicalRatioIdealMaxParts4: number;
+  };
 };
 
 export type PaintForwardCalibration = {
@@ -48,18 +58,11 @@ export type ForwardPigmentCalibration = {
 };
 
 export type DeveloperCalibration = {
-  /**
-   * INVERSE knobs only affect target -> candidate generation -> ranking.
-   * They must never alter a recipe's predicted swatch after forward mixing.
-   */
   inverseSearch: InverseSearchCalibration;
-  /**
-   * FORWARD calibration only affects recipe -> predicted.
-   * No target data may be read here, and no target may directly modify the
-   * predicted swatch after mixing.
-   */
   forwardPigments: ForwardPigmentCalibration;
 };
+
+const STORAGE_KEY = 'paint-mix-developer-calibration';
 
 const defaultPerPaintForwardCalibration: ForwardPigmentCalibration['paints'] = {
   'paint-mars-black': { tintingStrength: 1.08, darknessBias: 0.03, chromaBias: -0.08, earthStrengthBias: 0, whiteLiftBias: 0 },
@@ -91,6 +94,16 @@ export const defaultDeveloperCalibration: DeveloperCalibration = {
     neutrals: { balancePenalty: 2.4 },
     greenTargets: { requireEarthForDarkNatural: true, vividOffHuePenalty: 0.22 },
     ratioSearch: { maxComponents: 3, darkRatioFamiliesEnabled: true, neighborhoodRadius: 2 },
+    global: {
+      familyBeamWidth: 8,
+      dedupeBasinThreshold: 0.01,
+      excellentMatchThreshold: 0.18,
+      workableMatchThreshold: 0.34,
+      practicalRatioHardMaxParts: 12,
+      practicalRatioIdealMaxParts2: 8,
+      practicalRatioIdealMaxParts3: 9,
+      practicalRatioIdealMaxParts4: 10,
+    },
   },
   forwardPigments: {
     paints: defaultPerPaintForwardCalibration,
@@ -99,12 +112,65 @@ export const defaultDeveloperCalibration: DeveloperCalibration = {
 
 const cloneCalibration = (calibration: DeveloperCalibration): DeveloperCalibration => JSON.parse(JSON.stringify(calibration)) as DeveloperCalibration;
 
+const listeners = new Set<(calibration: DeveloperCalibration) => void>();
+
+const notify = () => {
+  const snapshot = getDeveloperCalibration();
+  listeners.forEach((listener) => listener(snapshot));
+};
+
+const persistCalibration = (calibration: DeveloperCalibration) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(calibration));
+};
+
+const loadCalibration = (): DeveloperCalibration | null => {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as DeveloperCalibration;
+  } catch {
+    return null;
+  }
+};
+
 let currentDeveloperCalibration: DeveloperCalibration = cloneCalibration(defaultDeveloperCalibration);
+const fromStorage = loadCalibration();
+if (fromStorage) {
+  currentDeveloperCalibration = {
+    ...cloneCalibration(defaultDeveloperCalibration),
+    ...fromStorage,
+    inverseSearch: {
+      ...cloneCalibration(defaultDeveloperCalibration).inverseSearch,
+      ...fromStorage.inverseSearch,
+      global: {
+        ...cloneCalibration(defaultDeveloperCalibration).inverseSearch.global,
+        ...(fromStorage.inverseSearch?.global ?? {}),
+      },
+    },
+    forwardPigments: {
+      paints: {
+        ...cloneCalibration(defaultDeveloperCalibration).forwardPigments.paints,
+        ...(fromStorage.forwardPigments?.paints ?? {}),
+      },
+    },
+  };
+}
 
 export const getDeveloperCalibration = (): DeveloperCalibration => currentDeveloperCalibration;
 
+export const subscribeDeveloperCalibration = (listener: (calibration: DeveloperCalibration) => void): (() => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+
 export const resetDeveloperCalibration = (): DeveloperCalibration => {
   currentDeveloperCalibration = cloneCalibration(defaultDeveloperCalibration);
+  persistCalibration(currentDeveloperCalibration);
+  notify();
   return currentDeveloperCalibration;
 };
 
@@ -131,6 +197,8 @@ export const updateDeveloperCalibration = (patch: Partial<DeveloperCalibration>)
   }
 
   currentDeveloperCalibration = next;
+  persistCalibration(currentDeveloperCalibration);
+  notify();
   return currentDeveloperCalibration;
 };
 
