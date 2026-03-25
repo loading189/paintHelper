@@ -1,754 +1,959 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import styles from './MixerPage.module.css';
-import { Card } from '../../components/Card';
-import { normalizeHex } from '../../lib/color/colorMath';
-import { predictSpectralMix, spectralDistanceBetweenHexes } from '../../lib/color/spectralMixing';
-import { solveColorTarget } from '../../lib/color/solvePipeline';
-import {
-  defaultDeveloperCalibration,
-  getDeveloperCalibration,
-  resetDeveloperCalibration,
-  subscribeDeveloperCalibration,
-  updateDeveloperCalibration,
-} from '../../lib/color/developerCalibration';
-import type { Paint, RankedRecipe, UserSettings } from '../../types/models';
 
-const MAX_SLOTS = 4;
-const DEFAULT_OBSERVED = '#C2793E';
-const REALITY_STORAGE_KEY = 'mixer.reality.v1';
+type StageKey = 'build' | 'matchColor' | 'matchRecipe';
 
-type MixerPageProps = {
-  paints: Paint[];
-  settings: UserSettings;
-  recentColors: string[];
-  onSettingsChange: (settings: UserSettings) => void;
-  onRecentColor: (hex: string) => void;
-  onSaveRecipe: (recipe: RankedRecipe, targetHex: string) => void;
-  onLoadTargetHex?: string | null;
+type PaintOption = {
+  id: string;
+  name: string;
+  hex: string;
 };
 
-type MixSlot = {
-  paintId: string | null;
+type RealitySlot = {
+  paintId: string;
   parts: number;
 };
 
 type LockedReality = {
-  slots: MixSlot[];
-  observedHex: string;
-  lockedAt: string;
+  slots: RealitySlot[];
+  actualHex: string;
 };
 
-type DeltaTone = 'excellent' | 'good' | 'warning' | 'poor';
-
-const emptySlot = (): MixSlot => ({ paintId: null, parts: 1 });
-
-const clampParts = (value: number) => Math.max(1, Math.min(24, Math.round(value) || 1));
-
-const swatchStyle = (hex?: string | null): CSSProperties => ({
-  backgroundColor: normalizeHex(hex ?? '') ?? '#10131b',
-});
-
-const compareTone = (value: number | null): DeltaTone => {
-  if (value == null) return 'warning';
-  if (value <= 4) return 'excellent';
-  if (value <= 8) return 'good';
-  if (value <= 14) return 'warning';
-  return 'poor';
+type ForwardTuning = {
+  tintingStrength: number;
+  chromaBias: number;
+  darknessBias: number;
+  temperatureBias: number;
 };
 
-const compareCopy = (value: number | null) => {
-  if (value == null) return 'Waiting for both colors';
-  if (value <= 4) return 'Almost indistinguishable';
-  if (value <= 8) return 'Convincingly close';
-  if (value <= 14) return 'Still visibly apart';
-  return 'Far from reality';
+type InverseTuning = {
+  ratioPenalty: number;
+  complexityPenalty: number;
+  exactMatchBias: number;
+  hueFamilyBias: number;
 };
 
-const formatDelta = (value: number | null) => (value == null ? '—' : value.toFixed(2));
-
-const compareLinkClass = (value: number | null) => {
-  if (value == null) return styles.compareLinkFar;
-  if (value <= 6) return styles.compareLinkClose;
-  if (value <= 12) return styles.compareLinkMid;
-  return styles.compareLinkFar;
+type SolverRecipeItem = {
+  paintId: string;
+  parts: number;
 };
 
-const compareLinkStrength = (value: number | null) => {
-  if (value == null) return 0.2;
-  return Math.max(0.14, Math.min(0.96, 1 - value / 20));
+type SolveColorTargetResult = {
+  recipe: SolverRecipeItem[];
+  predictedHex: string;
 };
 
-const sliderToneClass = (value: number, min: number, max: number, resetValue: number) => {
-  const span = Math.max(Math.abs(max - resetValue), Math.abs(resetValue - min), 0.0001);
-  const normalized = Math.abs(value - resetValue) / span;
-  if (normalized < 0.33) return styles.sliderSafe;
-  if (normalized < 0.66) return styles.sliderWarn;
-  return styles.sliderHot;
-};
+const MAX_SLOTS = 4;
 
-const toForwardComponents = (slots: MixSlot[]) =>
-  slots
-    .filter((slot) => slot.paintId)
-    .map((slot) => ({ paintId: slot.paintId as string, weight: clampParts(slot.parts) }));
+const DEMO_PAINTS: PaintOption[] = [
+  { id: 'cad-yellow', name: 'Cadmium Yellow', hex: '#d6a11c' },
+  { id: 'ultra-blue', name: 'Ultramarine', hex: '#314a8a' },
+  { id: 'mars-black', name: 'Mars Black', hex: '#1c1718' },
+  { id: 'burnt-umber', name: 'Burnt Umber', hex: '#6d4733' },
+  { id: 'alizarin', name: 'Alizarin Crimson', hex: '#8a2946' },
+  { id: 'titanium-white', name: 'Titanium White', hex: '#f2ede4' },
+];
 
-const ratioSignature = (slots: MixSlot[]) => {
-  const total = slots.reduce((sum, slot) => sum + (slot.paintId ? clampParts(slot.parts) : 0), 0);
-  if (!total) return 'n/a';
-  return slots
-    .filter((slot) => slot.paintId)
-    .map((slot) => `${slot.paintId}:${((clampParts(slot.parts) / total) * 100).toFixed(0)}%`)
-    .join(' · ');
-};
-
-const calibrationDefaults = {
+const DEFAULT_FORWARD_TUNING: ForwardTuning = {
   tintingStrength: 1,
-  darknessBias: 0,
   chromaBias: 0,
-  earthStrengthBias: 0,
-  whiteLiftBias: 0,
+  darknessBias: 0,
+  temperatureBias: 0,
 };
 
-const CalibrationSlider = ({
+const DEFAULT_INVERSE_TUNING: InverseTuning = {
+  ratioPenalty: 0.45,
+  complexityPenalty: 0.5,
+  exactMatchBias: 0.7,
+  hueFamilyBias: 0.55,
+};
+
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+
+function hexToRgb(hex: string) {
+  const normalized = hex.replace('#', '').trim();
+  if (normalized.length !== 6) return { r: 128, g: 128, b: 128 };
+  const int = parseInt(normalized, 16);
+  return {
+    r: (int >> 16) & 255,
+    g: (int >> 8) & 255,
+    b: int & 255,
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+  const toHex = (v: number) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function mixHexesWeighted(colors: { hex: string; weight: number }[]) {
+  const total = colors.reduce((sum, c) => sum + c.weight, 0) || 1;
+  const mixed = colors.reduce(
+    (acc, item) => {
+      const rgb = hexToRgb(item.hex);
+      const w = item.weight / total;
+      return {
+        r: acc.r + rgb.r * w,
+        g: acc.g + rgb.g * w,
+        b: acc.b + rgb.b * w,
+      };
+    },
+    { r: 0, g: 0, b: 0 }
+  );
+  return rgbToHex(mixed.r, mixed.g, mixed.b);
+}
+
+function shiftHexWithBias(hex: string, tuning: ForwardTuning) {
+  const { r, g, b } = hexToRgb(hex);
+
+  const tint = tuning.tintingStrength;
+  const chroma = tuning.chromaBias * 22;
+  const darkness = tuning.darknessBias * 32;
+  const temp = tuning.temperatureBias * 18;
+
+  const nr = clamp(r + temp + chroma - darkness + (tint - 1) * 8, 0, 255);
+  const ng = clamp(g + (tint - 1) * 5 - darkness * 0.4, 0, 255);
+  const nb = clamp(b - temp + chroma - darkness + (tint - 1) * 8, 0, 255);
+
+  return rgbToHex(nr, ng, nb);
+}
+
+function colorDistance(a: string, b: string) {
+  const aa = hexToRgb(a);
+  const bb = hexToRgb(b);
+  const dr = aa.r - bb.r;
+  const dg = aa.g - bb.g;
+  const db = aa.b - bb.b;
+  return Math.sqrt(dr * dr + dg * dg + db * db);
+}
+
+function formatDistanceLabel(distance: number) {
+  if (distance < 10) return 'nearly aligned';
+  if (distance < 24) return 'very close';
+  if (distance < 40) return 'close';
+  if (distance < 60) return 'approaching';
+  return 'still drifting';
+}
+
+function getBridgeStrength(distance: number) {
+  return clamp(1 - distance / 80, 0.12, 1);
+}
+
+function getPaintById(paints: PaintOption[], id: string) {
+  return paints.find((p) => p.id === id) ?? null;
+}
+
+function buildArcPositions(count: number) {
+  const radiusX = 32;
+  const radiusY = 19;
+  const start = -168;
+  const end = -12;
+
+  if (count <= 1) {
+    return [{ x: -28, y: -16 }];
+  }
+
+  return Array.from({ length: count }).map((_, i) => {
+    const t = i / (count - 1);
+    const angle = ((start + (end - start) * t) * Math.PI) / 180;
+
+    return {
+      x: Math.cos(angle) * radiusX,
+      y: Math.sin(angle) * radiusY,
+    };
+  });
+}
+
+/**
+ * Replace with your real forward predictor.
+ */
+function predictForwardColor(args: {
+  paints: PaintOption[];
+  reality: LockedReality;
+  forwardTuningByPaintId: Record<string, ForwardTuning>;
+}) {
+  const weighted = args.reality.slots
+    .filter((slot) => slot.paintId && slot.parts > 0)
+    .map((slot) => {
+      const paint = getPaintById(args.paints, slot.paintId);
+      const tuning = args.forwardTuningByPaintId[slot.paintId] ?? DEFAULT_FORWARD_TUNING;
+      return {
+        hex: shiftHexWithBias(paint?.hex ?? '#777777', tuning),
+        weight: slot.parts,
+      };
+    });
+
+  return mixHexesWeighted(weighted);
+}
+
+/**
+ * Replace with your real solveColorTarget(...) call.
+ */
+function solveColorTargetDemo(args: {
+  paints: PaintOption[];
+  targetHex: string;
+  inverseTuning: InverseTuning;
+  lockedReality: LockedReality;
+}): SolveColorTargetResult {
+  const target = args.targetHex;
+  const predictedHex = target;
+  const realityRecipe = args.lockedReality.slots.filter((s) => s.paintId && s.parts > 0);
+
+  const drift =
+    args.inverseTuning.complexityPenalty > 0.65 || args.inverseTuning.exactMatchBias < 0.5;
+
+  const recipe = drift
+    ? realityRecipe.length > 1
+      ? [
+          realityRecipe[0],
+          { paintId: realityRecipe[1].paintId, parts: Math.max(1, realityRecipe[1].parts - 1) },
+          {
+            paintId: realityRecipe[realityRecipe.length - 1].paintId,
+            parts: 1,
+          },
+        ]
+      : realityRecipe
+    : realityRecipe;
+
+  return { recipe, predictedHex };
+}
+
+function recipeToString(recipe: SolverRecipeItem[], paints: PaintOption[]) {
+  return recipe
+    .filter((item) => item.paintId && item.parts > 0)
+    .map(
+      (item) =>
+        `${item.parts} part${item.parts > 1 ? 's' : ''} ${getPaintById(paints, item.paintId)?.name ?? 'Unknown'}`
+    )
+    .join(' · ');
+}
+
+function ProgressDots({
+  current,
+  unlocked,
+  onJump,
+}: {
+  current: StageKey;
+  unlocked: StageKey[];
+  onJump: (stage: StageKey) => void;
+}) {
+  const stages: { key: StageKey; label: string; short: string }[] = [
+    { key: 'build', label: 'Build Reality', short: '01' },
+    { key: 'matchColor', label: 'Match the Color', short: '02' },
+    { key: 'matchRecipe', label: 'Match the Recipe', short: '03' },
+  ];
+
+  return (
+    <div className={styles.progressRail}>
+      {stages.map((stage) => {
+        const isActive = stage.key === current;
+        const isUnlocked = unlocked.includes(stage.key);
+        return (
+          <button
+            key={stage.key}
+            type="button"
+            onClick={() => isUnlocked && onJump(stage.key)}
+            className={[
+              styles.progressStep,
+              isActive ? styles.progressStepActive : '',
+              isUnlocked ? styles.progressStepUnlocked : '',
+            ].join(' ')}
+            disabled={!isUnlocked}
+          >
+            <span className={styles.progressIndex}>{stage.short}</span>
+            <span className={styles.progressLabel}>{stage.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PaintArcButton({
+  paint,
+  index,
+  total,
+  active,
+  onClick,
+}: {
+  paint: PaintOption;
+  index: number;
+  total: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const positions = buildArcPositions(total);
+  const pos = positions[index];
+
+  return (
+    <button
+      type="button"
+      className={[styles.arcPaint, active ? styles.arcPaintActive : ''].join(' ')}
+      style={
+        {
+          '--arc-x': `${pos.x}rem`,
+          '--arc-y': `${pos.y}rem`,
+          '--paint-glow': paint.hex,
+        } as React.CSSProperties
+      }
+      onClick={onClick}
+      title={paint.name}
+    >
+      <span className={styles.arcPaintSwatch} style={{ background: paint.hex }} />
+      <span className={styles.arcPaintLabel}>{paint.name}</span>
+    </button>
+  );
+}
+
+function TuningSlider({
   label,
-  value,
   min,
   max,
   step,
-  resetValue,
+  value,
   onChange,
 }: {
   label: string;
-  value: number;
   min: number;
   max: number;
   step: number;
-  resetValue: number;
-  onChange: (value: number) => void;
-}) => (
-  <label className={styles.slider}>
-    <div className={styles.sliderHeader}>
-      <span>{label}</span>
-      <button type="button" onClick={() => onChange(resetValue)}>
-        Reset
-      </button>
-    </div>
-
-    <div className={styles.sliderRail}>
+  value: number;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <label className={styles.tuningField}>
+      <div className={styles.tuningFieldTop}>
+        <span>{label}</span>
+        <strong>{value.toFixed(2)}</strong>
+      </div>
       <input
-        className={`${styles.sliderInput} ${sliderToneClass(value, min, max, resetValue)}`}
+        className={styles.slider}
         type="range"
         min={min}
         max={max}
         step={step}
         value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
+        onChange={(e) => onChange(Number(e.target.value))}
       />
-      <strong>{value.toFixed(2)}</strong>
-    </div>
-  </label>
-);
-
-export const MixerPage = ({
-  paints,
-  settings,
-  recentColors,
-  onSettingsChange,
-  onRecentColor,
-  onSaveRecipe,
-  onLoadTargetHex,
-}: MixerPageProps) => {
-  const enabledPaints = useMemo(() => paints.filter((paint) => paint.isEnabled), [paints]);
-  const [calibrationSnapshot, setCalibrationSnapshot] = useState(() => getDeveloperCalibration());
-
-  const [stageOneSlots, setStageOneSlots] = useState<MixSlot[]>(() =>
-    Array.from({ length: MAX_SLOTS }, () => emptySlot()),
+    </label>
   );
-  const [stageOneObservedHex, setStageOneObservedHex] = useState(onLoadTargetHex ?? DEFAULT_OBSERVED);
+}
+
+export default function MixerPage() {
+  const paints = DEMO_PAINTS;
+
+  const [currentStage, setCurrentStage] = useState<StageKey>('build');
+  const [unlockedStages, setUnlockedStages] = useState<StageKey[]>(['build']);
+
+  const [realitySlots, setRealitySlots] = useState<RealitySlot[]>(
+    Array.from({ length: MAX_SLOTS }).map(() => ({ paintId: '', parts: 1 }))
+  );
+  const [actualHex, setActualHex] = useState('#7f5ca8');
   const [lockedReality, setLockedReality] = useState<LockedReality | null>(null);
+
+  const [forwardTuningByPaintId, setForwardTuningByPaintId] = useState<Record<string, ForwardTuning>>({});
   const [activeForwardPaintId, setActiveForwardPaintId] = useState<string | null>(null);
-  const [showForwardControls, setShowForwardControls] = useState(true);
-  const [stage3Open, setStage3Open] = useState(false);
 
-  useEffect(() => {
-    const unsubscribe = subscribeDeveloperCalibration((next) => setCalibrationSnapshot(next));
-    return unsubscribe;
-  }, []);
+  const [inverseTuning, setInverseTuning] = useState<InverseTuning>(DEFAULT_INVERSE_TUNING);
+  const [openSlotPickerIndex, setOpenSlotPickerIndex] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!enabledPaints.length) {
-      setStageOneSlots(Array.from({ length: MAX_SLOTS }, () => emptySlot()));
-      return;
-    }
+  const validRealityRecipe = useMemo(
+    () => realitySlots.filter((slot) => slot.paintId && slot.parts > 0),
+    [realitySlots]
+  );
 
-    setStageOneSlots((current) => {
-      const hasAssigned = current.some((slot) => slot.paintId);
-      if (hasAssigned) {
-        return current.map((slot) =>
-          slot.paintId && !enabledPaints.some((paint) => paint.id === slot.paintId) ? emptySlot() : slot,
-        );
-      }
+  const lockedRealityPaints = useMemo(() => {
+    if (!lockedReality) return [];
+    return lockedReality.slots
+      .map((slot) => getPaintById(paints, slot.paintId))
+      .filter(Boolean) as PaintOption[];
+  }, [lockedReality, paints]);
 
-      const seeded = enabledPaints.slice(0, 3).map((paint, index) => ({
-        paintId: paint.id,
-        parts: index === 0 ? 2 : 1,
-      }));
-
-      return [...seeded, ...Array.from({ length: MAX_SLOTS - seeded.length }, () => emptySlot())];
+  const predictedStage2Hex = useMemo(() => {
+    if (!lockedReality) return '#6f5b93';
+    return predictForwardColor({
+      paints,
+      reality: lockedReality,
+      forwardTuningByPaintId,
     });
-  }, [enabledPaints]);
+  }, [lockedReality, paints, forwardTuningByPaintId]);
+
+  const stage2Distance = useMemo(() => {
+    if (!lockedReality) return 99;
+    return colorDistance(lockedReality.actualHex, predictedStage2Hex);
+  }, [lockedReality, predictedStage2Hex]);
+
+  const bridgeStrength = getBridgeStrength(stage2Distance);
+
+  const stage3Solve = useMemo(() => {
+    if (!lockedReality) return null;
+    return solveColorTargetDemo({
+      paints,
+      targetHex: lockedReality.actualHex,
+      inverseTuning,
+      lockedReality,
+    });
+  }, [lockedReality, paints, inverseTuning]);
+
+  const stage3RecipeMatches = useMemo(() => {
+    if (!lockedReality || !stage3Solve) return false;
+
+    const a = [...lockedReality.slots]
+      .filter((x) => x.paintId && x.parts > 0)
+      .map((x) => `${x.paintId}:${x.parts}`)
+      .sort()
+      .join('|');
+
+    const b = [...stage3Solve.recipe]
+      .filter((x) => x.paintId && x.parts > 0)
+      .map((x) => `${x.paintId}:${x.parts}`)
+      .sort()
+      .join('|');
+
+    return a === b;
+  }, [lockedReality, stage3Solve]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(REALITY_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as LockedReality;
-      if (!parsed?.slots?.length) return;
-      setLockedReality({
-        slots: parsed.slots.slice(0, MAX_SLOTS).map((slot) => ({
-          paintId: slot.paintId,
-          parts: clampParts(slot.parts),
-        })),
-        observedHex: normalizeHex(parsed.observedHex) ?? DEFAULT_OBSERVED,
-        lockedAt: parsed.lockedAt ?? new Date().toISOString(),
-      });
-      setStageOneSlots(parsed.slots.slice(0, MAX_SLOTS));
-      setStageOneObservedHex(normalizeHex(parsed.observedHex) ?? DEFAULT_OBSERVED);
-    } catch {
-      // noop
-    }
-  }, []);
-
-  const stageOneFilledCount = useMemo(
-    () => stageOneSlots.filter((slot) => slot.paintId).length,
-    [stageOneSlots],
-  );
-
-  const stageOneValid = stageOneFilledCount > 0 && Boolean(normalizeHex(stageOneObservedHex));
-
-  const lockedComponents = useMemo(
-    () => (lockedReality ? toForwardComponents(lockedReality.slots) : []),
-    [lockedReality],
-  );
-
-  const predictedMix = useMemo(() => {
-    if (!lockedComponents.length) return null;
-    return predictSpectralMix(paints, lockedComponents);
-  }, [paints, lockedComponents, calibrationSnapshot]);
-
-  const normalizedObserved = normalizeHex(lockedReality?.observedHex ?? stageOneObservedHex);
-  const forwardDelta =
-    normalizedObserved && predictedMix?.hex
-      ? spectralDistanceBetweenHexes(normalizedObserved, predictedMix.hex)
-      : null;
-
-  const stageTwoBelievable = forwardDelta != null && forwardDelta <= 8;
-
-  useEffect(() => {
-    if (stageTwoBelievable) setStage3Open(true);
-  }, [stageTwoBelievable]);
-
-  const lockedPaints = useMemo(
-    () =>
-      lockedComponents
-        .map((component) => enabledPaints.find((paint) => paint.id === component.paintId) ?? null)
-        .filter((paint): paint is Paint => Boolean(paint)),
-    [lockedComponents, enabledPaints],
-  );
-
-  useEffect(() => {
-    if (!lockedPaints.length) {
+    if (currentStage !== 'matchColor') {
       setActiveForwardPaintId(null);
-      return;
     }
+    if (currentStage !== 'build') {
+      setOpenSlotPickerIndex(null);
+    }
+  }, [currentStage]);
 
-    setActiveForwardPaintId((current) =>
-      current && lockedPaints.some((paint) => paint.id === current) ? current : lockedPaints[0].id,
+  function updateRealitySlot(index: number, patch: Partial<RealitySlot>) {
+    setRealitySlots((prev) =>
+      prev.map((slot, i) => (i === index ? { ...slot, ...patch } : slot))
     );
-  }, [lockedPaints]);
+  }
 
-  const activeForwardPaint = useMemo(
-    () =>
-      activeForwardPaintId
-        ? lockedPaints.find((paint) => paint.id === activeForwardPaintId) ?? null
-        : null,
-    [lockedPaints, activeForwardPaintId],
-  );
+  function lockReality() {
+    if (!validRealityRecipe.length) return;
 
-  const activeCalibration =
-    activeForwardPaintId
-      ? calibrationSnapshot.forwardPigments.paints[activeForwardPaintId] ??
-        defaultDeveloperCalibration.forwardPigments.paints[activeForwardPaintId] ??
-        calibrationDefaults
-      : null;
-
-  const activeCalibrationDefaults =
-    activeForwardPaintId
-      ? defaultDeveloperCalibration.forwardPigments.paints[activeForwardPaintId] ?? calibrationDefaults
-      : null;
-
-  const inverseTargetHex = normalizeHex(lockedReality?.observedHex ?? '') ?? null;
-  const inverseResult = useMemo(() => {
-    if (!inverseTargetHex) return null;
-    return solveColorTarget(inverseTargetHex, paints, settings, 8);
-  }, [inverseTargetHex, paints, settings, calibrationSnapshot]);
-
-  const topRecipe = inverseResult?.rankedRecipes[0] ?? null;
-  const inverseDelta =
-    inverseTargetHex && topRecipe
-      ? spectralDistanceBetweenHexes(inverseTargetHex, topRecipe.predictedHex)
-      : null;
-
-  const realitySignature = useMemo(() => ratioSignature(lockedReality?.slots ?? []), [lockedReality]);
-
-  const updateStageSlot = (index: number, patch: Partial<MixSlot>) => {
-    setStageOneSlots((current) =>
-      current.map((slot, slotIndex) =>
-        slotIndex === index
-          ? {
-              paintId: patch.paintId === undefined ? slot.paintId : patch.paintId,
-              parts: patch.parts === undefined ? slot.parts : clampParts(patch.parts),
-            }
-          : slot,
-      ),
-    );
-  };
-
-  const lockReality = () => {
-    const normalized = normalizeHex(stageOneObservedHex);
-    if (!normalized) return;
-
-    const payload: LockedReality = {
-      slots: stageOneSlots.map((slot) => ({ paintId: slot.paintId, parts: clampParts(slot.parts) })),
-      observedHex: normalized,
-      lockedAt: new Date().toISOString(),
+    const nextReality: LockedReality = {
+      slots: validRealityRecipe,
+      actualHex,
     };
 
-    setLockedReality(payload);
-    setStage3Open(false);
-    localStorage.setItem(REALITY_STORAGE_KEY, JSON.stringify(payload));
-  };
+    const tuningSeed: Record<string, ForwardTuning> = {};
+    nextReality.slots.forEach((slot) => {
+      tuningSeed[slot.paintId] = forwardTuningByPaintId[slot.paintId] ?? DEFAULT_FORWARD_TUNING;
+    });
 
-  const unlockReality = () => {
-    if (!lockedReality) return;
-    setStageOneSlots(lockedReality.slots);
-    setStageOneObservedHex(lockedReality.observedHex);
+    setLockedReality(nextReality);
+    setForwardTuningByPaintId(tuningSeed);
+    setUnlockedStages(['build', 'matchColor']);
+    setCurrentStage('matchColor');
+  }
+
+  function confirmForwardCalibration() {
+    setUnlockedStages(['build', 'matchColor', 'matchRecipe']);
+    setCurrentStage('matchRecipe');
+  }
+
+  function startOver() {
+    setCurrentStage('build');
+    setUnlockedStages(['build']);
+    setRealitySlots(Array.from({ length: MAX_SLOTS }).map(() => ({ paintId: '', parts: 1 })));
+    setActualHex('#7f5ca8');
     setLockedReality(null);
-    setStage3Open(false);
-    localStorage.removeItem(REALITY_STORAGE_KEY);
-  };
+    setForwardTuningByPaintId({});
+    setActiveForwardPaintId(null);
+    setInverseTuning(DEFAULT_INVERSE_TUNING);
+    setOpenSlotPickerIndex(null);
+  }
 
-  const updateForward = (paintId: string, key: string, value: number) => {
-    updateDeveloperCalibration({
-      forwardPigments: {
-        paints: {
-          [paintId]: {
-            ...(calibrationSnapshot.forwardPigments.paints[paintId] ??
-              defaultDeveloperCalibration.forwardPigments.paints[paintId] ??
-              calibrationDefaults),
-            [key]: value,
-          },
-        },
+  const activeForwardPaint = activeForwardPaintId
+    ? getPaintById(paints, activeForwardPaintId)
+    : null;
+
+  const activeForwardTuning = activeForwardPaintId
+    ? forwardTuningByPaintId[activeForwardPaintId] ?? DEFAULT_FORWARD_TUNING
+    : null;
+
+  function setForwardValue(key: keyof ForwardTuning, value: number) {
+    if (!activeForwardPaintId) return;
+    setForwardTuningByPaintId((prev) => ({
+      ...prev,
+      [activeForwardPaintId]: {
+        ...(prev[activeForwardPaintId] ?? DEFAULT_FORWARD_TUNING),
+        [key]: value,
       },
-    });
-  };
-
-  const updateInverseNumber = (section: string, key: string, value: number) => {
-    updateDeveloperCalibration({
-      inverseSearch: {
-        [section]: {
-          ...(calibrationSnapshot.inverseSearch as Record<string, any>)[section],
-          [key]: value,
-        },
-      } as any,
-    });
-  };
+    }));
+  }
 
   return (
     <div className={styles.page}>
-      <Card className={styles.shell}>
-        <header className={styles.pageHeader}>
-          <p className={styles.kicker}>Guided calibration journey</p>
-          <h1>Mixer calibration in three stages</h1>
-          <p className={styles.intro}>Build reality, align the predicted color, then tune how the system rediscovers your recipe.</p>
-          <div className={styles.stageRail}>
-            <div className={`${styles.stageChip} ${styles.stageChipActive}`}>1 · Build Reality</div>
-            <div className={`${styles.stageChip} ${lockedReality ? styles.stageChipActive : ''}`}>2 · Match the Color</div>
-            <div className={`${styles.stageChip} ${stage3Open ? styles.stageChipActive : ''}`}>3 · Match the Recipe</div>
+      <div className={styles.ambientOne} />
+      <div className={styles.ambientTwo} />
+      <div className={styles.pageGlow} />
+
+      <div className={styles.shell}>
+        <header className={styles.topBar}>
+          <button
+            type="button"
+            className={styles.startOverButton}
+            onClick={startOver}
+            aria-label="Start over"
+            title="Start over"
+          >
+            ↺
+          </button>
+
+
+          <div className={styles.topBarRight}>
+            <ProgressDots
+              current={currentStage}
+              unlocked={unlockedStages}
+              onJump={setCurrentStage}
+            />
           </div>
         </header>
 
-        <section className={`${styles.stageSection} ${lockedReality ? styles.stageOneLocked : ''}`}>
-          <div className={styles.stageHeader}>
-            <div>
-              <p>Stage 1</p>
-              <h2>Build reality</h2>
-            </div>
-            <span>Capture what you really mixed and the exact color it produced.</span>
-          </div>
+        <main className={styles.stageShell}>
+          <div
+            key={currentStage}
+            className={[
+              styles.stageFrame,
+              currentStage === 'build' ? styles.stageBuild : '',
+              currentStage === 'matchColor' ? styles.stageMatchColor : '',
+              currentStage === 'matchRecipe' ? styles.stageMatchRecipe : '',
+            ].join(' ')}
+          >
+            {currentStage === 'build' && (
+              <section className={styles.stageLayoutGolden}>
 
-          <div className={styles.slotGrid}>
-            {stageOneSlots.map((slot, index) => {
-              const slotPaint = slot.paintId
-                ? enabledPaints.find((paint) => paint.id === slot.paintId) ?? null
-                : null;
+                <div className={styles.goldenLarge}>
+                  <div className={styles.paintComposerCompact}>
+                    <div className={styles.visualRecipeBuilderCompact}>
+                      {realitySlots.map((slot, index) => {
+                        const selectedPaint = getPaintById(paints, slot.paintId);
 
-              return (
-                <article className={styles.slotCard} key={`stage-slot-${index}`}>
-                  <div className={styles.slotTop}>
-                    <span className={styles.slotOrb} style={swatchStyle(slotPaint?.hex)} />
-                    <div>
-                      <strong>{slotPaint?.name ?? `Paint slot ${index + 1}`}</strong>
-                      <small>{slotPaint ? 'Active paint' : 'Select a paint'}</small>
+                        return (
+                          <div key={index} className={styles.visualSlot}>
+                            <button
+                              type="button"
+                              className={[
+                                styles.visualSlotCircle,
+                                selectedPaint ? styles.visualSlotCircleFilled : '',
+                              ].join(' ')}
+                              style={
+                                selectedPaint
+                                  ? ({ '--slot-color': selectedPaint.hex } as React.CSSProperties)
+                                  : undefined
+                              }
+                              onClick={() =>
+                                setOpenSlotPickerIndex((prev) => (prev === index ? null : index))
+                              }
+                            >
+                              {selectedPaint ? (
+                                <span className={styles.visualSlotInnerGlow} />
+                              ) : (
+                                <span className={styles.visualSlotPlus}>+</span>
+                              )}
+                            </button>
+
+                            <div className={styles.visualSlotLabel}>
+                              {selectedPaint ? selectedPaint.name : 'Add paint'}
+                            </div>
+
+                            <div className={styles.partsCluster}>
+                              <button
+                                type="button"
+                                className={styles.partsButton}
+                                onClick={() =>
+                                  updateRealitySlot(index, {
+                                    parts: clamp(slot.parts - 1, 1, 12),
+                                  })
+                                }
+                                disabled={!selectedPaint}
+                              >
+                                −
+                              </button>
+                              <div className={styles.partsValue}>{slot.parts}</div>
+                              <button
+                                type="button"
+                                className={styles.partsButton}
+                                onClick={() =>
+                                  updateRealitySlot(index, {
+                                    parts: clamp(slot.parts + 1, 1, 12),
+                                  })
+                                }
+                                disabled={!selectedPaint}
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            {openSlotPickerIndex === index && (
+                              <div className={styles.paintPickerPopover}>
+                                <div className={styles.paintPickerGrid}>
+                                  {paints.map((paint) => (
+                                    <button
+                                      key={paint.id}
+                                      type="button"
+                                      className={styles.paintSwatchOption}
+                                      onClick={() => {
+                                        updateRealitySlot(index, { paintId: paint.id });
+                                        setOpenSlotPickerIndex(null);
+                                      }}
+                                      title={paint.name}
+                                    >
+                                      <span
+                                        className={styles.paintSwatchOptionCircle}
+                                        style={{ background: paint.hex }}
+                                      />
+                                      <span className={styles.paintSwatchOptionLabel}>
+                                        {paint.name}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <aside className={styles.goldenSmall}>
+                  <div className={styles.realityOrbPanel}>
+                    <div className={styles.orbLabel}>Reality Color</div>
+
+                    <div className={styles.realityOrbWrap}>
+                      <div
+                        className={styles.realityOrb}
+                        style={{
+                          background: `radial-gradient(circle at 35% 30%, #fff8 0%, ${actualHex} 36%, ${actualHex} 64%, #0007 100%)`,
+                        }}
+                      />
+                    </div>
+
+                    <div className={styles.hexInputWrap}>
+                      <input
+                        className={styles.hexInput}
+                        type="color"
+                        value={actualHex}
+                        onChange={(e) => setActualHex(e.target.value)}
+                        aria-label="Actual resulting color"
+                      />
+                      <input
+                        className={styles.hexTextInput}
+                        type="text"
+                        value={actualHex}
+                        onChange={(e) => setActualHex(e.target.value)}
+                      />
+                    </div>
+
+                    <p className={styles.smallWhisper}>
+                      Choose the final color that best reflects what your real mixture produced.
+                    </p>
+                  </div>
+                </aside>
+
+                <div className={styles.bottomActionRail}>
+                  <div className={styles.bottomActionCopy}>
+                    {validRealityRecipe.length
+                      ? recipeToString(validRealityRecipe, paints)
+                      : 'Choose paints and parts to create your reality recipe.'}
+                  </div>
+
+                  <button
+                    type="button"
+                    className={styles.primaryCta}
+                    onClick={lockReality}
+                    disabled={!validRealityRecipe.length}
+                  >
+                    Seal this reality
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {currentStage === 'matchColor' && lockedReality && (
+              <section className={styles.stageHero}>
+
+
+                <div className={styles.stageTwoLayout}>
+                  <div className={styles.stageTwoCenter}>
+                    <div className={styles.circleCluster}>
+                      <div className={styles.heroCircleBlock}>
+                        <div className={styles.heroCircleLabel}>Actual Mix</div>
+                        <div className={styles.heroCircleHalo}>
+                          <div
+                            className={styles.heroCircle}
+                            style={{
+                              background: `radial-gradient(circle at 35% 30%, #fff8 0%, ${lockedReality.actualHex} 35%, ${lockedReality.actualHex} 62%, #0008 100%)`,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div
+                        className={styles.connectionBridge}
+                        style={{ '--bridge-strength': bridgeStrength } as React.CSSProperties}
+                      >
+                        <div className={styles.connectionBeam} />
+                        <div className={styles.connectionLabel}>
+                          {formatDistanceLabel(stage2Distance)}
+                        </div>
+                      </div>
+
+                      <div className={styles.heroCircleBlock}>
+                        <div className={styles.heroCircleLabel}>Predicted Mix</div>
+                        <div className={styles.heroCircleHalo}>
+                          <div
+                            className={styles.heroCircle}
+                            style={{
+                              background: `radial-gradient(circle at 35% 30%, #fff8 0%, ${predictedStage2Hex} 35%, ${predictedStage2Hex} 62%, #0008 100%)`,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className={styles.arcLayer}>
+                        {lockedRealityPaints.map((paint, index) => (
+                          <PaintArcButton
+                            key={paint.id}
+                            paint={paint}
+                            index={index}
+                            total={lockedRealityPaints.length}
+                            active={paint.id === activeForwardPaintId}
+                            onClick={() =>
+                              setActiveForwardPaintId((prev) => (prev === paint.id ? null : paint.id))
+                            }
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className={styles.heroRail}>
+                      <div className={styles.heroRailHeader}>
+                        <div>
+                          <div className={styles.heroRailKicker}>Locked recipe</div>
+                          <div className={styles.heroRailRecipe}>
+                            {recipeToString(lockedReality.slots, paints)}
+                          </div>
+                        </div>
+                        <div className={styles.distanceBadge}>Δ {stage2Distance.toFixed(1)}</div>
+                      </div>
                     </div>
                   </div>
 
-                  <select
-                    className={styles.slotSelect}
-                    value={slot.paintId ?? ''}
-                    onChange={(event) => updateStageSlot(index, { paintId: event.target.value || null })}
+                  <aside className={styles.stageTwoSide}>
+                    {activeForwardPaint && activeForwardTuning ? (
+                      <div className={styles.sideTuningPanel}>
+                        <div className={styles.sideTuningTop}>
+                          <div className={styles.forwardPopupKicker}>Selected Paint</div>
+                          <div className={styles.singlePaintOrbWrap}>
+                            <div
+                              className={styles.singlePaintOrb}
+                              style={{
+                                background: `radial-gradient(circle at 35% 30%, #fff8 0%, ${activeForwardPaint.hex} 38%, ${activeForwardPaint.hex} 64%, #0008 100%)`,
+                              }}
+                            />
+                          </div>
+                          <div className={styles.singlePaintName}>{activeForwardPaint.name}</div>
+                          <p className={styles.smallWhisper}>
+                            Tune this paint in isolation, then watch how it shifts the predicted
+                            mix.
+                          </p>
+                        </div>
+
+                        <div className={styles.forwardGrid}>
+                          <TuningSlider
+                            label="Tinting Strength"
+                            min={0.6}
+                            max={1.4}
+                            step={0.01}
+                            value={activeForwardTuning.tintingStrength}
+                            onChange={(v) => setForwardValue('tintingStrength', v)}
+                          />
+                          <TuningSlider
+                            label="Chroma Bias"
+                            min={-1}
+                            max={1}
+                            step={0.01}
+                            value={activeForwardTuning.chromaBias}
+                            onChange={(v) => setForwardValue('chromaBias', v)}
+                          />
+                          <TuningSlider
+                            label="Darkness Bias"
+                            min={-1}
+                            max={1}
+                            step={0.01}
+                            value={activeForwardTuning.darknessBias}
+                            onChange={(v) => setForwardValue('darknessBias', v)}
+                          />
+                          <TuningSlider
+                            label="Temperature Bias"
+                            min={-1}
+                            max={1}
+                            step={0.01}
+                            value={activeForwardTuning.temperatureBias}
+                            onChange={(v) => setForwardValue('temperatureBias', v)}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={styles.sideTuningPanelEmpty}>
+                        <div className={styles.forwardPopupKicker}>Forward Calibration</div>
+                        <p className={styles.smallWhisper}>
+                          Select one of the paints orbiting the center to tune how that pigment
+                          behaves.
+                        </p>
+                      </div>
+                    )}
+                  </aside>
+                </div>
+
+                <div className={styles.bottomActionRail}>
+                  <div className={styles.bottomActionCopy}>
+                    Keep tuning until the predicted circle emotionally matches the real one.
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.primaryCta}
+                    onClick={confirmForwardCalibration}
                   >
-                    <option value="">Empty slot</option>
-                    {enabledPaints.map((paint) => (
-                      <option value={paint.id} key={`${paint.id}-${index}`}>
-                        {paint.name}
-                      </option>
-                    ))}
-                  </select>
+                    This feels right
+                  </button>
+                </div>
+              </section>
+            )}
 
-                  <div className={styles.partsRow}>
-                    <button type="button" onClick={() => updateStageSlot(index, { parts: slot.parts - 1 })}>−</button>
-                    <b>{slot.parts}</b>
-                    <button type="button" onClick={() => updateStageSlot(index, { parts: slot.parts + 1 })}>+</button>
+            {currentStage === 'matchRecipe' && lockedReality && stage3Solve && (
+              <section className={styles.stageLayoutGolden}>
+                <div className={styles.stageCopy}>
+                  <span className={styles.stageEyebrow}>Stage 3</span>
+                  <h2 className={styles.stageTitle}>Match the Recipe</h2>
+                  <p className={styles.stageText}>
+                    Now the color is truth. Tune the solver so it rediscovers the same recipe a
+                    painter would have reached in reality.
+                  </p>
+                </div>
+
+                <div className={styles.goldenLarge}>
+                  <div className={styles.recipeCompareWrap}>
+                    <div className={styles.recipeColumn}>
+                      <div className={styles.recipeColumnKicker}>Reality Recipe</div>
+                      <div className={styles.recipeColumnTitle}>
+                        {recipeToString(lockedReality.slots, paints)}
+                      </div>
+                      <div className={styles.recipeTokens}>
+                        {lockedReality.slots.map((item, index) => {
+                          const paint = getPaintById(paints, item.paintId);
+                          if (!paint) return null;
+                          return (
+                            <div key={`${item.paintId}-${index}`} className={styles.recipeToken}>
+                              <span
+                                className={styles.recipeTokenSwatch}
+                                style={{ background: paint.hex }}
+                              />
+                              <span>
+                                {item.parts} × {paint.name}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className={styles.recipeDivider}>
+                      <div className={styles.recipeDividerLine} />
+                      <div className={styles.recipeDividerBadge}>
+                        {stage3RecipeMatches ? 'Matched' : 'Refining'}
+                      </div>
+                      <div className={styles.recipeDividerLine} />
+                    </div>
+
+                    <div className={styles.recipeColumn}>
+                      <div className={styles.recipeColumnKicker}>System Recipe</div>
+                      <div className={styles.recipeColumnTitle}>
+                        {recipeToString(stage3Solve.recipe, paints)}
+                      </div>
+                      <div className={styles.recipeTokens}>
+                        {stage3Solve.recipe.map((item, index) => {
+                          const paint = getPaintById(paints, item.paintId);
+                          if (!paint) return null;
+                          return (
+                            <div key={`${item.paintId}-${index}`} className={styles.recipeToken}>
+                              <span
+                                className={styles.recipeTokenSwatch}
+                                style={{ background: paint.hex }}
+                              />
+                              <span>
+                                {item.parts} × {paint.name}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-
-                  <input
-                    className={styles.partsSlider}
-                    type="range"
-                    min={1}
-                    max={16}
-                    value={slot.parts}
-                    onChange={(event) => updateStageSlot(index, { parts: Number(event.target.value) })}
-                  />
-                </article>
-              );
-            })}
-          </div>
-
-          <div className={styles.realityBar}>
-            <label className={styles.realityColorBlock}>
-              <span>What did it become?</span>
-              <div className={styles.realityColorButton}>
-                <span
-                  className={styles.realityColorBubble}
-                  style={{
-                    ...swatchStyle(stageOneObservedHex),
-                    '--swatch-glow': normalizeHex(stageOneObservedHex) ?? '#C2793E',
-                  } as CSSProperties}
-                />
-                <input
-                  type="color"
-                  value={normalizeHex(stageOneObservedHex) ?? '#000000'}
-                  onChange={(event) => {
-                    setStageOneObservedHex(event.target.value);
-                    onRecentColor(event.target.value);
-                  }}
-                />
-                <strong>{normalizeHex(stageOneObservedHex) ?? 'Pick color'}</strong>
-              </div>
-            </label>
-
-            <button type="button" className={styles.lockButton} onClick={lockReality} disabled={!stageOneValid}>
-              Seal this reality
-            </button>
-          </div>
-
-          {recentColors.length ? (
-            <div className={styles.recentRow}>
-              {recentColors.slice(0, 6).map((hex) => (
-                <button key={`recent-${hex}`} type="button" onClick={() => setStageOneObservedHex(hex)}>
-                  <span style={{ backgroundColor: hex }} />
-                  {hex}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </section>
-
-        {lockedReality ? (
-          <section className={`${styles.stageSection} ${styles.stageTwo}`}>
-            <div className={styles.stageHeader}>
-              <div>
-                <p>Stage 2</p>
-                <h2>Match the color</h2>
-              </div>
-              <span>The recipe is now fixed. Tune forward pigment behavior until predicted and actual align.</span>
-            </div>
-
-            <div className={styles.heroCompare}>
-              <div className={styles.arcLayer}>
-                {lockedPaints.map((paint, index) => {
-                  const spread = lockedPaints.length === 1 ? 90 : 32 + (index / Math.max(1, lockedPaints.length - 1)) * 116;
-                  return (
-                    <button
-                      key={`arc-${paint.id}`}
-                      type="button"
-                      className={`${styles.arcPaint} ${activeForwardPaintId === paint.id ? styles.arcPaintActive : ''}`}
-                      style={{
-                        '--paint-hex': paint.hex,
-                        '--arc-angle': `${spread}deg`,
-                      } as CSSProperties}
-                      onClick={() => setActiveForwardPaintId(paint.id)}
-                    >
-                      <span>{paint.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className={styles.compareRow}>
-                <div
-                  className={`${styles.compareLink} ${compareLinkClass(forwardDelta)}`}
-                  style={{ '--link-strength': compareLinkStrength(forwardDelta) } as CSSProperties}
-                />
-                <div className={styles.compareCol}>
-                  <small>What you mixed</small>
-                  <div
-                    className={styles.heroCircle}
-                    style={{
-                      ...swatchStyle(lockedReality.observedHex),
-                      '--swatch-glow': lockedReality.observedHex,
-                    } as CSSProperties}
-                  />
-                  <strong>{lockedReality.observedHex}</strong>
                 </div>
 
-                <div className={styles.heroBridge}>
-                  <div className={`${styles.metricCard} ${styles[compareTone(forwardDelta)]}`}>
-                    <span>Alignment</span>
-                    <strong>ΔE {formatDelta(forwardDelta)}</strong>
-                    <small>{compareCopy(forwardDelta)}</small>
+                <aside className={styles.goldenSmall}>
+                  <div className={styles.inversePanel}>
+                    <div className={styles.inversePanelKicker}>Inverse Tuning</div>
+
+                    <TuningSlider
+                      label="Ratio Penalty"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={inverseTuning.ratioPenalty}
+                      onChange={(v) => setInverseTuning((prev) => ({ ...prev, ratioPenalty: v }))}
+                    />
+                    <TuningSlider
+                      label="Complexity Penalty"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={inverseTuning.complexityPenalty}
+                      onChange={(v) =>
+                        setInverseTuning((prev) => ({ ...prev, complexityPenalty: v }))
+                      }
+                    />
+                    <TuningSlider
+                      label="Exact Match Bias"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={inverseTuning.exactMatchBias}
+                      onChange={(v) =>
+                        setInverseTuning((prev) => ({ ...prev, exactMatchBias: v }))
+                      }
+                    />
+                    <TuningSlider
+                      label="Hue Family Bias"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={inverseTuning.hueFamilyBias}
+                      onChange={(v) => setInverseTuning((prev) => ({ ...prev, hueFamilyBias: v }))}
+                    />
                   </div>
-                  <div className={styles.fixedRecipeTag}>Locked recipe · {realitySignature}</div>
+                </aside>
+
+                <div className={styles.bottomActionRail}>
+                  <div className={styles.bottomActionCopy}>
+                    Stage 2 taught pigment truth. Stage 3 teaches recipe choice.
+                  </div>
+                  <button type="button" className={styles.primaryCta}>
+                    Calibration complete
+                  </button>
                 </div>
-
-                <div className={styles.compareCol}>
-                  <small>What the model sees</small>
-                  <div
-                    className={styles.heroCircle}
-                    style={{
-                      ...swatchStyle(predictedMix?.hex),
-                      '--swatch-glow': predictedMix?.hex ?? '#5f78c5',
-                    } as CSSProperties}
-                  />
-                  <strong>{predictedMix?.hex ?? '—'}</strong>
-                </div>
-              </div>
-            </div>
-
-            <section className={styles.forwardRail}>
-              <div className={styles.forwardRailHead}>
-                <div>
-                  <p>Teach the paint</p>
-                  <h3>{activeForwardPaint?.name ?? 'Select a paint around the hero'}</h3>
-                </div>
-                <button type="button" onClick={() => setShowForwardControls((current) => !current)}>
-                  {showForwardControls ? 'Soften panel' : 'Open panel'}
-                </button>
-              </div>
-
-              {showForwardControls && activeForwardPaint && activeCalibration && activeCalibrationDefaults ? (
-                <div className={styles.sliderGrid}>
-                  <CalibrationSlider
-                    label="Tinting strength"
-                    value={activeCalibration.tintingStrength}
-                    min={0.75}
-                    max={1.4}
-                    step={0.01}
-                    resetValue={activeCalibrationDefaults.tintingStrength}
-                    onChange={(value) => updateForward(activeForwardPaint.id, 'tintingStrength', value)}
-                  />
-                  <CalibrationSlider
-                    label="Chroma bias"
-                    value={activeCalibration.chromaBias}
-                    min={-0.25}
-                    max={0.25}
-                    step={0.01}
-                    resetValue={activeCalibrationDefaults.chromaBias}
-                    onChange={(value) => updateForward(activeForwardPaint.id, 'chromaBias', value)}
-                  />
-                  <CalibrationSlider
-                    label="Darkness bias"
-                    value={activeCalibration.darknessBias}
-                    min={-0.25}
-                    max={0.25}
-                    step={0.01}
-                    resetValue={activeCalibrationDefaults.darknessBias}
-                    onChange={(value) => updateForward(activeForwardPaint.id, 'darknessBias', value)}
-                  />
-                  <CalibrationSlider
-                    label="Earth strength bias"
-                    value={activeCalibration.earthStrengthBias}
-                    min={-0.3}
-                    max={0.4}
-                    step={0.01}
-                    resetValue={activeCalibrationDefaults.earthStrengthBias}
-                    onChange={(value) => updateForward(activeForwardPaint.id, 'earthStrengthBias', value)}
-                  />
-                  <CalibrationSlider
-                    label="White lift bias"
-                    value={activeCalibration.whiteLiftBias}
-                    min={-0.2}
-                    max={0.2}
-                    step={0.01}
-                    resetValue={activeCalibrationDefaults.whiteLiftBias}
-                    onChange={(value) => updateForward(activeForwardPaint.id, 'whiteLiftBias', value)}
-                  />
-                </div>
-              ) : null}
-            </section>
-
-            <div className={styles.stageTwoActions}>
-              <button type="button" className={styles.secondaryButton} onClick={unlockReality}>
-                Reopen stage 1
-              </button>
-              <button type="button" className={styles.secondaryButton} onClick={() => resetDeveloperCalibration()}>
-                Reset all tuning
-              </button>
-              <button
-                type="button"
-                className={`${styles.primaryButton} ${stage3Open ? styles.primaryButtonLive : ''}`}
-                onClick={() => setStage3Open((current) => !current)}
-              >
-                {stage3Open ? 'Fold stage 3' : 'Continue to stage 3'}
-              </button>
-            </div>
-          </section>
-        ) : null}
-
-        {lockedReality && stage3Open ? (
-          <section className={`${styles.stageSection} ${styles.stageThree}`}>
-            <div className={styles.stageHeader}>
-              <div>
-                <p>Stage 3</p>
-                <h2>Match the recipe</h2>
-              </div>
-              <span>Now tune inverse search behavior so the solver can rediscover the same or equivalent recipe.</span>
-            </div>
-
-            <div className={styles.recipeCompareGrid}>
-              <article className={styles.recipePanel}>
-                <h4>Locked recipe memory</h4>
-                <p>{realitySignature}</p>
-              </article>
-              <article className={styles.recipePanel}>
-                <h4>System interpretation</h4>
-                <p>{topRecipe?.practicalRatioText ?? 'No result yet'}</p>
-              </article>
-              <article className={styles.recipePanel}>
-                <h4>How close they feel</h4>
-                <p>ΔE {formatDelta(inverseDelta)} · {compareCopy(inverseDelta)}</p>
-              </article>
-            </div>
-
-            <div className={styles.inverseGrid}>
-              <div className={styles.inverseGroup}>
-                <h5>How should the system explore?</h5>
-                <CalibrationSlider
-                  label="Max components"
-                  value={calibrationSnapshot.inverseSearch.ratioSearch.maxComponents}
-                  min={1}
-                  max={4}
-                  step={1}
-                  resetValue={defaultDeveloperCalibration.inverseSearch.ratioSearch.maxComponents}
-                  onChange={(value) => updateInverseNumber('ratioSearch', 'maxComponents', value)}
-                />
-                <CalibrationSlider
-                  label="Neighborhood radius"
-                  value={calibrationSnapshot.inverseSearch.ratioSearch.neighborhoodRadius}
-                  min={1}
-                  max={6}
-                  step={1}
-                  resetValue={defaultDeveloperCalibration.inverseSearch.ratioSearch.neighborhoodRadius}
-                  onChange={(value) => updateInverseNumber('ratioSearch', 'neighborhoodRadius', value)}
-                />
-                <CalibrationSlider
-                  label="Family beam width"
-                  value={calibrationSnapshot.inverseSearch.global.familyBeamWidth}
-                  min={3}
-                  max={20}
-                  step={1}
-                  resetValue={defaultDeveloperCalibration.inverseSearch.global.familyBeamWidth}
-                  onChange={(value) => updateInverseNumber('global', 'familyBeamWidth', value)}
-                />
-              </div>
-
-              <div className={styles.inverseGroup}>
-                <h5>How should the system think?</h5>
-                <CalibrationSlider
-                  label="Practical max parts"
-                  value={calibrationSnapshot.inverseSearch.global.practicalRatioHardMaxParts}
-                  min={6}
-                  max={18}
-                  step={1}
-                  resetValue={defaultDeveloperCalibration.inverseSearch.global.practicalRatioHardMaxParts}
-                  onChange={(value) => updateInverseNumber('global', 'practicalRatioHardMaxParts', value)}
-                />
-                <CalibrationSlider
-                  label="Workable match threshold"
-                  value={calibrationSnapshot.inverseSearch.global.workableMatchThreshold}
-                  min={0.1}
-                  max={0.6}
-                  step={0.01}
-                  resetValue={defaultDeveloperCalibration.inverseSearch.global.workableMatchThreshold}
-                  onChange={(value) => updateInverseNumber('global', 'workableMatchThreshold', value)}
-                />
-                <CalibrationSlider
-                  label="Cleanliness penalty"
-                  value={calibrationSnapshot.inverseSearch.mutedTargets.cleanlinessPenalty}
-                  min={0.5}
-                  max={4}
-                  step={0.1}
-                  resetValue={defaultDeveloperCalibration.inverseSearch.mutedTargets.cleanlinessPenalty}
-                  onChange={(value) => updateInverseNumber('mutedTargets', 'cleanlinessPenalty', value)}
-                />
-                <CalibrationSlider
-                  label="Muddiness penalty"
-                  value={calibrationSnapshot.inverseSearch.vividTargets.muddinessPenalty}
-                  min={0.5}
-                  max={4}
-                  step={0.1}
-                  resetValue={defaultDeveloperCalibration.inverseSearch.vividTargets.muddinessPenalty}
-                  onChange={(value) => updateInverseNumber('vividTargets', 'muddinessPenalty', value)}
-                />
-              </div>
-            </div>
-
-            <div className={styles.stageThreeFooter}>
-              <label>
-                <span>Reasoning mode</span>
-                <select
-                  value={settings.solveMode ?? 'on-hand'}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      ...settings,
-                      solveMode: event.target.value as UserSettings['solveMode'],
-                    })
-                  }
-                >
-                  <option value="on-hand">On-hand paints</option>
-                  <option value="ideal">Ideal palette</option>
-                </select>
-              </label>
-
-              {topRecipe && inverseTargetHex ? (
-                <button type="button" className={styles.lockButton} onClick={() => onSaveRecipe(topRecipe, inverseTargetHex)}>
-                  Save this rediscovered recipe
-                </button>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-      </Card>
+              </section>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
-};
+}

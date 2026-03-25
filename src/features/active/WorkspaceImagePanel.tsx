@@ -330,7 +330,7 @@ export const WorkspaceImagePanel = ({
               y1={line.y1}
               x2={line.x2}
               y2={line.y2}
-              stroke={line.major ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.3)'}
+              stroke={line.major ? 'rgb(255, 0, 212)' : 'rgb(255, 0, 212)'}
               strokeWidth={line.major ? 1.3 : 1}
               strokeDasharray={guideMode === 'quadrants' ? '0' : line.major ? '0' : '5 8'}
             />

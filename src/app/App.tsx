@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MixerPage } from '../features/mixer/MixerPage';
+import MixerPage  from '../features/mixer/MixerPage';
 import { ActivePaintingPage } from '../features/active/ActivePaintingPage';
 import { PaintsPage } from '../features/paints/PaintsPage';
 import { SessionsPage } from '../features/sessions/SessionsPage';
