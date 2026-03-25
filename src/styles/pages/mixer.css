@@ -1,16 +1,87 @@
-.mixer-layout {
+.mixer-zone-grid {
   display: grid;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
-.mixer-hero-panel {
+@media (min-width: 1200px) {
+  .mixer-zone-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.mixer-row {
   display: grid;
   gap: 0.5rem;
+  grid-template-columns: minmax(0, 1fr) 6rem auto;
 }
 
-.mixer-hero-ratio {
-  font-size: 1.15rem;
-  font-weight: 600;
+.mixer-swatch-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mixer-swatch {
+  height: 72px;
+  border-radius: 0.8rem;
+  border: 1px solid var(--border-soft);
+  margin-bottom: 0.35rem;
+}
+
+.mixer-swatch-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+}
+
+.mixer-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.mixer-control-board {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.75rem;
+  max-height: 31rem;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.mixer-control-card {
+  border: 1px solid var(--border-soft);
+  border-radius: 0.8rem;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.mixer-headline-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mixer-field-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.mixer-check {
+  border: 1px solid var(--border-soft);
+  border-radius: 0.7rem;
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-strong);
 }
 
 .mixer-recent-chip {

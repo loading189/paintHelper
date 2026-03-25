@@ -4,6 +4,7 @@ import { predictSpectralMix, spectralDistanceBetweenHexes } from '../spectralMix
 import { practicalRatioFromWeights, simplifyRatio } from '../../utils/ratio';
 import { canonicalizeRecipeComponents } from '../recipeCanonicalization';
 import type { CandidateTemplate, EvaluatedCandidate, TargetProfile } from './types';
+import type { InverseSearchCalibration } from '../developerCalibration';
 
 const buildScore = (
   mode: 'spectral-first',
@@ -16,7 +17,7 @@ const buildScore = (
   ratioComplexity: number,
   constructionPenalty: number,
   hueFamilyPenalty: number,
-  valueWeight: number,
+  valueWeight: number
 ): RecipeScoreBreakdown => {
   const primaryScore =
     spectralDistance +
@@ -329,6 +330,7 @@ export const evaluateCandidate = (
   targetAnalysis: NonNullable<ReturnType<typeof analyzeColor>>,
   _rankingMode: 'spectral-first',
   profile: TargetProfile,
+  tuning: InverseSearchCalibration,
 ): EvaluatedCandidate | null => {
   if (template.paintIds.length !== weights.length) return null;
 
@@ -354,9 +356,16 @@ export const evaluateCandidate = (
   };
 
   const exactParts = simplifyRatio(weights);
+  const idealMaxParts =
+    weights.length === 4
+      ? tuning.global.practicalRatioIdealMaxParts4
+      : weights.length === 3
+        ? tuning.global.practicalRatioIdealMaxParts3
+        : tuning.global.practicalRatioIdealMaxParts2;
+
   const practicalParts = practicalRatioFromWeights(weights, {
-    idealMaxParts: weights.length === 3 ? 9 : 8,
-    hardMaxParts: 12,
+    idealMaxParts,
+    hardMaxParts: tuning.global.practicalRatioHardMaxParts,
   });
 
   const ratioComplexity = practicalParts.reduce((sum, value) => sum + value, 0);
@@ -389,7 +398,7 @@ export const evaluateCandidate = (
     ratioComplexity,
     constructionPenalty,
     hueFamilyPenalty,
-    valueWeight,
+    valueWeight
   );
 
   const hasEarth = recipe.some(
