@@ -1,0 +1,92 @@
+.paintCockpitLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'stage recipe'
+    'tray tray';
+  gap: 0.7rem;
+  min-height: calc(100vh - 102px);
+}
+
+.paintCockpitMain { grid-area: stage; min-width: 0; }
+.paintCockpitRightRail { grid-area: recipe; padding: 0.68rem; }
+.paintCockpitStageCard { padding: 0.58rem; height: 100%; display: grid; gap: 0.45rem; }
+.paintCockpitStage { position: relative; min-height: 0; height: 100%; }
+
+.paintReferenceEmpty {
+  min-height: 380px;
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-card);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.workspaceImageShell { position: relative; width: 100%; min-height: 100%; height: 100%; border-radius: 14px; overflow: hidden; background: #090d13; }
+.workspaceImageCanvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+.workspaceOverlay { pointer-events: none; position: absolute; inset: 0; }
+
+.workspaceStageHud { position: absolute; z-index: 12; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; pointer-events: none; }
+.workspaceStageHudTop { top: 10px; left: 10px; right: 10px; }
+.workspaceStagePill,
+.workspaceStageControlGroup { pointer-events: auto; display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(12, 16, 24, 0.78); backdrop-filter: blur(8px); min-height: 32px; padding: 0.2rem 0.32rem; }
+.workspaceStagePill { color: var(--text-muted); padding: 0.22rem 0.52rem; }
+.workspaceStagePillLabel { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.workspaceStagePillValue { color: var(--text-body); font-size: 0.72rem; }
+.workspaceStageControlLabel { font-size: 0.64rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; padding-left: 0.25rem; }
+.workspaceStageSegmented { display: inline-flex; gap: 0.2rem; }
+.workspaceStageSegment { border: 1px solid transparent; border-radius: 999px; color: var(--text-muted); background: transparent; padding: 0.2rem 0.48rem; font-size: 0.68rem; cursor: pointer; }
+.workspaceStageSegment:hover { color: var(--text-body); border-color: rgba(255, 255, 255, 0.18); }
+.workspaceStageSegmentActive { color: var(--text-strong); border-color: rgba(157, 190, 247, 0.62); background: rgba(120, 149, 209, 0.24); }
+
+.paintCockpitRecipePanel { display: grid; gap: 0.8rem; }
+.paintCockpitTarget { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem; border-radius: 12px; background: rgba(13, 18, 25, 0.88); }
+.paintCockpitTargetSwatch { width: 52px; height: 52px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.24); }
+.paintCockpitTargetSwatchSmall { width: 36px; height: 36px; border-radius: 10px; }
+.paintCockpitHex { font-size: 0.9rem; color: var(--text-strong); margin: 0; }
+.paintCockpitPredictionRow { display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; align-items: start; }
+.paintCockpitRecipeText { font-size: 0.76rem; line-height: 1.5; color: var(--text-body); border-left: 1px solid rgba(255, 255, 255, 0.1); padding-left: 0.55rem; }
+.paintCockpitGuidance { margin: 0; padding-left: 1rem; display: grid; gap: 0.25rem; color: var(--text-muted); font-size: 0.72rem; }
+.paintCockpitActions { display: grid; gap: 0.45rem; }
+.metaText { font-size: 0.75rem; color: var(--text-muted); }
+.subtleText { font-size: 0.75rem; color: var(--text-subtle); }
+
+.paintUsedTray { grid-area: tray; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 0.45rem 0.65rem; background: linear-gradient(180deg, rgba(13, 18, 24, 0.9), rgba(10, 13, 19, 0.84)); }
+.paintUsedTrayHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+.paintUsedTrayRail { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.2rem; }
+.paintUsedChip { display: inline-flex; align-items: center; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 999px; background: rgba(19, 24, 34, 0.85); color: var(--text-body); padding: 0.2rem 0.24rem; font-size: 0.72rem; white-space: nowrap; animation: chipSlideIn 240ms ease-out; }
+.paintUsedChipSelect { display: inline-flex; align-items: center; gap: 0.4rem; border: 0; border-radius: 999px; background: transparent; color: inherit; padding: 0.06rem 0.36rem 0.06rem 0.06rem; cursor: pointer; }
+.paintUsedChipActive { border-color: rgba(154, 183, 235, 0.72); box-shadow: 0 0 0 1px rgba(154, 183, 235, 0.45); }
+.paintUsedChipSwatch { width: 16px; height: 16px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.35); }
+.paintUsedChipDelete { border: 0; border-radius: 999px; min-width: 24px; height: 24px; padding: 0 0.45rem; background: rgba(255, 255, 255, 0.06); color: rgba(231, 213, 227, 0.85); font-size: 0.72rem; line-height: 1; cursor: pointer; }
+.paintUsedChipDeleteArmed { background: rgba(183, 87, 118, 0.22); color: #ffdfe7; }
+
+.floatingWheel { position: absolute; z-index: 20; user-select: none; }
+.floatingWheelOrb { width: 56px; height: 56px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.26); background: radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.32), rgba(31, 38, 48, 0.95)); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.46); display: grid; place-items: center; animation: wheelBreathe 3.4s ease-in-out infinite; transition: transform 220ms ease, box-shadow 220ms ease; }
+.floatingWheelOrb:hover { transform: translateY(-1px) scale(1.03); }
+.floatingWheelOrbHasColor { box-shadow: 0 8px 24px color-mix(in srgb, var(--selected-color) 35%, transparent), 0 10px 30px rgba(0, 0, 0, 0.46); }
+.floatingWheelOrbInner { width: 28px; height: 28px; border-radius: 999px; border: 2px solid rgba(255, 255, 255, 0.76); background: var(--selected-color, #6f7f96); }
+.floatingWheelPanel { position: absolute; top: 68px; left: -114px; width: 292px; padding: 0.72rem; border-radius: 16px; background: rgba(11, 15, 22, 0.92); border: 1px solid rgba(255, 255, 255, 0.11); backdrop-filter: blur(12px); box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42); animation: wheelBloom 240ms cubic-bezier(0.2, 0.85, 0.22, 1); }
+.floatingWheelModes { display: flex; gap: 0.3rem; margin-bottom: 0.55rem; }
+.floatingWheelMode { border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.12); color: var(--text-muted); padding: 0.22rem 0.52rem; text-transform: capitalize; font-size: 0.72rem; }
+.floatingWheelModeActive { color: var(--text-strong); border-color: rgba(156, 183, 234, 0.7); background: rgba(126, 156, 211, 0.2); }
+.floatingWheelRing { position: relative; height: 244px; display: grid; place-items: center; }
+.floatingWheelNode { position: absolute; left: 50%; top: 50%; margin-left: -23px; margin-top: -23px; background: transparent; border: none; display: grid; place-items: center; border-radius: 999px; padding: 0; transition: transform 180ms ease, filter 180ms ease; }
+.floatingWheelNode::before { content: ''; width: var(--node-visual-size, 40px); height: var(--node-visual-size, 40px); border-radius: 999px; border: 1.2px solid rgba(255, 255, 255, 0.35); background: var(--node-color, #8ea2bb); box-shadow: 0 8px 16px rgba(0, 0, 0, 0.46); transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
+.floatingWheelNode:hover::before { transform: scale(1.08); box-shadow: 0 12px 22px rgba(0, 0, 0, 0.52); }
+.floatingWheelNodeActive::before { border-color: rgba(255, 255, 255, 0.97); box-shadow: 0 0 0 3px rgba(8, 11, 18, 0.9), 0 0 0 5px color-mix(in srgb, var(--node-color, #a9b8d6) 78%, white), 0 0 26px color-mix(in srgb, var(--node-color, #a9b8d6) 40%, transparent); }
+
+@keyframes wheelBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+@keyframes wheelBloom { from { opacity: 0; transform: translateY(-6px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes chipSlideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 1200px) {
+  .workspaceImageShell { min-height: 460px; }
+  .workspaceImageCanvas { min-height: 460px; }
+}
+
+@media (max-width: 1120px) {
+  .paintCockpitLayout { grid-template-columns: 1fr; grid-template-areas: 'stage' 'recipe' 'tray'; }
+  .paintCockpitStage { min-height: 58vh; }
+}

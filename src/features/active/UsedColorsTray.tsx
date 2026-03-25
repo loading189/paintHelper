@@ -1,3 +1,4 @@
+import styles from './ActivePaintingPage.module.css';
 import { useEffect, useState } from 'react';
 
 export type UsedTrayColor = {
@@ -37,34 +38,34 @@ export const UsedColorsTray = ({ usedColors, activeHex, onSelect, onDelete }: Pr
   };
 
   return (
-    <section className="paint-used-tray">
-      <div className="paint-used-tray__header">
+    <section className={styles.paintUsedTray}>
+      <div className={styles.paintUsedTrayHeader}>
         <p className="studio-kicker">Used colors in painting</p>
-        <span className="text-xs text-[color:var(--text-subtle)]">{usedColors.length} saved</span>
+        <span className={styles.subtleText}>{usedColors.length} saved</span>
       </div>
 
-      <div className="paint-used-tray__rail">
+      <div className={styles.paintUsedTrayRail}>
         {usedColors.length ? (
           usedColors.map((color) => {
             const confirmDelete = armedDeleteId === color.id;
             return (
               <div
                 key={color.id}
-                className={`paint-used-chip ${activeHex === color.hex ? 'active' : ''}`}
+                className={`${styles.paintUsedChip} ${activeHex === color.hex ? styles.paintUsedChipActive : ""}`}
                 title={`${color.hex} · V${color.value}`}
               >
                 <button
                   type="button"
-                  className="paint-used-chip__select"
+                  className={styles.paintUsedChipSelect}
                   onClick={() => onSelect(color)}
                 >
-                  <span className="paint-used-chip__swatch" style={{ backgroundColor: color.hex }} />
+                  <span className={styles.paintUsedChipSwatch} style={{ backgroundColor: color.hex }} />
                   <span>{color.hex}</span>
                 </button>
 
                 <button
                   type="button"
-                  className={`paint-used-chip__delete ${confirmDelete ? 'is-armed' : ''}`}
+                  className={`${styles.paintUsedChipDelete} ${confirmDelete ? styles.paintUsedChipDeleteArmed : ""}`}
                   onClick={() => handleDelete(color.id)}
                   aria-label={confirmDelete ? `Confirm delete ${color.hex}` : `Delete ${color.hex}`}
                 >
@@ -74,7 +75,7 @@ export const UsedColorsTray = ({ usedColors, activeHex, onSelect, onDelete }: Pr
             );
           })
         ) : (
-          <p className="text-xs text-[color:var(--text-muted)]">Mark colors as used to build your in-painting palette.</p>
+          <p className={styles.metaText}>Mark colors as used to build your in-painting palette.</p>
         )}
       </div>
     </section>

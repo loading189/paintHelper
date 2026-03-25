@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import styles from './ActivePaintingPage.module.css';
 
 export type WheelMode = 'painting' | 'view' | 'saved';
 
@@ -102,11 +103,11 @@ export const FloatingColorWheel = ({
   return (
     <div
       ref={rootRef}
-      className={`floating-wheel ${expanded ? 'is-expanded' : ''}`}
+      className={styles.floatingWheel}
       style={{ left: position.x, top: position.y }}
     >
       <button
-        className={`floating-wheel-orb ${selectedHex ? 'has-color' : ''}`}
+        className={`${styles.floatingWheelOrb} ${selectedHex ? styles.floatingWheelOrbHasColor : ""}`}
         style={{ '--selected-color': selectedHex ?? '#6f7f96' } as CSSProperties}
         onMouseDown={(event) => {
           if (event.button !== 0) return;
@@ -141,16 +142,16 @@ export const FloatingColorWheel = ({
         }}
         aria-label="Toggle color wheel"
       >
-        <span className="floating-wheel-orb__inner" />
+        <span className={styles.floatingWheelOrbInner} />
       </button>
 
       {expanded ? (
-        <div className="floating-wheel-panel">
-          <div className="floating-wheel-modes">
+        <div className={styles.floatingWheelPanel}>
+          <div className={styles.floatingWheelModes}>
             {modes.map((entry) => (
               <button
                 key={entry}
-                className={`floating-wheel-mode ${mode === entry ? 'active' : ''}`}
+                className={`${styles.floatingWheelMode} ${mode === entry ? styles.floatingWheelModeActive : ""}`}
                 onClick={() => onChangeMode(entry)}
               >
                 {entry}
@@ -158,7 +159,7 @@ export const FloatingColorWheel = ({
             ))}
           </div>
 
-          <div className="floating-wheel-ring">
+          <div className={styles.floatingWheelRing}>
             {ringNodes.map((node, index) => {
               const angle = (Math.PI * 2 * index) / Math.max(1, ringNodes.length) - Math.PI / 2;
               const radius = 98;
@@ -170,7 +171,7 @@ export const FloatingColorWheel = ({
               return (
                 <button
                   key={node.id}
-                  className={`floating-wheel-node ${selectedHex === node.hex ? 'active' : ''}`}
+                  className={`${styles.floatingWheelNode} ${selectedHex === node.hex ? styles.floatingWheelNodeActive : ""}`}
                   style={{
                     '--node-color': node.hex,
                     '--node-visual-size': `${visualSize}px`,
