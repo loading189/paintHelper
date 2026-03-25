@@ -41,26 +41,51 @@ export const FloatingColorWheel = ({
   onSelectColor,
 }: Props) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
-  const dragDistanceRef = useRef(0);
+  const dragRef = useRef<{
+    offsetX: number;
+    offsetY: number;
+    startClientX: number;
+    startClientY: number;
+    activated: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
+  const DRAG_THRESHOLD_PX = 6;
+
+  const getParentRect = () => {
+    const offsetParent = rootRef.current?.offsetParent;
+    if (offsetParent instanceof HTMLElement) {
+      return offsetParent.getBoundingClientRect();
+    }
+    return { left: 0, top: 0 };
+  };
 
   useEffect(() => {
     const onMoveDoc = (event: MouseEvent) => {
-      if (!dragRef.current) return;
-      dragDistanceRef.current += Math.abs(event.movementX) + Math.abs(event.movementY);
-      if (dragDistanceRef.current > 3) {
+      const dragState = dragRef.current;
+      if (!dragState) return;
+
+      const deltaX = event.clientX - dragState.startClientX;
+      const deltaY = event.clientY - dragState.startClientY;
+      if (!dragState.activated && Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD_PX) {
+        dragState.activated = true;
         setIsDragging(true);
       }
+
+      if (!dragState.activated) return;
+
+      const parentRect = getParentRect();
       onMove({
-        x: Math.max(12, event.clientX - dragRef.current.dx),
-        y: Math.max(12, event.clientY - dragRef.current.dy),
+        x: Math.max(12, event.clientX - parentRect.left - dragState.offsetX),
+        y: Math.max(12, event.clientY - parentRect.top - dragState.offsetY),
       });
     };
 
     const onUp = () => {
+      if (dragRef.current?.activated) {
+        suppressClickRef.current = true;
+      }
       dragRef.current = null;
-      dragDistanceRef.current = 0;
       setTimeout(() => setIsDragging(false), 0);
     };
 
@@ -85,15 +110,32 @@ export const FloatingColorWheel = ({
         style={{ '--selected-color': selectedHex ?? '#6f7f96' } as CSSProperties}
         onMouseDown={(event) => {
           if (event.button !== 0) return;
+          event.preventDefault();
+
+          const parentRect = getParentRect();
           const rect = rootRef.current?.getBoundingClientRect();
           if (!rect) return;
+
           dragRef.current = {
-            dx: event.clientX - rect.left,
-            dy: event.clientY - rect.top,
+            offsetX: event.clientX - rect.left,
+            offsetY: event.clientY - rect.top,
+            startClientX: event.clientX,
+            startClientY: event.clientY,
+            activated: false,
           };
-          dragDistanceRef.current = 0;
+
+          // If the wheel is already out-of-sync with its parent coordinate space,
+          // normalize on pickup so the drag starts with the exact grab point.
+          onMove({
+            x: rect.left - parentRect.left,
+            y: rect.top - parentRect.top,
+          });
         }}
         onClick={() => {
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            return;
+          }
           if (isDragging) return;
           onToggleExpanded();
         }}
