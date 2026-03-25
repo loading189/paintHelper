@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MixerPage } from '../features/mixer/MixerPage';
 import { ActivePaintingPage } from '../features/active/ActivePaintingPage';
-import { PaintingPrepPage } from '../features/prep/PaintingPrepPage';
 import { PaintsPage } from '../features/paints/PaintsPage';
 import { SessionsPage } from '../features/sessions/SessionsPage';
 import { loadAppState, saveAppState } from '../lib/storage/localState';
@@ -10,7 +9,6 @@ import type { MixRecipe, Paint, RankedRecipe, UserSettings, WorkspaceView } from
 import { createId } from '../lib/utils/id';
 
 const navItems: Array<{ id: WorkspaceView; label: string }> = [
-  { id: 'prep', label: 'Prep' },
   { id: 'paint', label: 'Paint' },
   { id: 'mixer', label: 'Mixer' },
   { id: 'projects', label: 'Projects' },
@@ -18,7 +16,7 @@ const navItems: Array<{ id: WorkspaceView; label: string }> = [
 ];
 
 const App = () => {
-  const [view, setView] = useState<WorkspaceView>('prep');
+  const [view, setView] = useState<WorkspaceView>('paint');
   const [state, setState] = useState(loadAppState);
   const [saveMessage, setSaveMessage] = useState('');
   const [isPreparingSave, setIsPreparingSave] = useState(false);
@@ -215,23 +213,12 @@ const App = () => {
 
       {/* MAIN */}
       <main className="studio-main">
-        {view === 'prep' && (
-          <PaintingPrepPage
-            session={currentSession}
-            paints={state.paints}
-            settings={state.settings}
-            onSessionChange={updateSession}
-            onCreateProject={createProject}
-          />
-        )}
-
         {view === 'paint' && (
           <ActivePaintingPage
             session={currentSession}
             paints={state.paints}
             settings={state.settings}
             onSessionChange={updateSession}
-            onReopenInPrep={() => setView('prep')}
           />
         )}
 
@@ -252,7 +239,7 @@ const App = () => {
             currentSessionId={state.currentSessionId}
             onSelect={(id) => {
               setState((c) => ({ ...c, currentSessionId: id }));
-              setView('prep');
+              setView('paint');
             }}
             onCreate={createProject}
           />

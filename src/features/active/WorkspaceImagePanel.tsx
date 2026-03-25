@@ -237,7 +237,7 @@ export const WorkspaceImagePanel = ({
   const hoverTemperature = liveHover ? classifyTemperature(liveHover.hex) : null;
 
   if (!image?.dataUrl) {
-    return <div className="paint-reference-empty">Upload a reference image in Prep.</div>;
+    return <div className="paint-reference-empty">Upload a reference image to start painting.</div>;
   }
 
   return (

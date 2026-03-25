@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '../../components/Card';
 import { solveColorTarget } from '../../lib/color/solvePipeline';
 import { createId } from '../../lib/utils/id';
@@ -37,7 +37,6 @@ type ActivePaintingPageProps = {
   paints: Paint[];
   settings: UserSettings;
   onSessionChange: (session: PaintingSession) => void;
-  onReopenInPrep: () => void;
 };
 
 const toNode = (color: VisibleColorCluster): WheelColorNode => ({
@@ -51,9 +50,9 @@ export const ActivePaintingPage = ({
   session,
   paints,
   settings,
-  onReopenInPrep,
-  onSessionChange: _onSessionChange,
+  onSessionChange,
 }: ActivePaintingPageProps) => {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedColor, setSelectedColor] = useState<SelectedColor | null>(null);
   const [wheelMode, setWheelMode] = useState<WheelMode>('painting');
   const [wheelExpanded, setWheelExpanded] = useState(false);
@@ -85,7 +84,7 @@ export const ActivePaintingPage = ({
         <div className="space-y-3">
           <p className="studio-kicker">Paint</p>
           <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[color:var(--text-strong)]">No project selected</h2>
-          <p className="text-sm text-[color:var(--text-muted)]">Open a project in Prep first.</p>
+          <p className="text-sm text-[color:var(--text-muted)]">Select or create a project to begin painting.</p>
         </div>
       </Card>
     );
@@ -133,13 +132,68 @@ export const ActivePaintingPage = ({
     });
   };
 
+  const updateSession = (patch: Partial<PaintingSession>) => {
+    if (!session) return;
+    onSessionChange({
+      ...session,
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const handleUpload = async (file: File | undefined) => {
+    if (!file || !session) return;
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+    updateSession({
+      referenceImage: {
+        id: createId('reference-image'),
+        name: file.name,
+        mimeType: file.type,
+        dataUrl,
+        addedAt: new Date().toISOString(),
+      },
+    });
+  };
+
   return (
     <div className="paint-cockpit-layout">
       <section className="paint-cockpit-main">
         <Card className="paint-cockpit-stage-card">
           <div className="paint-cockpit-stage-header">
             <div className="paint-cockpit-actions-row">
-              <button className="studio-button studio-button-secondary" onClick={onReopenInPrep}>Open Prep</button>
+              <input
+                ref={fileInputRef}
+                className="hidden"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(event) => {
+                  void handleUpload(event.target.files?.[0]);
+                  event.currentTarget.value = '';
+                }}
+              />
+              <button
+                className="studio-button studio-button-secondary"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {session.referenceImage ? 'Replace' : 'Upload'}
+              </button>
+              <button
+                className="studio-button studio-button-secondary"
+                onClick={() => updateSession({ referenceImage: undefined })}
+                disabled={!session.referenceImage}
+              >
+                Clear
+              </button>
+              {session.referenceImage && (
+                <span className="studio-chip studio-chip-info">{session.referenceImage.name}</span>
+              )}
               <button
                 className="studio-button studio-button-secondary"
                 onClick={() => {

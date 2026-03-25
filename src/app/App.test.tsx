@@ -6,7 +6,6 @@ describe('App workstation shell', () => {
   it('renders the compact control strip navigation and project controls', () => {
     const markup = renderToStaticMarkup(<App />);
     expect(markup).toContain('Paint Mix Matcher');
-    expect(markup).toContain('Prep');
     expect(markup).toContain('Paint');
     expect(markup).toContain('Mixer');
     expect(markup).toContain('Projects');
