@@ -1,82 +1,124 @@
 .page {
   min-height: 100vh;
-  padding: 24px;
+  padding: 28px;
   background:
-    radial-gradient(circle at 14% 0%, rgba(255, 173, 107, 0.08), transparent 24%),
-    radial-gradient(circle at 88% 0%, rgba(116, 151, 255, 0.08), transparent 26%),
-    linear-gradient(180deg, #0b0d13 0%, #08090f 100%);
-  color: rgba(250, 243, 236, 0.96);
+    radial-gradient(circle at 14% -6%, rgba(255, 154, 204, 0.2), transparent 28%),
+    radial-gradient(circle at 92% -12%, rgba(129, 155, 255, 0.2), transparent 34%),
+    radial-gradient(circle at 48% 110%, rgba(108, 64, 176, 0.18), transparent 36%),
+    linear-gradient(180deg, #090b12 0%, #070910 44%, #05070d 100%);
+  color: rgba(252, 246, 240, 0.95);
 }
 
 .shell {
-  border-radius: 34px;
-  padding: 28px;
+  position: relative;
+  isolation: isolate;
+  border-radius: 38px;
+  padding: 30px;
   background:
-    radial-gradient(circle at top, rgba(244, 153, 87, 0.08), transparent 34%),
-    linear-gradient(180deg, rgba(28, 21, 21, 0.95), rgba(9, 11, 16, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    radial-gradient(circle at 50% -32%, rgba(252, 177, 219, 0.14), transparent 54%),
+    radial-gradient(circle at 88% 12%, rgba(125, 146, 255, 0.14), transparent 42%),
+    linear-gradient(170deg, rgba(28, 22, 33, 0.9), rgba(8, 10, 16, 0.96) 52%, rgba(6, 8, 14, 0.98));
+  box-shadow:
+    0 44px 90px rgba(0, 0, 0, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -24px 44px rgba(20, 8, 34, 0.28);
+}
+
+.shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: none;
 }
 
 .pageHeader h1 {
   margin: 0;
-  font-size: clamp(2rem, 4.2vw, 3.2rem);
-  letter-spacing: -0.04em;
+  font-size: clamp(2rem, 4.1vw, 3.15rem);
+  letter-spacing: -0.045em;
+  text-wrap: balance;
 }
 
 .kicker {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-size: 0.74rem;
-  color: rgba(255, 208, 174, 0.72);
+  letter-spacing: 0.17em;
+  font-size: 0.73rem;
+  color: rgba(255, 208, 188, 0.75);
 }
 
 .intro {
-  margin: 12px 0 0;
-  color: rgba(242, 224, 210, 0.75);
+  margin: 14px 0 0;
+  max-width: 65ch;
+  color: rgba(241, 226, 214, 0.78);
 }
 
 .stageRail {
-  margin-top: 18px;
+  margin-top: 20px;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
 
 .stageChip {
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(236, 225, 214, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(236, 223, 212, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 360ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .stageChipActive {
-  color: rgba(255, 247, 240, 0.94);
-  border-color: rgba(142, 178, 255, 0.4);
-  box-shadow: 0 0 18px rgba(142, 178, 255, 0.15);
+  color: rgba(255, 246, 238, 0.96);
+  border-color: rgba(174, 196, 255, 0.52);
+  box-shadow: 0 0 22px rgba(142, 178, 255, 0.2), inset 0 0 18px rgba(117, 130, 248, 0.15);
 }
 
 .stageSection {
-  margin-top: 24px;
-  border-radius: 28px;
-  padding: 22px;
+  margin-top: 26px;
+  border-radius: 30px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% -20%, rgba(255, 198, 226, 0.12), transparent 48%),
+    linear-gradient(180deg, rgba(18, 16, 26, 0.82), rgba(8, 10, 16, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 18px 50px rgba(1, 3, 8, 0.45);
+  animation: settle 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.stageSection::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   border: 1px solid rgba(255, 255, 255, 0.07);
-  background: linear-gradient(180deg, rgba(24, 20, 22, 0.88), rgba(12, 14, 20, 0.95));
-  animation: settle 520ms ease both;
+  pointer-events: none;
+}
+
+.stageOneLocked {
+  opacity: 0.66;
+  transform: scale(0.994);
+  filter: saturate(0.86);
 }
 
 .stageTwo {
   background:
-    radial-gradient(circle at center, rgba(77, 116, 217, 0.1), transparent 42%),
-    linear-gradient(180deg, rgba(21, 23, 31, 0.95), rgba(9, 10, 16, 0.98));
+    radial-gradient(circle at 48% 0%, rgba(104, 136, 255, 0.18), transparent 52%),
+    radial-gradient(circle at 80% 10%, rgba(214, 96, 255, 0.14), transparent 50%),
+    linear-gradient(180deg, rgba(14, 17, 30, 0.9), rgba(7, 10, 18, 0.96));
 }
 
 .stageThree {
   background:
-    radial-gradient(circle at top, rgba(255, 166, 96, 0.08), transparent 40%),
-    linear-gradient(180deg, rgba(24, 20, 27, 0.92), rgba(9, 10, 16, 0.98));
+    radial-gradient(circle at 26% 0%, rgba(106, 120, 244, 0.14), transparent 46%),
+    linear-gradient(180deg, rgba(15, 18, 30, 0.9), rgba(7, 9, 17, 0.97));
 }
 
 .stageHeader {
@@ -88,80 +130,107 @@
 
 .stageHeader p {
   margin: 0 0 4px;
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: rgba(255, 204, 168, 0.68);
+  letter-spacing: 0.16em;
+  color: rgba(255, 210, 190, 0.72);
 }
 
 .stageHeader h2 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.45rem;
 }
 
 .stageHeader span {
   max-width: 460px;
-  color: rgba(230, 216, 206, 0.66);
+  color: rgba(236, 221, 211, 0.72);
 }
 
 .slotGrid {
-  margin-top: 18px;
+  margin-top: 20px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
 .slotCard {
-  border-radius: 22px;
+  border-radius: 24px;
   padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  background:
+    radial-gradient(circle at 26% 8%, rgba(255, 181, 216, 0.11), transparent 42%),
+    linear-gradient(190deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 18px rgba(0, 0, 0, 0.24);
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.slotCard:hover {
+  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 14px 30px rgba(0, 0, 0, 0.32);
 }
 
 .slotTop {
   display: grid;
-  grid-template-columns: 44px 1fr;
+  grid-template-columns: 46px 1fr;
   gap: 10px;
   align-items: center;
 }
 
 .slotOrb {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: inset 0 2px 8px rgba(255, 255, 255, 0.1), 0 8px 18px rgba(0, 0, 0, 0.24);
+  box-shadow:
+    inset 0 6px 12px rgba(255, 255, 255, 0.2),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.26),
+    0 10px 16px rgba(0, 0, 0, 0.26);
 }
 
 .slotTop small {
-  color: rgba(217, 214, 225, 0.62);
+  color: rgba(223, 219, 232, 0.66);
 }
 
 .slotSelect,
 .stageThreeFooter select {
   margin-top: 10px;
   width: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(13, 16, 22, 0.88);
-  color: rgba(249, 245, 238, 0.92);
+  border-radius: 14px;
+  border: none;
+  background: rgba(9, 12, 20, 0.8);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: rgba(249, 245, 238, 0.94);
   padding: 9px 10px;
 }
 
 .partsRow {
-  margin-top: 10px;
+  margin-top: 11px;
   display: inline-flex;
   gap: 10px;
   align-items: center;
 }
 
 .partsRow button {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
   border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(250, 248, 245, 0.94);
+  background: rgba(255, 255, 255, 0.11);
+  color: rgba(252, 249, 245, 0.96);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.partsRow button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(255, 187, 222, 0.22);
+}
+
+.partsRow button:active,
+.lockButton:active,
+.primaryButton:active,
+.secondaryButton:active,
+.forwardRailHead button:active,
+.recentRow button:active,
+.arcPaint:active {
+  transform: scale(0.97);
 }
 
 .partsSlider,
@@ -172,7 +241,7 @@
 }
 
 .realityBar {
-  margin-top: 18px;
+  margin-top: 20px;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -185,8 +254,8 @@
 }
 
 .realityColorBlock > span {
-  color: rgba(236, 220, 207, 0.72);
-  font-size: 0.86rem;
+  color: rgba(238, 224, 215, 0.75);
+  font-size: 0.88rem;
 }
 
 .realityColorButton {
@@ -201,12 +270,15 @@
   width: 86px;
   height: 86px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow:
-    inset 0 4px 14px rgba(255, 255, 255, 0.18),
-    inset 0 -12px 24px rgba(0, 0, 0, 0.28),
-    0 0 36px color-mix(in srgb, var(--swatch-glow) 45%, transparent),
+    inset 0 5px 15px rgba(255, 255, 255, 0.22),
+    inset 0 -14px 24px rgba(0, 0, 0, 0.28),
+    0 0 46px color-mix(in srgb, var(--swatch-glow) 52%, transparent),
     0 14px 30px rgba(0, 0, 0, 0.35);
+}
+
+.realityColorBubble {
+  animation: realityPulse 6s ease-in-out infinite;
 }
 
 .realityColorButton input {
@@ -222,38 +294,54 @@
 .forwardRailHead button {
   border: none;
   border-radius: 999px;
-  padding: 11px 16px;
+  padding: 11px 17px;
   cursor: pointer;
   font-weight: 600;
+  transition: transform 180ms ease, box-shadow 260ms ease, filter 260ms ease;
 }
 
 .lockButton,
 .primaryButton {
-  background: linear-gradient(180deg, #9ab9ff, #6f92ed);
-  color: #06101e;
+  background: linear-gradient(170deg, #c1b5ff, #7e93f1 62%, #6f83dd);
+  color: #0a1124;
+  box-shadow: 0 12px 28px rgba(115, 130, 232, 0.35);
+}
+
+.lockButton:hover,
+.primaryButton:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow: 0 20px 34px rgba(134, 150, 255, 0.35), 0 0 24px rgba(212, 156, 255, 0.24);
 }
 
 .lockButton:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .recentRow {
-  margin-top: 12px;
+  margin-top: 14px;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 9px;
 }
 
 .recentRow button {
   border: none;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(241, 236, 228, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(243, 237, 229, 0.94);
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
+  transition: transform 200ms ease, box-shadow 240ms ease;
+}
+
+.recentRow button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(255, 185, 224, 0.18);
 }
 
 .recentRow span {
@@ -264,17 +352,20 @@
 
 .heroCompare {
   margin-top: 16px;
-  border-radius: 28px;
-  padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(8, 11, 18, 0.7);
+  border-radius: 30px;
+  padding: 22px;
   position: relative;
   overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(138, 171, 255, 0.14), transparent 50%),
+    radial-gradient(circle at 65% 10%, rgba(239, 131, 255, 0.1), transparent 44%),
+    rgba(8, 12, 21, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 48px rgba(2, 5, 11, 0.4);
 }
 
 .arcLayer {
   position: relative;
-  min-height: 170px;
+  min-height: 174px;
 }
 
 .arcPaint {
@@ -286,14 +377,27 @@
   width: 58px;
   height: 58px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: none;
   background: var(--paint-hex);
   transform:
     rotate(var(--arc-angle))
     translateY(-124px)
     rotate(calc(-1 * var(--arc-angle)));
-  transition: transform 220ms ease;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 260ms ease, filter 260ms ease;
+  box-shadow:
+    inset 0 5px 11px rgba(255, 255, 255, 0.2),
+    inset 0 -9px 15px rgba(0, 0, 0, 0.25),
+    0 10px 24px rgba(0, 0, 0, 0.38),
+    0 0 20px color-mix(in srgb, var(--paint-hex) 32%, transparent);
+  animation: arcEnter 620ms cubic-bezier(0.22, 1, 0.36, 1) both, arcFloat 6.8s ease-in-out infinite;
+}
+
+.arcPaint:hover {
+  transform:
+    rotate(var(--arc-angle))
+    translateY(-128px)
+    rotate(calc(-1 * var(--arc-angle)))
+    scale(1.03);
 }
 
 .arcPaint span {
@@ -302,20 +406,57 @@
   bottom: -24px;
   transform: translateX(-50%);
   font-size: 0.72rem;
-  color: rgba(230, 224, 237, 0.82);
+  color: rgba(236, 230, 244, 0.84);
   white-space: nowrap;
 }
 
 .arcPaintActive {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 10px 24px rgba(0, 0, 0, 0.32);
+  box-shadow:
+    inset 0 6px 12px rgba(255, 255, 255, 0.26),
+    0 0 0 2px rgba(250, 245, 255, 0.8),
+    0 12px 26px rgba(0, 0, 0, 0.38),
+    0 0 28px color-mix(in srgb, var(--paint-hex) 48%, transparent);
 }
 
 .compareRow {
-  margin-top: 8px;
+  margin-top: 12px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 300px minmax(0, 1fr);
   align-items: center;
   gap: 16px;
+  position: relative;
+}
+
+.compareLink {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  top: 50%;
+  height: 2px;
+  border-radius: 999px;
+  opacity: calc(0.25 + var(--link-strength, 0.3));
+  filter: blur(0.3px);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(177, 204, 255, 0.18) 0 11px,
+      rgba(177, 204, 255, 0.08) 11px 20px
+    );
+  box-shadow: 0 0 20px rgba(153, 180, 255, 0.22);
+  transition: opacity 420ms ease, transform 420ms ease, box-shadow 420ms ease;
+}
+
+.compareLinkClose {
+  background: linear-gradient(90deg, rgba(173, 197, 255, 0.18), rgba(246, 158, 252, 0.28), rgba(173, 197, 255, 0.18));
+  box-shadow: 0 0 30px rgba(201, 166, 255, 0.38);
+}
+
+.compareLinkMid {
+  transform: scaleX(0.92);
+}
+
+.compareLinkFar {
+  transform: scaleX(0.78);
 }
 
 .compareCol {
@@ -326,7 +467,7 @@
 
 .compareCol small {
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   color: rgba(228, 214, 196, 0.72);
 }
 
@@ -334,7 +475,7 @@
   width: clamp(140px, 19vw, 210px);
   height: auto;
   aspect-ratio: 1;
-  animation: breathe 4.2s ease-in-out infinite;
+  animation: breathe 5.2s ease-in-out infinite;
 }
 
 .heroBridge {
@@ -344,37 +485,38 @@
 
 .metricCard {
   text-align: center;
-  border-radius: 16px;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(13, 16, 24, 0.84);
+  border-radius: 18px;
+  padding: 13px;
+  background: rgba(13, 16, 26, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 10px 22px rgba(0, 0, 0, 0.32);
 }
 
 .metricCard span {
   display: block;
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.13em;
   color: rgba(225, 215, 199, 0.64);
 }
 
 .fixedRecipeTag {
   text-align: center;
   font-size: 0.82rem;
-  color: rgba(234, 224, 208, 0.84);
+  color: rgba(234, 224, 208, 0.86);
 }
 
-.excellent { box-shadow: 0 0 0 1px rgba(86, 215, 163, 0.38); }
-.good { box-shadow: 0 0 0 1px rgba(120, 174, 255, 0.4); }
-.warning { box-shadow: 0 0 0 1px rgba(242, 184, 92, 0.4); }
-.poor { box-shadow: 0 0 0 1px rgba(252, 105, 105, 0.45); }
+.excellent { box-shadow: inset 0 0 0 1px rgba(86, 215, 163, 0.5), 0 0 22px rgba(86, 215, 163, 0.16); }
+.good { box-shadow: inset 0 0 0 1px rgba(120, 174, 255, 0.5), 0 0 22px rgba(120, 174, 255, 0.16); }
+.warning { box-shadow: inset 0 0 0 1px rgba(242, 184, 92, 0.5), 0 0 22px rgba(242, 184, 92, 0.16); }
+.poor { box-shadow: inset 0 0 0 1px rgba(252, 105, 105, 0.56), 0 0 22px rgba(252, 105, 105, 0.18); }
 
 .forwardRail {
-  margin-top: 16px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 18px;
+  border-radius: 24px;
   background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 10px 22px rgba(0, 0, 0, 0.25);
   padding: 16px;
+  animation: popIn 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .forwardRailHead {
@@ -386,7 +528,7 @@
 .forwardRailHead p {
   margin: 0 0 4px;
   font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(226, 214, 204, 0.58);
 }
@@ -403,9 +545,9 @@
 }
 
 .slider {
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   padding: 10px;
 }
 
@@ -422,14 +564,37 @@
   cursor: pointer;
 }
 
+.sliderRail {
+  margin-top: 6px;
+}
+
 .sliderRail strong {
+  display: block;
+  margin-top: 6px;
   font-size: 0.82rem;
   color: rgba(250, 246, 240, 0.9);
 }
 
-.sliderSafe { accent-color: #55dda2; }
-.sliderWarn { accent-color: #f2ba63; }
-.sliderHot { accent-color: #ff7373; }
+.sliderInput {
+  height: 8px;
+  border-radius: 999px;
+  appearance: none;
+  background: linear-gradient(90deg, rgba(85, 221, 162, 0.82), rgba(242, 184, 99, 0.82) 66%, rgba(255, 115, 115, 0.86));
+}
+
+.sliderInput::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2), 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.sliderSafe { filter: saturate(0.9); }
+.sliderWarn { filter: saturate(1.1); }
+.sliderHot { filter: saturate(1.22); }
 
 .stageTwoActions {
   margin-top: 16px;
@@ -439,34 +604,39 @@
 }
 
 .secondaryButton {
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.1);
   color: rgba(247, 242, 236, 0.94);
 }
 
+.secondaryButton:hover,
+.forwardRailHead button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(194, 160, 255, 0.16);
+}
+
 .primaryButtonLive {
-  box-shadow: 0 0 24px rgba(132, 170, 255, 0.33);
+  box-shadow: 0 0 24px rgba(132, 170, 255, 0.35), 0 14px 24px rgba(112, 129, 242, 0.34);
 }
 
 .recipeCompareGrid {
-  margin-top: 16px;
+  margin-top: 17px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .recipePanel {
   border-radius: 14px;
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .recipePanel h4 {
   margin: 0 0 8px;
   font-size: 0.86rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(224, 206, 186, 0.68);
+  letter-spacing: 0.11em;
+  color: rgba(213, 199, 244, 0.72);
 }
 
 .recipePanel p {
@@ -474,7 +644,7 @@
 }
 
 .inverseGrid {
-  margin-top: 14px;
+  margin-top: 16px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
@@ -482,17 +652,18 @@
 
 .inverseGroup {
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
   padding: 12px;
 }
 
 .inverseGroup h5 {
   margin: 0 0 10px;
+  color: rgba(222, 212, 246, 0.9);
 }
 
 .stageThreeFooter {
-  margin-top: 12px;
+  margin-top: 14px;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -502,17 +673,37 @@
 .stageThreeFooter label span {
   display: block;
   margin-bottom: 6px;
-  color: rgba(230, 218, 203, 0.74);
+  color: rgba(225, 214, 243, 0.82);
 }
 
 @keyframes settle {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes breathe {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.02); }
+  50% { transform: scale(1.018); }
+}
+
+@keyframes realityPulse {
+  0%, 100% { transform: scale(1); box-shadow: inset 0 5px 15px rgba(255, 255, 255, 0.2), inset 0 -14px 24px rgba(0, 0, 0, 0.28), 0 0 36px color-mix(in srgb, var(--swatch-glow) 42%, transparent), 0 14px 30px rgba(0, 0, 0, 0.35); }
+  50% { transform: scale(1.02); box-shadow: inset 0 5px 15px rgba(255, 255, 255, 0.24), inset 0 -14px 24px rgba(0, 0, 0, 0.25), 0 0 44px color-mix(in srgb, var(--swatch-glow) 58%, transparent), 0 16px 32px rgba(0, 0, 0, 0.36); }
+}
+
+@keyframes arcFloat {
+  0%, 100% { margin-top: 0; }
+  50% { margin-top: -1.5px; }
+}
+
+@keyframes arcEnter {
+  from { opacity: 0; filter: blur(4px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @media (max-width: 1120px) {
@@ -526,6 +717,10 @@
   .compareRow {
     grid-template-columns: 1fr;
     text-align: center;
+  }
+
+  .compareLink {
+    display: none;
   }
 
   .stageHeader {

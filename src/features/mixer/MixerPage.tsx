@@ -58,13 +58,25 @@ const compareTone = (value: number | null): DeltaTone => {
 
 const compareCopy = (value: number | null) => {
   if (value == null) return 'Waiting for both colors';
-  if (value <= 4) return 'Excellent match';
-  if (value <= 8) return 'Believable match';
+  if (value <= 4) return 'Almost indistinguishable';
+  if (value <= 8) return 'Convincingly close';
   if (value <= 14) return 'Still visibly apart';
   return 'Far from reality';
 };
 
 const formatDelta = (value: number | null) => (value == null ? '—' : value.toFixed(2));
+
+const compareLinkClass = (value: number | null) => {
+  if (value == null) return styles.compareLinkFar;
+  if (value <= 6) return styles.compareLinkClose;
+  if (value <= 12) return styles.compareLinkMid;
+  return styles.compareLinkFar;
+};
+
+const compareLinkStrength = (value: number | null) => {
+  if (value == null) return 0.2;
+  return Math.max(0.14, Math.min(0.96, 1 - value / 20));
+};
 
 const sliderToneClass = (value: number, min: number, max: number, resetValue: number) => {
   const span = Math.max(Math.abs(max - resetValue), Math.abs(resetValue - min), 0.0001);
@@ -357,7 +369,7 @@ export const MixerPage = ({
         <header className={styles.pageHeader}>
           <p className={styles.kicker}>Guided calibration journey</p>
           <h1>Mixer calibration in three stages</h1>
-          <p className={styles.intro}>Build reality, align the predicted color, then tune how the solver re-discovers your recipe.</p>
+          <p className={styles.intro}>Build reality, align the predicted color, then tune how the system rediscovers your recipe.</p>
           <div className={styles.stageRail}>
             <div className={`${styles.stageChip} ${styles.stageChipActive}`}>1 · Build Reality</div>
             <div className={`${styles.stageChip} ${lockedReality ? styles.stageChipActive : ''}`}>2 · Match the Color</div>
@@ -365,7 +377,7 @@ export const MixerPage = ({
           </div>
         </header>
 
-        <section className={styles.stageSection}>
+        <section className={`${styles.stageSection} ${lockedReality ? styles.stageOneLocked : ''}`}>
           <div className={styles.stageHeader}>
             <div>
               <p>Stage 1</p>
@@ -424,7 +436,7 @@ export const MixerPage = ({
 
           <div className={styles.realityBar}>
             <label className={styles.realityColorBlock}>
-              <span>Reality color (truth swatch)</span>
+              <span>What did it become?</span>
               <div className={styles.realityColorButton}>
                 <span
                   className={styles.realityColorBubble}
@@ -446,7 +458,7 @@ export const MixerPage = ({
             </label>
 
             <button type="button" className={styles.lockButton} onClick={lockReality} disabled={!stageOneValid}>
-              Save / lock reality
+              Seal this reality
             </button>
           </div>
 
@@ -494,8 +506,12 @@ export const MixerPage = ({
               </div>
 
               <div className={styles.compareRow}>
+                <div
+                  className={`${styles.compareLink} ${compareLinkClass(forwardDelta)}`}
+                  style={{ '--link-strength': compareLinkStrength(forwardDelta) } as CSSProperties}
+                />
                 <div className={styles.compareCol}>
-                  <small>Actual mix</small>
+                  <small>What you mixed</small>
                   <div
                     className={styles.heroCircle}
                     style={{
@@ -508,15 +524,15 @@ export const MixerPage = ({
 
                 <div className={styles.heroBridge}>
                   <div className={`${styles.metricCard} ${styles[compareTone(forwardDelta)]}`}>
-                    <span>Match quality</span>
+                    <span>Alignment</span>
                     <strong>ΔE {formatDelta(forwardDelta)}</strong>
                     <small>{compareCopy(forwardDelta)}</small>
                   </div>
-                  <div className={styles.fixedRecipeTag}>Fixed recipe · {realitySignature}</div>
+                  <div className={styles.fixedRecipeTag}>Locked recipe · {realitySignature}</div>
                 </div>
 
                 <div className={styles.compareCol}>
-                  <small>Predicted mix</small>
+                  <small>What the model sees</small>
                   <div
                     className={styles.heroCircle}
                     style={{
@@ -532,18 +548,18 @@ export const MixerPage = ({
             <section className={styles.forwardRail}>
               <div className={styles.forwardRailHead}>
                 <div>
-                  <p>Forward tuning rail</p>
+                  <p>Teach the paint</p>
                   <h3>{activeForwardPaint?.name ?? 'Select a paint around the hero'}</h3>
                 </div>
                 <button type="button" onClick={() => setShowForwardControls((current) => !current)}>
-                  {showForwardControls ? 'Hide controls' : 'Show controls'}
+                  {showForwardControls ? 'Soften panel' : 'Open panel'}
                 </button>
               </div>
 
               {showForwardControls && activeForwardPaint && activeCalibration && activeCalibrationDefaults ? (
                 <div className={styles.sliderGrid}>
                   <CalibrationSlider
-                    label="tintingStrength"
+                    label="Tinting strength"
                     value={activeCalibration.tintingStrength}
                     min={0.75}
                     max={1.4}
@@ -552,7 +568,7 @@ export const MixerPage = ({
                     onChange={(value) => updateForward(activeForwardPaint.id, 'tintingStrength', value)}
                   />
                   <CalibrationSlider
-                    label="chromaBias"
+                    label="Chroma bias"
                     value={activeCalibration.chromaBias}
                     min={-0.25}
                     max={0.25}
@@ -561,7 +577,7 @@ export const MixerPage = ({
                     onChange={(value) => updateForward(activeForwardPaint.id, 'chromaBias', value)}
                   />
                   <CalibrationSlider
-                    label="darknessBias"
+                    label="Darkness bias"
                     value={activeCalibration.darknessBias}
                     min={-0.25}
                     max={0.25}
@@ -570,7 +586,7 @@ export const MixerPage = ({
                     onChange={(value) => updateForward(activeForwardPaint.id, 'darknessBias', value)}
                   />
                   <CalibrationSlider
-                    label="earthStrengthBias"
+                    label="Earth strength bias"
                     value={activeCalibration.earthStrengthBias}
                     min={-0.3}
                     max={0.4}
@@ -579,7 +595,7 @@ export const MixerPage = ({
                     onChange={(value) => updateForward(activeForwardPaint.id, 'earthStrengthBias', value)}
                   />
                   <CalibrationSlider
-                    label="whiteLiftBias"
+                    label="White lift bias"
                     value={activeCalibration.whiteLiftBias}
                     min={-0.2}
                     max={0.2}
@@ -593,17 +609,17 @@ export const MixerPage = ({
 
             <div className={styles.stageTwoActions}>
               <button type="button" className={styles.secondaryButton} onClick={unlockReality}>
-                Edit stage 1 reality
+                Reopen stage 1
               </button>
               <button type="button" className={styles.secondaryButton} onClick={() => resetDeveloperCalibration()}>
-                Reset all calibration
+                Reset all tuning
               </button>
               <button
                 type="button"
                 className={`${styles.primaryButton} ${stage3Open ? styles.primaryButtonLive : ''}`}
                 onClick={() => setStage3Open((current) => !current)}
               >
-                {stage3Open ? 'Collapse stage 3' : 'Continue to stage 3'}
+                {stage3Open ? 'Fold stage 3' : 'Continue to stage 3'}
               </button>
             </div>
           </section>
@@ -621,24 +637,24 @@ export const MixerPage = ({
 
             <div className={styles.recipeCompareGrid}>
               <article className={styles.recipePanel}>
-                <h4>Locked reality recipe</h4>
+                <h4>Locked recipe memory</h4>
                 <p>{realitySignature}</p>
               </article>
               <article className={styles.recipePanel}>
-                <h4>System-generated recipe</h4>
+                <h4>System interpretation</h4>
                 <p>{topRecipe?.practicalRatioText ?? 'No result yet'}</p>
               </article>
               <article className={styles.recipePanel}>
-                <h4>Solver match</h4>
+                <h4>How close they feel</h4>
                 <p>ΔE {formatDelta(inverseDelta)} · {compareCopy(inverseDelta)}</p>
               </article>
             </div>
 
             <div className={styles.inverseGrid}>
               <div className={styles.inverseGroup}>
-                <h5>Search scope</h5>
+                <h5>How should the system explore?</h5>
                 <CalibrationSlider
-                  label="maxComponents"
+                  label="Max components"
                   value={calibrationSnapshot.inverseSearch.ratioSearch.maxComponents}
                   min={1}
                   max={4}
@@ -647,7 +663,7 @@ export const MixerPage = ({
                   onChange={(value) => updateInverseNumber('ratioSearch', 'maxComponents', value)}
                 />
                 <CalibrationSlider
-                  label="neighborhoodRadius"
+                  label="Neighborhood radius"
                   value={calibrationSnapshot.inverseSearch.ratioSearch.neighborhoodRadius}
                   min={1}
                   max={6}
@@ -656,7 +672,7 @@ export const MixerPage = ({
                   onChange={(value) => updateInverseNumber('ratioSearch', 'neighborhoodRadius', value)}
                 />
                 <CalibrationSlider
-                  label="familyBeamWidth"
+                  label="Family beam width"
                   value={calibrationSnapshot.inverseSearch.global.familyBeamWidth}
                   min={3}
                   max={20}
@@ -667,9 +683,9 @@ export const MixerPage = ({
               </div>
 
               <div className={styles.inverseGroup}>
-                <h5>Ranking + practicality</h5>
+                <h5>How should the system think?</h5>
                 <CalibrationSlider
-                  label="practicalRatioHardMaxParts"
+                  label="Practical max parts"
                   value={calibrationSnapshot.inverseSearch.global.practicalRatioHardMaxParts}
                   min={6}
                   max={18}
@@ -678,7 +694,7 @@ export const MixerPage = ({
                   onChange={(value) => updateInverseNumber('global', 'practicalRatioHardMaxParts', value)}
                 />
                 <CalibrationSlider
-                  label="workableMatchThreshold"
+                  label="Workable match threshold"
                   value={calibrationSnapshot.inverseSearch.global.workableMatchThreshold}
                   min={0.1}
                   max={0.6}
@@ -687,7 +703,7 @@ export const MixerPage = ({
                   onChange={(value) => updateInverseNumber('global', 'workableMatchThreshold', value)}
                 />
                 <CalibrationSlider
-                  label="cleanlinessPenalty"
+                  label="Cleanliness penalty"
                   value={calibrationSnapshot.inverseSearch.mutedTargets.cleanlinessPenalty}
                   min={0.5}
                   max={4}
@@ -696,7 +712,7 @@ export const MixerPage = ({
                   onChange={(value) => updateInverseNumber('mutedTargets', 'cleanlinessPenalty', value)}
                 />
                 <CalibrationSlider
-                  label="muddinessPenalty"
+                  label="Muddiness penalty"
                   value={calibrationSnapshot.inverseSearch.vividTargets.muddinessPenalty}
                   min={0.5}
                   max={4}
@@ -709,7 +725,7 @@ export const MixerPage = ({
 
             <div className={styles.stageThreeFooter}>
               <label>
-                <span>Solve mode</span>
+                <span>Reasoning mode</span>
                 <select
                   value={settings.solveMode ?? 'on-hand'}
                   onChange={(event) =>
@@ -726,7 +742,7 @@ export const MixerPage = ({
 
               {topRecipe && inverseTargetHex ? (
                 <button type="button" className={styles.lockButton} onClick={() => onSaveRecipe(topRecipe, inverseTargetHex)}>
-                  Save system-generated recipe
+                  Save this rediscovered recipe
                 </button>
               ) : null}
             </div>
