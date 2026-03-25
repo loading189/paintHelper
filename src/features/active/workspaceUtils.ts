@@ -299,3 +299,9 @@ export const quantizeValueGrouping = (luminance: number, groups: 3 | 5 | 9): num
   const index = Math.round(darkness * (groups - 1));
   return clamp(index, 0, groups - 1);
 };
+
+export const colorDistanceHex = (aHex: string, bHex: string): number =>
+  colorDistance(hexToRgb(aHex), hexToRgb(bHex));
+
+export const isNearHex = (aHex: string, bHex: string, threshold = 10): boolean =>
+  colorDistanceHex(aHex, bHex) <= threshold;

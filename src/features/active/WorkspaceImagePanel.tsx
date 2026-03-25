@@ -28,36 +28,32 @@ type HoverInfo = {
 
 type Props = {
   image?: ReferenceImageMeta;
-  displayMode: DisplayMode;
-  guideMode: GuideMode;
-  sampleRadius: number;
-  visibleLimit: number;
-  pinnedHexes: Set<string>;
+  displayMode?: DisplayMode;
+  guideMode?: GuideMode;
+  sampleRadius?: number;
+  visibleLimit?: number;
+  pinnedHexes?: Set<string>;
   viewport: ViewportState | null;
   onViewportChange: (viewport: ViewportState) => void;
   onVisibleColorsChange: (colors: VisibleColorCluster[]) => void;
+  onPaintingDominantsChange?: (colors: VisibleColorCluster[]) => void;
   onSample: (sample: { point: { x: number; y: number }; hex: string; value: number }) => void;
-  onHover: (hover: HoverInfo | null) => void;
+  onHover?: (hover: HoverInfo | null) => void;
 };
 
 const formatDisplayMode = (mode: DisplayMode) => mode.replace(/-/g, ' ');
-const formatGuideMode = (mode: GuideMode) => {
-  if (mode === 'grid-3') return '3 × 3 grid';
-  if (mode === 'grid-4') return '4 × 4 grid';
-  if (mode === 'quadrants') return 'quadrants';
-  return 'off';
-};
 
 export const WorkspaceImagePanel = ({
   image,
-  displayMode,
-  guideMode,
-  sampleRadius,
-  visibleLimit,
+  displayMode = 'color',
+  guideMode = 'off',
+  sampleRadius = 2,
+  visibleLimit = 10,
   pinnedHexes,
   viewport,
   onViewportChange,
   onVisibleColorsChange,
+  onPaintingDominantsChange,
   onSample,
   onHover,
 }: Props) => {
@@ -65,9 +61,7 @@ export const WorkspaceImagePanel = ({
   const shellRef = useRef<HTMLDivElement | null>(null);
   const [bitmap, setBitmap] = useState<ImageData | null>(null);
   const [dragging, setDragging] = useState<{ x: number; y: number } | null>(null);
-  const [lastSample, setLastSample] = useState<{ point: { x: number; y: number }; hex: string; value: number } | null>(
-    null,
-  );
+  const [lastSample, setLastSample] = useState<{ point: { x: number; y: number }; hex: string; value: number } | null>(null);
   const [liveHover, setLiveHover] = useState<HoverInfo | null>(null);
 
   useEffect(() => {
@@ -93,8 +87,19 @@ export const WorkspaceImagePanel = ({
       if (!shellRef.current) return;
       const rect = shellRef.current.getBoundingClientRect();
       onViewportChange(fitViewport(img.width, img.height, rect.width, rect.height));
+
+      const full = extractVisibleClusters({
+        data: data.data,
+        width: img.width,
+        height: img.height,
+        bounds: { x: 0, y: 0, width: img.width, height: img.height },
+        maxColors: Math.max(10, visibleLimit),
+        minPercent: 0.01,
+        pinnedHexes: new Set<string>(),
+      });
+      onPaintingDominantsChange?.(full);
     };
-  }, [image, onViewportChange]);
+  }, [image, onPaintingDominantsChange, onViewportChange, visibleLimit]);
 
   useEffect(() => {
     if (!bitmap || !viewport || !canvasRef.current) return;
@@ -113,7 +118,6 @@ export const WorkspaceImagePanel = ({
     if (!scratchCtx) return;
 
     const displayImage = new ImageData(new Uint8ClampedArray(bitmap.data), bitmap.width, bitmap.height);
-
     if (displayMode !== 'color') {
       for (let i = 0; i < displayImage.data.length; i += 4) {
         const r = displayImage.data[i];
@@ -127,8 +131,7 @@ export const WorkspaceImagePanel = ({
           displayImage.data[i + 1] = gray;
           displayImage.data[i + 2] = gray;
         } else if (displayMode === 'high-contrast-grayscale') {
-          const boosted = Math.pow(l, 0.8);
-          const gray = Math.round(Math.min(1, Math.max(0, boosted)) * 255);
+          const gray = Math.round(Math.pow(l, 0.8) * 255);
           displayImage.data[i] = gray;
           displayImage.data[i + 1] = gray;
           displayImage.data[i + 2] = gray;
@@ -140,13 +143,11 @@ export const WorkspaceImagePanel = ({
         } else if (displayMode === 'edge-map') {
           const x = (i / 4) % bitmap.width;
           const y = Math.floor(i / 4 / bitmap.width);
-
           if (x > 0 && y > 0 && x < bitmap.width - 1 && y < bitmap.height - 1) {
             const leftIdx = i - 4;
             const rightIdx = i + 4;
             const upIdx = i - bitmap.width * 4;
             const downIdx = i + bitmap.width * 4;
-
             const gx =
               (bitmap.data[rightIdx] + bitmap.data[rightIdx + 1] + bitmap.data[rightIdx + 2]) -
               (bitmap.data[leftIdx] + bitmap.data[leftIdx + 1] + bitmap.data[leftIdx + 2]);
@@ -154,7 +155,6 @@ export const WorkspaceImagePanel = ({
               (bitmap.data[downIdx] + bitmap.data[downIdx + 1] + bitmap.data[downIdx + 2]) -
               (bitmap.data[upIdx] + bitmap.data[upIdx + 1] + bitmap.data[upIdx + 2]);
             const mag = Math.min(255, Math.round(Math.sqrt(gx * gx + gy * gy) / 3));
-
             displayImage.data[i] = mag;
             displayImage.data[i + 1] = mag;
             displayImage.data[i + 2] = mag;
@@ -164,7 +164,6 @@ export const WorkspaceImagePanel = ({
           const q = quantizeValueGrouping(l, groups as 3 | 5 | 9);
           const normalized = groups === 9 ? 1 - (q - 1) / 8 : 1 - q / (groups - 1);
           const gray = Math.round(normalized * 255);
-
           displayImage.data[i] = gray;
           displayImage.data[i + 1] = gray;
           displayImage.data[i + 2] = gray;
@@ -177,13 +176,7 @@ export const WorkspaceImagePanel = ({
     ctx.fillStyle = '#0D1117';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(
-      scratch,
-      viewport.offsetX,
-      viewport.offsetY,
-      bitmap.width * viewport.zoom,
-      bitmap.height * viewport.zoom,
-    );
+    ctx.drawImage(scratch, viewport.offsetX, viewport.offsetY, bitmap.width * viewport.zoom, bitmap.height * viewport.zoom);
 
     const bounds = getVisibleImageBounds(viewport);
     const visible = extractVisibleClusters({
@@ -193,7 +186,7 @@ export const WorkspaceImagePanel = ({
       bounds,
       maxColors: visibleLimit,
       minPercent: 0.015,
-      pinnedHexes,
+      pinnedHexes: pinnedHexes ?? new Set<string>(),
     });
 
     onVisibleColorsChange(visible);
@@ -209,19 +202,12 @@ export const WorkspaceImagePanel = ({
 
     for (let i = 1; i < divisions; i += 1) {
       const ratio = i / divisions;
-
       const vStart = imageToScreenPoint({ x: viewport.imageWidth * ratio, y: 0 }, viewport);
-      const vEnd = imageToScreenPoint(
-        { x: viewport.imageWidth * ratio, y: viewport.imageHeight },
-        viewport,
-      );
+      const vEnd = imageToScreenPoint({ x: viewport.imageWidth * ratio, y: viewport.imageHeight }, viewport);
       lines.push({ x1: vStart.x, y1: vStart.y, x2: vEnd.x, y2: vEnd.y });
 
       const hStart = imageToScreenPoint({ x: 0, y: viewport.imageHeight * ratio }, viewport);
-      const hEnd = imageToScreenPoint(
-        { x: viewport.imageWidth, y: viewport.imageHeight * ratio },
-        viewport,
-      );
+      const hEnd = imageToScreenPoint({ x: viewport.imageWidth, y: viewport.imageHeight * ratio }, viewport);
       lines.push({ x1: hStart.x, y1: hStart.y, x2: hEnd.x, y2: hEnd.y });
     }
 
@@ -243,7 +229,7 @@ export const WorkspaceImagePanel = ({
     <div className="workspace-image-shell" ref={shellRef}>
       <canvas
         ref={canvasRef}
-        className={`workspace-image-canvas workspace-image-canvas--${displayMode}`}
+        className="workspace-image-canvas"
         onWheel={(event) => {
           event.preventDefault();
           if (!viewport) return;
@@ -254,21 +240,19 @@ export const WorkspaceImagePanel = ({
           const zoomFactor = event.deltaY < 0 ? 1.12 : 0.89;
           const nextZoom = Math.max(0.1, Math.min(24, viewport.zoom * zoomFactor));
 
-          const next: ViewportState = {
+          onViewportChange({
             ...viewport,
             zoom: nextZoom,
             offsetX: point.x - imagePoint.x * nextZoom,
             offsetY: point.y - imagePoint.y * nextZoom,
-          };
-
-          onViewportChange(next);
+          });
         }}
         onMouseDown={(event) => setDragging({ x: event.clientX, y: event.clientY })}
         onMouseUp={() => setDragging(null)}
         onMouseLeave={() => {
           setDragging(null);
           setLiveHover(null);
-          onHover(null);
+          onHover?.(null);
         }}
         onMouseMove={(event) => {
           if (!viewport || !bitmap) return;
@@ -276,7 +260,6 @@ export const WorkspaceImagePanel = ({
           if (dragging) {
             const dx = event.clientX - dragging.x;
             const dy = event.clientY - dragging.y;
-
             setDragging({ x: event.clientX, y: event.clientY });
             onViewportChange({
               ...viewport,
@@ -290,20 +273,8 @@ export const WorkspaceImagePanel = ({
           const screenPoint = { x: event.clientX - rect.left, y: event.clientY - rect.top };
           const imagePoint = screenToImagePoint(screenPoint, viewport);
           const rgb = sampleImageAtPoint(bitmap.data, bitmap.width, bitmap.height, imagePoint, sampleRadius);
-          const neighborhood = sampleImageAtPoint(
-            bitmap.data,
-            bitmap.width,
-            bitmap.height,
-            imagePoint,
-            sampleRadius + 5,
-          );
-          const localContrast = Math.round(
-            Math.sqrt(
-              (rgb.r - neighborhood.r) ** 2 +
-                (rgb.g - neighborhood.g) ** 2 +
-                (rgb.b - neighborhood.b) ** 2,
-            ),
-          );
+          const neighborhood = sampleImageAtPoint(bitmap.data, bitmap.width, bitmap.height, imagePoint, sampleRadius + 5);
+          const localContrast = Math.round(Math.sqrt((rgb.r - neighborhood.r) ** 2 + (rgb.g - neighborhood.g) ** 2 + (rgb.b - neighborhood.b) ** 2));
           const luminance = rgbToLuminance(rgb);
 
           const hover: HoverInfo = {
@@ -315,7 +286,7 @@ export const WorkspaceImagePanel = ({
           };
 
           setLiveHover(hover);
-          onHover(hover);
+          onHover?.(hover);
         }}
         onClick={(event) => {
           if (!viewport || !bitmap) return;
@@ -324,12 +295,10 @@ export const WorkspaceImagePanel = ({
           const screenPoint = { x: event.clientX - rect.left, y: event.clientY - rect.top };
           const imagePoint = screenToImagePoint(screenPoint, viewport);
           const rgb = sampleImageAtPoint(bitmap.data, bitmap.width, bitmap.height, imagePoint, sampleRadius);
-          const luminance = rgbToLuminance(rgb);
-
           const sample = {
             point: imagePoint,
             hex: rgbToHex(rgb),
-            value: toPainterValue(luminance),
+            value: toPainterValue(rgbToLuminance(rgb)),
           };
 
           setLastSample(sample);
@@ -355,46 +324,7 @@ export const WorkspaceImagePanel = ({
           {sampleMarker ? (
             <g className="workspace-sample-marker">
               <circle cx={sampleMarker.x} cy={sampleMarker.y} r={9} fill="none" stroke="white" strokeWidth={1.5} />
-              <circle
-                cx={sampleMarker.x}
-                cy={sampleMarker.y}
-                r={3.5}
-                fill={lastSample?.hex ?? '#FFFFFF'}
-                stroke="rgba(13,17,23,0.9)"
-                strokeWidth={1}
-              />
-              <line
-                x1={sampleMarker.x - 14}
-                y1={sampleMarker.y}
-                x2={sampleMarker.x - 6}
-                y2={sampleMarker.y}
-                stroke="white"
-                strokeWidth={1}
-              />
-              <line
-                x1={sampleMarker.x + 6}
-                y1={sampleMarker.y}
-                x2={sampleMarker.x + 14}
-                y2={sampleMarker.y}
-                stroke="white"
-                strokeWidth={1}
-              />
-              <line
-                x1={sampleMarker.x}
-                y1={sampleMarker.y - 14}
-                x2={sampleMarker.x}
-                y2={sampleMarker.y - 6}
-                stroke="white"
-                strokeWidth={1}
-              />
-              <line
-                x1={sampleMarker.x}
-                y1={sampleMarker.y + 6}
-                x2={sampleMarker.x}
-                y2={sampleMarker.y + 14}
-                stroke="white"
-                strokeWidth={1}
-              />
+              <circle cx={sampleMarker.x} cy={sampleMarker.y} r={3.5} fill={lastSample?.hex ?? '#FFFFFF'} stroke="rgba(13,17,23,0.9)" strokeWidth={1} />
             </g>
           ) : null}
         </svg>
@@ -405,34 +335,18 @@ export const WorkspaceImagePanel = ({
           <span className="workspace-stage-pill__label">Mode</span>
           <span className="workspace-stage-pill__value">{formatDisplayMode(displayMode)}</span>
         </div>
-
-        <div className="workspace-stage-pill">
-          <span className="workspace-stage-pill__label">Guides</span>
-          <span className="workspace-stage-pill__value">{formatGuideMode(guideMode)}</span>
-        </div>
-
         {viewport ? (
           <div className="workspace-stage-pill">
             <span className="workspace-stage-pill__label">Zoom</span>
             <span className="workspace-stage-pill__value">{Math.round(viewport.zoom * 100)}%</span>
           </div>
         ) : null}
-
         {liveHover ? (
           <div className="workspace-stage-pill">
             <span className="workspace-stage-pill__label">Hover</span>
-            <span className="workspace-stage-pill__value">
-              {liveHover.hex} · V{liveHover.value} · {hoverTemperature}
-            </span>
+            <span className="workspace-stage-pill__value">{liveHover.hex} · V{liveHover.value} · {hoverTemperature}</span>
           </div>
         ) : null}
-      </div>
-
-      <div className="workspace-stage-hud workspace-stage-hud--bottom">
-        <div className="workspace-stage-status">
-          <span className="workspace-stage-status__dot" />
-          <span>Scroll to zoom · drag to pan · click to sample</span>
-        </div>
       </div>
     </div>
   );
