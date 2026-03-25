@@ -22,7 +22,7 @@ export type RecipeBadge =
   | 'Muted naturally'
   | 'Chromatic build'
   | 'Single-paint shortcut';
-export type WorkspaceView = 'prep' | 'paint' | 'mixer' | 'projects' | 'paints';
+export type WorkspaceView = 'paint' | 'mixer' | 'projects' | 'paints';
 export type MixStatus = 'not-mixed' | 'mixed' | 'adjusted' | 'remix-needed';
 export type SampleMode = 'pixel' | 'average' | 'smart';
 export type SessionStatus = 'planning' | 'active' | 'completed' | 'archived';

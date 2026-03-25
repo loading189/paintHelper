@@ -1,7 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ActivePaintingPage } from '../active/ActivePaintingPage';
-import { PaintingPrepPage } from './PaintingPrepPage';
+import { ActivePaintingPage } from './ActivePaintingPage';
 import type { PaintingSession, RankedRecipe } from '../../types/models';
 import { starterPaints, defaultSettings } from '../../lib/storage/seedData';
 import { analyzeColor } from '../../lib/color/colorAnalysis';
@@ -110,30 +109,14 @@ const session: PaintingSession = {
 };
 
 describe('workflow pages', () => {
-  it('renders Prep with reference sampling flow and a clear candidate-versus-selected palette split', () => {
+  it('renders Paint mode with compact image setup controls and saved recipe guidance', () => {
     const markup = renderToStaticMarkup(
-      <PaintingPrepPage
-        session={session}
-        paints={starterPaints}
-        settings={defaultSettings}
-        onSessionChange={() => undefined}
-        onCreateProject={() => undefined}
-      />,
+      <ActivePaintingPage session={session} paints={starterPaints} settings={defaultSettings} onSessionChange={() => undefined} />,
     );
 
-    expect(markup).toContain('Reference image');
-    expect(markup).toContain('Candidate Tray');
-    expect(markup).toContain('Selected painting palette');
-    expect(markup).toContain('Extract palette');
-    expect(markup).toContain('Refresh recipe');
-    expect(markup).not.toContain('Project notes');
-  });
-
-  it('renders Paint mode with the image and saved recipe guidance, not primary technical stats', () => {
-    const markup = renderToStaticMarkup(
-      <ActivePaintingPage session={session} paints={starterPaints} settings={defaultSettings} onSessionChange={() => undefined} onReopenInPrep={() => undefined} />,
-    );
-
+    expect(markup).toContain('Replace');
+    expect(markup).toContain('Clear');
+    expect(markup).toContain('landscape.jpg');
     expect(markup).toContain('Painting helper workspace');
     expect(markup).toContain('Target / predicted / actual');
     expect(markup).toContain('Visible viewport colors');
@@ -157,11 +140,24 @@ describe('workflow pages', () => {
         paints={starterPaints}
         settings={defaultSettings}
         onSessionChange={() => undefined}
-        onReopenInPrep={() => undefined}
       />,
     );
 
     expect(pendingMarkup).toContain('Section palette');
     expect(pendingMarkup).toContain('Tree shadow');
+  });
+
+  it('renders an Upload control when there is no reference image yet', () => {
+    const emptyImageMarkup = renderToStaticMarkup(
+      <ActivePaintingPage
+        session={{ ...session, referenceImage: undefined }}
+        paints={starterPaints}
+        settings={defaultSettings}
+        onSessionChange={() => undefined}
+      />,
+    );
+
+    expect(emptyImageMarkup).toContain('Upload');
+    expect(emptyImageMarkup).not.toContain('Replace');
   });
 });
