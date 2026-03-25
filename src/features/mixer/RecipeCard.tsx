@@ -3,6 +3,7 @@ import { MixPathBlock } from '../../components/MixPathBlock';
 import { NextAdjustmentBlock } from '../../components/NextAdjustmentBlock';
 import { SwatchComparisonPanel } from '../../components/SwatchComparisonPanel';
 import type { Paint, RankedRecipe } from '../../types/models';
+import styles from './RecipeCard.module.css';
 
 type RecipeCardProps = {
   rank: number;
@@ -17,20 +18,20 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
 
   return (
-    <Card className="p-4 sm:p-5 mixer-recipe-card">
-      <div className="mixer-recipe-topline">
+    <Card className={`p-4 sm:p-5 ${styles.recipeCard}`}>
+      <div className={styles.recipeTopline}>
         <div>
           <div className="flex flex-wrap gap-2">
             <span className="studio-chip">Recipe #{rank}</span>
             <span className="studio-chip studio-chip-success">{recipe.qualityLabel}</span>
           </div>
-          <h3 className="mixer-recipe-title">{recipe.recipeText}</h3>
-          <p className="mixer-recipe-copy">Use the swatch match, practical ratio, and next adjustments first.</p>
+          <h3 className={styles.recipeTitle}>{recipe.recipeText}</h3>
+          <p className={styles.recipeCopy}>Use the swatch match, practical ratio, and next adjustments first.</p>
         </div>
-        <div className="mixer-recipe-actions">
+        <div className={styles.recipeActions}>
           <div className="recipe-ratio-hero">
             <p className="studio-eyebrow">Practical ratio</p>
-            <p className="mixer-ratio-display">{recipe.practicalRatioText}</p>
+            <p className={styles.ratioDisplay}>{recipe.practicalRatioText}</p>
           </div>
           <button className="studio-button studio-button-primary" type="button" onClick={() => onSave(recipe)}>
             Save recipe
@@ -38,7 +39,7 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
         </div>
       </div>
 
-      <div className="mixer-recipe-grid">
+      <div className={styles.recipeGrid}>
         <div className="space-y-5">
           <SwatchComparisonPanel
             targetHex={recipe.targetAnalysis.normalizedHex}
@@ -47,7 +48,7 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
             predictedHelper={recipe.qualityLabel}
           />
 
-          <section className="studio-panel studio-panel-strong mixer-palette-panel">
+          <section className={`studio-panel studio-panel-strong ${styles.palettePanel}`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="studio-eyebrow">Palette recipe</p>
@@ -55,13 +56,13 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
               </div>
               {showPercentages ? <span className="studio-chip studio-chip-info">{recipe.practicalPercentages.map((value) => `${value}%`).join(' · ')}</span> : null}
             </div>
-            <ul className="mixer-component-list">
+            <ul className={styles.componentList}>
               {recipe.components.map((component, index) => {
                 const paint = paintMap.get(component.paintId);
                 return (
-                  <li key={`${component.paintId}-${index}`} className="mixer-component-row">
+                  <li key={`${component.paintId}-${index}`} className={styles.componentRow}>
                     <div className="flex items-center gap-3">
-                      <span className="mixer-component-swatch" style={{ backgroundColor: paint?.hex ?? '#c7beb2' }} />
+                      <span className={styles.componentSwatch} style={{ backgroundColor: paint?.hex ?? '#c7beb2' }} />
                       <div>
                         <p className="font-semibold text-[color:var(--text-strong)]">{paint?.name ?? component.paintId}</p>
                         <p className="text-xs text-[color:var(--text-muted)]">{showPartsRatios ? `${recipe.practicalParts[index]} part${recipe.practicalParts[index] === 1 ? '' : 's'}` : 'Mix component'}</p>
@@ -102,7 +103,7 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
             <div className="mt-4 space-y-4">
               <MixPathBlock steps={recipe.mixPath} warnings={recipe.stabilityWarnings} layeringSuggestion={recipe.layeringSuggestion} />
               <div className="grid gap-3 text-sm text-[color:var(--text-body)]">
-                <div className="mixer-detail-block">
+                <div className={styles.detailBlock}>
                   <p className="font-semibold text-[color:var(--text-strong)]">Score summary</p>
                   <p className="mt-2">Mode: {recipe.scoreBreakdown.mode}</p>
                   <p>Primary truth score: {recipe.scoreBreakdown.primaryScore.toFixed(3)}</p>
@@ -118,7 +119,7 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
                   <p>Chroma difference: {recipe.scoreBreakdown.chromaDifference.toFixed(3)}</p>
                 </div>
                 {recipe.whyThisRanked.length ? (
-                  <div className="mixer-detail-block">
+                  <div className={styles.detailBlock}>
                     <p className="font-semibold text-[color:var(--text-strong)]">Why this ranked</p>
                     <ul className="mt-2 space-y-2">
                       {recipe.whyThisRanked.map((line) => <li key={line}>• {line}</li>)}
