@@ -166,66 +166,6 @@ export const ActivePaintingPage = ({
     <div className="paint-cockpit-layout">
       <section className="paint-cockpit-main">
         <Card className="paint-cockpit-stage-card">
-          <div className="paint-cockpit-stage-header">
-            <div className="paint-cockpit-actions-row">
-              <input
-                ref={fileInputRef}
-                className="hidden"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(event) => {
-                  void handleUpload(event.target.files?.[0]);
-                  event.currentTarget.value = '';
-                }}
-              />
-              <button
-                className="studio-button studio-button-secondary"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {session.referenceImage ? 'Replace' : 'Upload'}
-              </button>
-              <button
-                className="studio-button studio-button-secondary"
-                onClick={() => updateSession({ referenceImage: undefined })}
-                disabled={!session.referenceImage}
-              >
-                Clear
-              </button>
-              {session.referenceImage && (
-                <span className="studio-chip studio-chip-info">{session.referenceImage.name}</span>
-              )}
-              <button
-                className="studio-button studio-button-secondary"
-                onClick={() => {
-                  if (!viewport || !session.referenceImage) return;
-                  setViewport(
-                    fitViewport(
-                      viewport.imageWidth,
-                      viewport.imageHeight,
-                      viewport.containerWidth,
-                      viewport.containerHeight,
-                    ),
-                  );
-                }}
-              >
-                Fit
-              </button>
-              <button
-                className="studio-button studio-button-secondary"
-                onClick={() => viewport && setViewport({ ...viewport, zoom: Math.min(24, viewport.zoom * 1.18) })}
-                disabled={!viewport}
-              >
-                +
-              </button>
-              <button
-                className="studio-button studio-button-secondary"
-                onClick={() => viewport && setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom * 0.84) })}
-                disabled={!viewport}
-              >
-                −
-              </button>
-            </div>
-          </div>
 
           <div className="paint-cockpit-stage">
             <WorkspaceImagePanel
