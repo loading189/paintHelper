@@ -17,6 +17,7 @@ import {
   type ViewportState,
   type VisibleColorCluster,
 } from './workspaceUtils';
+import styles from './ActivePaintingPage.module.css';
 
 type HoverInfo = {
   point: { x: number; y: number };
@@ -237,14 +238,14 @@ export const WorkspaceImagePanel = ({
   const hoverTemperature = liveHover ? classifyTemperature(liveHover.hex) : null;
 
   if (!image?.dataUrl) {
-    return <div className="paint-reference-empty">Upload a reference image to start painting.</div>;
+    return <div className={styles.paintReferenceEmpty}>Upload a reference image to start painting.</div>;
   }
 
   return (
-    <div className="workspace-image-shell" ref={shellRef}>
+    <div className={styles.workspaceImageShell} ref={shellRef}>
       <canvas
         ref={canvasRef}
-        className="workspace-image-canvas"
+        className={styles.workspaceImageCanvas}
         onWheel={(event) => {
           event.preventDefault();
           if (!viewport) return;
@@ -322,7 +323,7 @@ export const WorkspaceImagePanel = ({
       />
 
       {viewport ? (
-        <svg className="workspace-overlay" width={viewport.containerWidth} height={viewport.containerHeight}>
+        <svg className={styles.workspaceOverlay} width={viewport.containerWidth} height={viewport.containerHeight}>
           {guides.map((line) => (
             <line
               key={`${line.x1}-${line.y1}-${line.x2}-${line.y2}`}
@@ -345,14 +346,14 @@ export const WorkspaceImagePanel = ({
         </svg>
       ) : null}
 
-      <div className="workspace-stage-hud workspace-stage-hud--top">
-        <div className="workspace-stage-control-group">
-          <span className="workspace-stage-control-label">Filter</span>
-          <div className="workspace-stage-segmented">
+      <div className={`${styles.workspaceStageHud} ${styles.workspaceStageHudTop}`}>
+        <div className={styles.workspaceStageControlGroup}>
+          <span className={styles.workspaceStageControlLabel}>Filter</span>
+          <div className={styles.workspaceStageSegmented}>
             {displayModes.map((entry) => (
               <button
                 key={entry.value}
-                className={`workspace-stage-segment ${displayMode === entry.value ? 'active' : ''}`}
+                className={`${styles.workspaceStageSegment} ${displayMode === entry.value ? styles.workspaceStageSegmentActive : ""}`}
                 onClick={() => onDisplayModeChange?.(entry.value)}
                 type="button"
               >
@@ -361,13 +362,13 @@ export const WorkspaceImagePanel = ({
             ))}
           </div>
         </div>
-        <div className="workspace-stage-control-group">
-          <span className="workspace-stage-control-label">Guides</span>
-          <div className="workspace-stage-segmented">
+        <div className={styles.workspaceStageControlGroup}>
+          <span className={styles.workspaceStageControlLabel}>Guides</span>
+          <div className={styles.workspaceStageSegmented}>
             {guideModes.map((entry) => (
               <button
                 key={entry.value}
-                className={`workspace-stage-segment ${guideMode === entry.value ? 'active' : ''}`}
+                className={`${styles.workspaceStageSegment} ${guideMode === entry.value ? styles.workspaceStageSegmentActive : ""}`}
                 onClick={() => onGuideModeChange?.(entry.value)}
                 type="button"
               >
@@ -377,15 +378,15 @@ export const WorkspaceImagePanel = ({
           </div>
         </div>
         {viewport ? (
-          <div className="workspace-stage-pill">
-            <span className="workspace-stage-pill__label">Zoom</span>
-            <span className="workspace-stage-pill__value">{Math.round(viewport.zoom * 100)}%</span>
+          <div className={styles.workspaceStagePill}>
+            <span className={styles.workspaceStagePillLabel}>Zoom</span>
+            <span className={styles.workspaceStagePillValue}>{Math.round(viewport.zoom * 100)}%</span>
           </div>
         ) : null}
         {liveHover ? (
-          <div className="workspace-stage-pill">
-            <span className="workspace-stage-pill__label">Hover</span>
-            <span className="workspace-stage-pill__value">{liveHover.hex} · V{liveHover.value} · {hoverTemperature}</span>
+          <div className={styles.workspaceStagePill}>
+            <span className={styles.workspaceStagePillLabel}>Hover</span>
+            <span className={styles.workspaceStagePillValue}>{liveHover.hex} · V{liveHover.value} · {hoverTemperature}</span>
           </div>
         ) : null}
       </div>

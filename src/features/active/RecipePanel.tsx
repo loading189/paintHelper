@@ -1,3 +1,4 @@
+import styles from './ActivePaintingPage.module.css';
 import type { RankedRecipe } from '../../types/models';
 
 type Props = {
@@ -9,36 +10,36 @@ type Props = {
 };
 
 export const RecipePanel = ({ selectedColor, recipe, isSolving, onRecalculate, onMarkUsed }: Props) => (
-  <aside className="paint-cockpit-recipe-panel">
+  <aside className={styles.paintCockpitRecipePanel}>
     <p className="studio-kicker">Recipe</p>
     {selectedColor ? (
       <>
-        <div className="paint-cockpit-target">
-          <div className="paint-cockpit-target__swatch" style={{ backgroundColor: selectedColor.hex }} />
+        <div className={styles.paintCockpitTarget}>
+          <div className={styles.paintCockpitTargetSwatch} style={{ backgroundColor: selectedColor.hex }} />
           <div>
-            <p className="paint-cockpit-hex">{selectedColor.hex}</p>
-            <p className="text-xs text-[color:var(--text-muted)]">Value {selectedColor.value} · 1 white · 9 black</p>
-            {selectedColor.label ? <p className="text-xs text-[color:var(--text-subtle)]">{selectedColor.label}</p> : null}
+            <p className={styles.paintCockpitHex}>{selectedColor.hex}</p>
+            <p className={styles.metaText}>Value {selectedColor.value} · 1 white · 9 black</p>
+            {selectedColor.label ? <p className={styles.subtleText}>{selectedColor.label}</p> : null}
           </div>
         </div>
 
-        <div className="paint-cockpit-prediction-row">
+        <div className={styles.paintCockpitPredictionRow}>
           <div>
-            <p className="text-xs text-[color:var(--text-muted)]">Predicted mix</p>
-            <div className="paint-cockpit-target__swatch paint-cockpit-target__swatch--small" style={{ backgroundColor: recipe?.predictedHex ?? '#1a202b' }} />
+            <p className={styles.metaText}>Predicted mix</p>
+            <div className={`${styles.paintCockpitTargetSwatch} ${styles.paintCockpitTargetSwatchSmall}`} style={{ backgroundColor: recipe?.predictedHex ?? '#1a202b' }} />
           </div>
-          <div className="paint-cockpit-recipe-text">
-            {recipe?.recipeText ? <p>{recipe.recipeText}</p> : <p className="text-xs text-[color:var(--text-muted)]">No recipe yet.</p>}
+          <div className={styles.paintCockpitRecipeText}>
+            {recipe?.recipeText ? <p>{recipe.recipeText}</p> : <p className={styles.metaText}>No recipe yet.</p>}
           </div>
         </div>
 
         {recipe?.guidanceText?.length ? (
-          <ul className="paint-cockpit-guidance">
+          <ul className={styles.paintCockpitGuidance}>
             {recipe.guidanceText.slice(0, 3).map((line) => <li key={line}>{line}</li>)}
           </ul>
         ) : null}
 
-        <div className="paint-cockpit-actions">
+        <div className={styles.paintCockpitActions}>
           <button className="studio-button studio-button-secondary" onClick={onRecalculate} disabled={isSolving}>
             {isSolving ? 'Solving…' : 'Recalculate'}
           </button>
@@ -48,7 +49,7 @@ export const RecipePanel = ({ selectedColor, recipe, isSolving, onRecalculate, o
         </div>
       </>
     ) : (
-      <p className="text-sm text-[color:var(--text-muted)]">Select a color from the image or wheel.</p>
+      <p className={styles.metaText}>Select a color from the image or wheel.</p>
     )}
   </aside>
 );

@@ -12,6 +12,7 @@ import {
 import { RecipePanel } from './RecipePanel';
 import { UsedColorsTray, type UsedTrayColor } from './UsedColorsTray';
 import { WorkspaceImagePanel } from './WorkspaceImagePanel';
+import styles from './ActivePaintingPage.module.css';
 import {
   isNearHex,
   toPainterValue,
@@ -135,10 +136,10 @@ export const ActivePaintingPage = ({
   };
 
   return (
-    <div className="paint-cockpit-layout">
-      <section className="paint-cockpit-main">
-        <Card className="paint-cockpit-stage-card">
-          <div className="paint-cockpit-stage">
+    <div className={styles.paintCockpitLayout}>
+      <section className={styles.paintCockpitMain}>
+        <Card className={styles.paintCockpitStageCard}>
+          <div className={styles.paintCockpitStage}>
             <WorkspaceImagePanel
               image={session.referenceImage}
               displayMode={displayMode}
@@ -187,7 +188,7 @@ export const ActivePaintingPage = ({
         </Card>
       </section>
 
-      <Card className="paint-cockpit-right-rail">
+      <Card className={styles.paintCockpitRightRail}>
         <RecipePanel
           selectedColor={selectedColor}
           recipe={currentRecipe}
