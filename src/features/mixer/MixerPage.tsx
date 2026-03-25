@@ -1,7 +1,6 @@
-import '../../styles/pages/mixer.css';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import styles from './MixerPage.module.css';
 import { Card } from '../../components/Card';
-import { analyzeColor } from '../../lib/color/colorAnalysis';
 import { normalizeHex } from '../../lib/color/colorMath';
 import { predictSpectralMix, spectralDistanceBetweenHexes } from '../../lib/color/spectralMixing';
 import { solveColorTarget } from '../../lib/color/solvePipeline';
@@ -15,7 +14,8 @@ import {
 import type { Paint, RankedRecipe, UserSettings } from '../../types/models';
 
 const DEFAULT_TARGET = '#7A8FB3';
-const DEFAULT_OBSERVED = '#777777';
+const DEFAULT_OBSERVED = '#C2793E';
+const MAX_SLOTS = 4;
 
 type MixerPageProps = {
   paints: Paint[];
@@ -27,59 +27,109 @@ type MixerPageProps = {
   onLoadTargetHex?: string | null;
 };
 
-type RecipeRow = { paintId: string; parts: number };
-
-type SavedForwardCase = {
-  id: string;
-  name: string;
-  observedHex: string;
-  recipe: RecipeRow[];
+type MixSlot = {
+  paintId: string | null;
+  parts: number;
 };
 
-const FORWARD_CASES_KEY = 'paint-mixer-forward-cases';
-
-const swatch = (hex?: string | null) => ({ backgroundColor: normalizeHex(hex ?? '') ?? '#000000' });
-
-const clampParts = (value: number) => Math.max(1, Math.round(value) || 1);
-
-const parseSavedForwardCases = (): SavedForwardCase[] => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(FORWARD_CASES_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as SavedForwardCase[];
-  } catch {
-    return [];
-  }
-};
-
-const persistForwardCases = (cases: SavedForwardCase[]) => {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(FORWARD_CASES_KEY, JSON.stringify(cases));
-};
+type DeltaTone = 'excellent' | 'good' | 'warning' | 'poor';
+type StabilityTone = 'stable' | 'aggressive' | 'extreme';
 
 const solveModeLabels: Record<'on-hand' | 'ideal', string> = {
   'on-hand': 'On-hand paints',
   ideal: 'Ideal palette',
 };
 
-const toneClassFromValue = (ratio: number) => {
-  if (ratio <= 0.45) return 'safe';
-  if (ratio <= 0.75) return 'aggressive';
+const emptySlot = (): MixSlot => ({ paintId: null, parts: 1 });
+
+const clampParts = (value: number) => Math.max(1, Math.min(24, Math.round(value) || 1));
+
+const swatchStyle = (hex?: string | null): CSSProperties => ({
+  backgroundColor: normalizeHex(hex ?? '') ?? '#131722',
+});
+
+const compareTone = (value: number | null): DeltaTone => {
+  if (value == null) return 'warning';
+  if (value <= 4) return 'excellent';
+  if (value <= 8) return 'good';
+  if (value <= 14) return 'warning';
+  return 'poor';
+};
+
+const compareCopy = (value: number | null) => {
+  if (value == null) return 'Waiting for both colors';
+  if (value <= 4) return 'Very close';
+  if (value <= 8) return 'Believable';
+  if (value <= 14) return 'Still off';
+  return 'Needs major correction';
+};
+
+const formatDelta = (value: number | null) => (value == null ? '—' : value.toFixed(2));
+
+const sliderToneClass = (value: number, min: number, max: number, resetValue: number) => {
+  const span = Math.max(Math.abs(max - resetValue), Math.abs(resetValue - min), 0.0001);
+  const normalized = Math.abs(value - resetValue) / span;
+  if (normalized < 0.33) return styles.sliderSafe;
+  if (normalized < 0.66) return styles.sliderWarn;
+  return styles.sliderHot;
+};
+
+const computePaintRisk = (
+  paintId: string | null,
+  calibrationSnapshot: ReturnType<typeof getDeveloperCalibration>,
+) => {
+  if (!paintId) return 0;
+
+  const current =
+    calibrationSnapshot.forwardPigments.paints[paintId] ??
+    defaultDeveloperCalibration.forwardPigments.paints[paintId];
+
+  const baseline =
+    defaultDeveloperCalibration.forwardPigments.paints[paintId] ?? {
+      tintingStrength: 1,
+      darknessBias: 0,
+      chromaBias: 0,
+      earthStrengthBias: 0,
+      whiteLiftBias: 0,
+    };
+
+  const normalizedDistances = [
+    Math.abs((current.tintingStrength ?? 1) - (baseline.tintingStrength ?? 1)) / 0.4,
+    Math.abs((current.darknessBias ?? 0) - (baseline.darknessBias ?? 0)) / 0.25,
+    Math.abs((current.chromaBias ?? 0) - (baseline.chromaBias ?? 0)) / 0.25,
+    Math.abs((current.earthStrengthBias ?? 0) - (baseline.earthStrengthBias ?? 0)) / 0.4,
+    Math.abs((current.whiteLiftBias ?? 0) - (baseline.whiteLiftBias ?? 0)) / 0.2,
+  ];
+
+  return normalizedDistances.reduce((sum, value) => sum + value, 0) / normalizedDistances.length;
+};
+
+const computeGlobalStability = (calibrationSnapshot: ReturnType<typeof getDeveloperCalibration>) => {
+  const ids = Object.keys(calibrationSnapshot.forwardPigments.paints);
+  if (!ids.length) return 0;
+
+  const scores = ids.map((paintId) => computePaintRisk(paintId, calibrationSnapshot));
+  return scores.reduce((sum, value) => sum + value, 0) / scores.length;
+};
+
+const stabilityTone = (score: number): StabilityTone => {
+  if (score < 0.35) return 'stable';
+  if (score < 0.75) return 'aggressive';
   return 'extreme';
 };
 
-const DeltaChip = ({ current, previous }: { current: number | null; previous: number | null }) => {
-  if (current == null) return <span className="mixer-delta-chip">ΔE n/a</span>;
-  if (previous == null) return <span className="mixer-delta-chip">ΔE {current.toFixed(3)}</span>;
-  const movedToward = current < previous;
-  const movedAway = current > previous;
-  return (
-    <span className={`mixer-delta-chip ${movedToward ? 'improved' : movedAway ? 'worsened' : ''}`}>
-      ΔE {current.toFixed(3)}
-      {movedToward ? ` ↓ ${Math.abs(previous - current).toFixed(3)}` : movedAway ? ` ↑ ${Math.abs(previous - current).toFixed(3)}` : ' · steady'}
-    </span>
-  );
+const stabilityCopy = (score: number) => {
+  const tone = stabilityTone(score);
+  if (tone === 'stable') return 'Stable';
+  if (tone === 'aggressive') return 'Aggressive';
+  return 'Extreme';
+};
+
+const stabilityNote = (score: number) => {
+  const tone = stabilityTone(score);
+  if (tone === 'stable') return 'Global pigment model is still healthy';
+  if (tone === 'aggressive') return 'You are bending the model noticeably';
+  return 'You are pushing the model to an extreme';
 };
 
 const CalibrationSlider = ({
@@ -88,79 +138,96 @@ const CalibrationSlider = ({
   min,
   max,
   step,
-  onChange,
   resetValue,
-  hint,
+  onChange,
 }: {
   label: string;
   value: number;
   min: number;
   max: number;
   step: number;
-  onChange: (value: number) => void;
   resetValue: number;
-  hint?: string;
-}) => {
-  const range = max - min || 1;
-  const ratio = Math.min(1, Math.max(0, (value - min) / range));
-  const tone = toneClassFromValue(Math.abs((value - resetValue) / range) * 2);
+  onChange: (value: number) => void;
+}) => (
+  <label className={styles.slider}>
+    <div className={styles.sliderHeader}>
+      <span>{label}</span>
+      <button type="button" onClick={() => onChange(resetValue)}>
+        Reset
+      </button>
+    </div>
 
-  return (
-    <div className="mixer-slider">
-      <div className="mixer-slider-head">
-        <p className="mixer-field-label">{label}</p>
-        <div className="mixer-slider-meta">
-          <span className={`mixer-range-pill ${tone}`}>{tone === 'safe' ? 'safe' : tone === 'aggressive' ? 'aggressive' : 'extreme'}</span>
-          <strong>{value.toFixed(2)}</strong>
-        </div>
-      </div>
+    <div className={styles.sliderRail}>
       <input
+        className={`${styles.sliderInput} ${sliderToneClass(value, min, max, resetValue)}`}
         type="range"
-        className={`mixer-range ${tone}`}
         min={min}
         max={max}
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        style={{ ['--fill' as string]: `${ratio * 100}%` }}
       />
-      <div className="mixer-slider-foot">
-        <span>{hint ?? `${min} → ${max}`}</span>
-        <button type="button" className="mixer-mini-reset" onClick={() => onChange(resetValue)}>Reset</button>
-      </div>
+      <strong>{value.toFixed(2)}</strong>
     </div>
-  );
-};
+  </label>
+);
 
-export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, onRecentColor, onSaveRecipe, onLoadTargetHex }: MixerPageProps) => {
+export const MixerPage = ({
+  paints,
+  settings,
+  recentColors,
+  onSettingsChange,
+  onRecentColor,
+  onSaveRecipe,
+  onLoadTargetHex,
+}: MixerPageProps) => {
   const enabledPaints = useMemo(() => paints.filter((paint) => paint.isEnabled), [paints]);
   const [calibrationSnapshot, setCalibrationSnapshot] = useState(() => getDeveloperCalibration());
 
-  const [forwardRecipe, setForwardRecipe] = useState<RecipeRow[]>(() => enabledPaints.slice(0, 3).map((paint, index) => ({ paintId: paint.id, parts: index === 0 ? 3 : 2 })));
-  const [observedHex, setObservedHex] = useState(DEFAULT_OBSERVED);
-  const [savedCases, setSavedCases] = useState<SavedForwardCase[]>(() => parseSavedForwardCases());
+  const [mixSlots, setMixSlots] = useState<MixSlot[]>(() => {
+    const seeded = enabledPaints.slice(0, 3).map((paint, index) => ({
+      paintId: paint.id,
+      parts: index === 0 ? 2 : 1,
+    }));
+    return [...seeded, ...Array.from({ length: MAX_SLOTS - seeded.length }, () => emptySlot())];
+  });
 
+  const [selectedSlot, setSelectedSlot] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activePopupOpen, setActivePopupOpen] = useState(false);
+
+  const [observedHex, setObservedHex] = useState(DEFAULT_OBSERVED);
   const [targetHex, setTargetHex] = useState(onLoadTargetHex ?? DEFAULT_TARGET);
   const [solveResult, setSolveResult] = useState(() => {
     const initial = normalizeHex(onLoadTargetHex ?? DEFAULT_TARGET);
     return initial ? solveColorTarget(initial, paints, settings, 8) : null;
   });
 
-  const [previousForwardDistance, setPreviousForwardDistance] = useState<number | null>(null);
-  const [previousTargetDistance, setPreviousTargetDistance] = useState<number | null>(null);
-
   useEffect(() => {
-    const unsubscribe = subscribeDeveloperCalibration((next) => {
-      setCalibrationSnapshot(next);
-    });
+    const unsubscribe = subscribeDeveloperCalibration((next) => setCalibrationSnapshot(next));
     return unsubscribe;
   }, []);
 
   useEffect(() => {
-    if (!enabledPaints.length) return;
-    setForwardRecipe((current) => {
-      const safeRows = current.map((row) => ({ ...row, paintId: enabledPaints.some((paint) => paint.id === row.paintId) ? row.paintId : enabledPaints[0].id }));
-      return safeRows.length ? safeRows : [{ paintId: enabledPaints[0].id, parts: 1 }];
+    if (!enabledPaints.length) {
+      setMixSlots(Array.from({ length: MAX_SLOTS }, () => emptySlot()));
+      return;
+    }
+
+    setMixSlots((current) => {
+      const hydrated = current.map((slot) => {
+        if (!slot.paintId) return slot;
+        return enabledPaints.some((paint) => paint.id === slot.paintId) ? slot : emptySlot();
+      });
+
+      if (hydrated.some((slot) => slot.paintId)) return hydrated;
+
+      const seeded = enabledPaints.slice(0, 3).map((paint, index) => ({
+        paintId: paint.id,
+        parts: index === 0 ? 2 : 1,
+      }));
+
+      return [...seeded, ...Array.from({ length: MAX_SLOTS - seeded.length }, () => emptySlot())];
     });
   }, [enabledPaints]);
 
@@ -175,63 +242,104 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
     setSolveResult(solveColorTarget(normalized, paints, settings, 8));
   }, [targetHex, paints, settings, calibrationSnapshot]);
 
-  const forwardComponents = useMemo(() => forwardRecipe.map((entry) => ({ paintId: entry.paintId, weight: clampParts(entry.parts) })), [forwardRecipe]);
+  const filledSlots = useMemo(() => mixSlots.filter((slot) => slot.paintId), [mixSlots]);
+
+  const forwardComponents = useMemo(
+    () =>
+      filledSlots.map((slot) => ({
+        paintId: slot.paintId as string,
+        weight: clampParts(slot.parts),
+      })),
+    [filledSlots],
+  );
 
   const forwardPrediction = useMemo(() => {
-    if (!enabledPaints.length || !forwardComponents.length) return null;
+    if (!forwardComponents.length) return null;
     return predictSpectralMix(paints, forwardComponents);
-  }, [forwardComponents, paints, enabledPaints.length, calibrationSnapshot]);
+  }, [forwardComponents, paints, calibrationSnapshot]);
+
+  const selectedPaintId = mixSlots[selectedSlot]?.paintId ?? null;
+  const activePaintId = selectedPaintId ?? filledSlots[0]?.paintId ?? null;
+  const activePaint = activePaintId
+    ? enabledPaints.find((paint) => paint.id === activePaintId) ?? null
+    : null;
+
+  const activeCalibration = activePaintId
+    ? calibrationSnapshot.forwardPigments.paints[activePaintId] ??
+      defaultDeveloperCalibration.forwardPigments.paints[activePaintId]
+    : null;
+
+  const activeDefaults = activePaintId
+    ? defaultDeveloperCalibration.forwardPigments.paints[activePaintId] ?? {
+        tintingStrength: 1,
+        darknessBias: 0,
+        chromaBias: 0,
+        earthStrengthBias: 0,
+        whiteLiftBias: 0,
+      }
+    : null;
 
   const normalizedObserved = normalizeHex(observedHex);
-  const forwardDistance = forwardPrediction && normalizedObserved
-    ? spectralDistanceBetweenHexes(forwardPrediction.hex, normalizedObserved)
-    : null;
-
   const normalizedTarget = normalizeHex(targetHex);
   const topRecipe = solveResult?.rankedRecipes[0] ?? null;
-  const targetDistance = normalizedTarget && topRecipe
-    ? spectralDistanceBetweenHexes(normalizedTarget, topRecipe.predictedHex)
-    : null;
 
-  useEffect(() => {
-    if (forwardDistance != null) setPreviousForwardDistance((current) => (current == null ? forwardDistance : current));
-  }, [forwardDistance]);
+  const forwardDelta =
+    normalizedObserved && forwardPrediction?.hex
+      ? spectralDistanceBetweenHexes(normalizedObserved, forwardPrediction.hex)
+      : null;
 
-  useEffect(() => {
-    if (targetDistance != null) setPreviousTargetDistance((current) => (current == null ? targetDistance : current));
-  }, [targetDistance]);
+  const targetDistance =
+    normalizedTarget && topRecipe
+      ? spectralDistanceBetweenHexes(normalizedTarget, topRecipe.predictedHex)
+      : null;
 
-  const updateInverseNumber = (section: string, key: string, value: number) => {
-    if (targetDistance != null) setPreviousTargetDistance(targetDistance);
-    updateDeveloperCalibration({
-      inverseSearch: {
-        [section]: {
-          ...(calibrationSnapshot.inverseSearch as any)[section],
-          [key]: value,
-        },
-      } as any,
+  const activePaintRisk = useMemo(
+    () => computePaintRisk(activePaintId, calibrationSnapshot),
+    [activePaintId, calibrationSnapshot],
+  );
+
+  const globalStability = useMemo(
+    () => computeGlobalStability(calibrationSnapshot),
+    [calibrationSnapshot],
+  );
+
+  const assignPaintToSlot = (paintId: string) => {
+    setMixSlots((current) => {
+      const next = [...current];
+      const firstOpen = next.findIndex((slot) => !slot.paintId);
+      const slotIndex = firstOpen >= 0 ? firstOpen : selectedSlot;
+
+      next[slotIndex] = {
+        paintId,
+        parts: next[slotIndex].paintId ? next[slotIndex].parts : 1,
+      };
+
+      return next;
     });
   };
 
-  const updateInverseBoolean = (section: string, key: string, value: boolean) => {
-    if (targetDistance != null) setPreviousTargetDistance(targetDistance);
-    updateDeveloperCalibration({
-      inverseSearch: {
-        [section]: {
-          ...(calibrationSnapshot.inverseSearch as any)[section],
-          [key]: value,
-        },
-      } as any,
-    });
+  const setSlotParts = (index: number, value: number) => {
+    setMixSlots((current) =>
+      current.map((slot, slotIndex) =>
+        slotIndex === index ? { ...slot, parts: clampParts(value) } : slot,
+      ),
+    );
   };
 
-  const updateForward = (paintId: string, key: string, value: number | string | undefined) => {
-    if (forwardDistance != null) setPreviousForwardDistance(forwardDistance);
+  const clearSlot = (index: number) => {
+    setMixSlots((current) =>
+      current.map((slot, slotIndex) => (slotIndex === index ? emptySlot() : slot)),
+    );
+    setActivePopupOpen(false);
+  };
+
+  const updateForward = (paintId: string, key: string, value: number) => {
     updateDeveloperCalibration({
       forwardPigments: {
         paints: {
           [paintId]: {
-            ...(calibrationSnapshot.forwardPigments.paints[paintId] ?? defaultDeveloperCalibration.forwardPigments.paints[paintId]),
+            ...(calibrationSnapshot.forwardPigments.paints[paintId] ??
+              defaultDeveloperCalibration.forwardPigments.paints[paintId]),
             [key]: value,
           },
         },
@@ -239,199 +347,620 @@ export const MixerPage = ({ paints, settings, recentColors, onSettingsChange, on
     });
   };
 
-  const saveCurrentForwardCase = () => {
-    const next: SavedForwardCase = {
-      id: `case-${Date.now()}`,
-      name: `Case ${savedCases.length + 1}`,
-      observedHex: normalizeHex(observedHex) ?? DEFAULT_OBSERVED,
-      recipe: forwardRecipe,
-    };
-    const combined = [next, ...savedCases].slice(0, 12);
-    setSavedCases(combined);
-    persistForwardCases(combined);
+  const updateInverseNumber = (section: string, key: string, value: number) => {
+    updateDeveloperCalibration({
+      inverseSearch: {
+        [section]: {
+          ...(calibrationSnapshot.inverseSearch as Record<string, any>)[section],
+          [key]: value,
+        },
+      } as any,
+    });
+  };
+
+  const updateInverseBoolean = (section: string, key: string, value: boolean) => {
+    updateDeveloperCalibration({
+      inverseSearch: {
+        [section]: {
+          ...(calibrationSnapshot.inverseSearch as Record<string, any>)[section],
+          [key]: value,
+        },
+      } as any,
+    });
   };
 
   return (
-    <div className="mixer-training-flow">
-      <Card className="p-4 sm:p-5">
-        <div className="mixer-stage-intro">
-          <div>
-            <p className="studio-eyebrow">Guided training</p>
-            <h2 className="workspace-mode-title">Mixer calibration in 2 stages</h2>
-            <p className="workspace-mode-copy">Stage 1 teaches paint behavior. Stage 2 then tunes how recipe selection works inside that paint model.</p>
-          </div>
-          <div className="mixer-stage-nav">
-            <span className="mixer-stage-pill active">1 · Train Paint Behavior</span>
-            <span className="mixer-stage-pill">2 · Tune Recipe Selection</span>
-          </div>
-        </div>
-      </Card>
+    <div className={styles.page}>
+      <Card className={styles.shell}>
+        <button
+          type="button"
+          className={`${styles.drawerHandle} ${drawerOpen ? styles.drawerHandleOpen : ''}`}
+          onClick={() => setDrawerOpen((current) => !current)}
+        >
+          {drawerOpen ? 'Close recipe tuning' : 'Open recipe tuning'}
+        </button>
 
-      <section className="mixer-stage mixer-stage-forward">
-        <div className="mixer-stage-header">
-          <p className="studio-eyebrow">Stage 1</p>
-          <h3 className="panel-heading-title">Train Paint Behavior</h3>
-          <p className="panel-heading-copy">Known real mix is fixed input. Observed color is truth. Adjust pigment controls until model prediction converges.</p>
-          <DeltaChip current={forwardDistance} previous={previousForwardDistance} />
-        </div>
+        <section className={styles.forwardSurface}>
+          <header className={styles.heroHeader}>
+            <p>Forward calibration</p>
+            <h2>Compare what the model predicts to what your real mix actually made.</h2>
+            <span>
+              Build the exact real-world recipe below, choose the actual observed result, and then
+              tune the active paint carefully without pushing the global model too far.
+            </span>
+          </header>
 
-        <div className="mixer-stage-grid">
-          <Card className="p-4 sm:p-5 mixer-surface">
-            <h4 className="mixer-subheading">Real Mix</h4>
-            <p className="mixer-support-copy">Enter the exact paints and parts used physically.</p>
-            <div className="mt-4 space-y-3">
-              {forwardRecipe.map((row, index) => (
-                <div className="mixer-row" key={`${index}-${row.paintId}`}>
-                  <select className="studio-select" value={row.paintId} onChange={(event) => setForwardRecipe((current) => current.map((entry, entryIndex) => entryIndex === index ? { ...entry, paintId: event.target.value } : entry))}>
-                    {enabledPaints.map((paint) => <option key={paint.id} value={paint.id}>{paint.name}</option>)}
-                  </select>
-                  <input className="studio-input" type="number" min={1} step={1} value={row.parts} onChange={(event) => setForwardRecipe((current) => current.map((entry, entryIndex) => entryIndex === index ? { ...entry, parts: clampParts(Number(event.target.value)) } : entry))} />
-                  <button className="studio-button" type="button" onClick={() => setForwardRecipe((current) => current.filter((_, entryIndex) => entryIndex !== index))} disabled={forwardRecipe.length <= 1}>Remove</button>
-                </div>
-              ))}
-              <button className="studio-button" type="button" onClick={() => enabledPaints[0] ? setForwardRecipe((current) => [...current, { paintId: enabledPaints[0].id, parts: 1 }]) : null}>Add paint row</button>
+          <section className={styles.comparisonBand}>
+            <div className={styles.comparisonColumn}>
+              <span className={styles.columnEyebrow}>System Predicts</span>
+              <div
+                className={styles.heroCircle}
+                style={
+                  {
+                    ...swatchStyle(forwardPrediction?.hex),
+                    '--swatch-glow': forwardPrediction?.hex ?? '#5f78c5',
+                  } as CSSProperties
+                }
+              />
+              <strong>{forwardPrediction?.hex ?? 'Pick paints to start'}</strong>
+              <small>Current forward model output</small>
             </div>
-          </Card>
 
-          <Card className="p-4 sm:p-5 mixer-surface">
-            <h4 className="mixer-subheading">Observed Color vs Model Prediction</h4>
-            <p className="mixer-support-copy">Move prediction toward observed swatch by tuning pigment behavior.</p>
-            <div className="mt-4 space-y-3">
-              <label>
-                <span className="mb-1 block text-xs font-medium text-[color:var(--text-muted)]">Observed color from real mix</span>
-                <input className="studio-input" value={observedHex} onChange={(event) => setObservedHex(event.target.value)} placeholder="#777777" />
-              </label>
-              <div className="mixer-swatch-grid">
-                <div><p className="mixer-swatch-label">Model Prediction</p><div className="mixer-swatch" style={swatch(forwardPrediction?.hex)} /><p>{forwardPrediction?.hex ?? 'n/a'}</p></div>
-                <div><p className="mixer-swatch-label">Observed Color</p><div className="mixer-swatch" style={swatch(normalizedObserved)} /><p>{normalizedObserved ?? 'n/a'}</p></div>
+            <div className={styles.bridgeColumn}>
+              <div className={`${styles.metricCard} ${styles[compareTone(forwardDelta)]}`}>
+                <span>Match</span>
+                <strong>ΔE {formatDelta(forwardDelta)}</strong>
+                <small>{compareCopy(forwardDelta)}</small>
               </div>
-              <p className="text-xs text-[color:var(--text-muted)]">Forward match ΔE {forwardDistance?.toFixed(3) ?? 'n/a'} · lower means prediction is learning your physical paint behavior.</p>
-              <button type="button" className="studio-button" onClick={saveCurrentForwardCase}>Save forward case</button>
-              {savedCases.length ? <div className="mixer-chip-row">{savedCases.slice(0, 6).map((saved) => <button className="mixer-recent-chip" type="button" key={saved.id} onClick={() => { setForwardRecipe(saved.recipe); setObservedHex(saved.observedHex); }}>{saved.name}</button>)}</div> : null}
-            </div>
-          </Card>
-        </div>
 
-        <Card className="p-4 sm:p-5 mixer-surface">
-          <div className="mixer-headline-row">
-            <div>
-              <h4 className="mixer-subheading">Pigment Controls</h4>
-              <p className="mixer-support-copy">These only affect paint behavior in resolveRuntimePaints → predictSpectralMix.</p>
+              <div className={`${styles.metricCard} ${styles[stabilityTone(globalStability)]}`}>
+                <span>Global stability</span>
+                <strong>{stabilityCopy(globalStability)}</strong>
+                <small>{stabilityNote(globalStability)}</small>
+              </div>
+
+              <div className={`${styles.metricCard} ${styles[stabilityTone(activePaintRisk)]}`}>
+                <span>Active paint risk</span>
+                <strong>{stabilityCopy(activePaintRisk)}</strong>
+                <small>
+                  {activePaint
+                    ? `${activePaint.name} is the paint you are bending right now`
+                    : 'Select a paint in your recipe'}
+                </small>
+              </div>
+
+              <div className={styles.bridgeLine} aria-hidden="true" />
             </div>
-            <button className="studio-button" type="button" onClick={() => resetDeveloperCalibration()}>Reset all calibration</button>
-          </div>
-          <div className="mixer-control-board">
-            {enabledPaints.map((paint) => {
-              const pigment = calibrationSnapshot.forwardPigments.paints[paint.id] ?? defaultDeveloperCalibration.forwardPigments.paints[paint.id];
-              const defaults = defaultDeveloperCalibration.forwardPigments.paints[paint.id] ?? { tintingStrength: 1, darknessBias: 0, chromaBias: 0, earthStrengthBias: 0, whiteLiftBias: 0 };
-              return (
-                <section className="mixer-control-card" key={paint.id}>
-                  <div className="mixer-headline-row">
-                    <div><p className="text-sm font-semibold text-[color:var(--text-strong)]">{paint.name}</p><p className="text-xs text-[color:var(--text-muted)]">{paint.id}</p></div>
-                    <span className="mixer-recent-swatch" style={{ backgroundColor: paint.hex, width: 20, height: 20 }} />
+
+            <div className={styles.comparisonColumn}>
+              <span className={styles.columnEyebrow}>Actual Real Mix</span>
+              <label className={styles.actualCircleButton}>
+                <div
+                  className={styles.heroCircle}
+                  style={
+                    {
+                      ...swatchStyle(normalizedObserved),
+                      '--swatch-glow': normalizedObserved ?? '#d78a57',
+                    } as CSSProperties
+                  }
+                />
+                <input
+                  className={styles.colorInputOverlay}
+                  type="color"
+                  value={normalizedObserved ?? '#000000'}
+                  onChange={(event) => {
+                    setObservedHex(event.target.value);
+                    onRecentColor(event.target.value);
+                  }}
+                />
+              </label>
+              <strong>{normalizedObserved ?? 'Pick observed color'}</strong>
+              <small>What the physical mixture looked like</small>
+            </div>
+          </section>
+
+          <section className={styles.calibrationStrip}>
+            <div className={styles.calibrationStripHeader}>
+              <div>
+                <p>Tuning active paint</p>
+                <h3>{activePaint?.name ?? 'Select a paint in your recipe'}</h3>
+              </div>
+
+              {activePaint ? (
+                <button
+                  type="button"
+                  className={styles.calibrationToggle}
+                  onClick={() => setActivePopupOpen((current) => !current)}
+                >
+                  {activePopupOpen ? 'Hide controls' : 'Adjust paint behavior'}
+                </button>
+              ) : null}
+            </div>
+
+            {activePopupOpen && activeCalibration && activeDefaults && activePaint ? (
+              <div className={styles.calibrationPopup}>
+                <div className={styles.popupIntro}>
+                  <span
+                    className={styles.popupSwatch}
+                    style={swatchStyle(activePaint.hex)}
+                    aria-hidden="true"
+                  />
+                  <div>
+                    <strong>Tuning: {activePaint.name}</strong>
+                    <small>
+                      These controls change how this paint behaves globally in the model. Your job
+                      is to improve this case without pushing the pigment world out of balance.
+                    </small>
                   </div>
-                  <CalibrationSlider label="tintingStrength" value={pigment.tintingStrength} min={0.75} max={1.4} step={0.01} resetValue={defaults.tintingStrength} onChange={(value) => updateForward(paint.id, 'tintingStrength', value)} />
-                  <CalibrationSlider label="darknessBias" value={pigment.darknessBias} min={-0.25} max={0.25} step={0.01} resetValue={defaults.darknessBias} onChange={(value) => updateForward(paint.id, 'darknessBias', value)} />
-                  <CalibrationSlider label="chromaBias" value={pigment.chromaBias} min={-0.25} max={0.25} step={0.01} resetValue={defaults.chromaBias} onChange={(value) => updateForward(paint.id, 'chromaBias', value)} />
-                  <CalibrationSlider label="earthStrengthBias" value={pigment.earthStrengthBias} min={-0.3} max={0.4} step={0.01} resetValue={defaults.earthStrengthBias} onChange={(value) => updateForward(paint.id, 'earthStrengthBias', value)} />
-                  <CalibrationSlider label="whiteLiftBias" value={pigment.whiteLiftBias} min={-0.2} max={0.2} step={0.01} resetValue={defaults.whiteLiftBias} onChange={(value) => updateForward(paint.id, 'whiteLiftBias', value)} />
-                  <label>
-                    <span className="mixer-field-label">baseHexOverride</span>
-                    <input className="studio-input" type="text" value={pigment?.baseHexOverride ?? ''} placeholder={paint.hex} onChange={(event) => updateForward(paint.id, 'baseHexOverride', event.target.value || undefined)} />
-                  </label>
-                </section>
-              );
-            })}
-          </div>
-        </Card>
-      </section>
+                </div>
 
-      <Card className="p-4 sm:p-5 mixer-stage-handoff">
-        <p className="studio-eyebrow">Stage handoff</p>
-        <p>Once the forward model reflects how your paints actually behave, move into recipe tuning to teach the solver how to choose the best path to each target.</p>
+                <div className={styles.sliderGrid}>
+                  <CalibrationSlider
+                    label="tintingStrength"
+                    value={activeCalibration.tintingStrength}
+                    min={0.75}
+                    max={1.4}
+                    step={0.01}
+                    resetValue={activeDefaults.tintingStrength}
+                    onChange={(value) => updateForward(activePaint.id, 'tintingStrength', value)}
+                  />
+                  <CalibrationSlider
+                    label="chromaBias"
+                    value={activeCalibration.chromaBias}
+                    min={-0.25}
+                    max={0.25}
+                    step={0.01}
+                    resetValue={activeDefaults.chromaBias}
+                    onChange={(value) => updateForward(activePaint.id, 'chromaBias', value)}
+                  />
+                  <CalibrationSlider
+                    label="darknessBias"
+                    value={activeCalibration.darknessBias}
+                    min={-0.25}
+                    max={0.25}
+                    step={0.01}
+                    resetValue={activeDefaults.darknessBias}
+                    onChange={(value) => updateForward(activePaint.id, 'darknessBias', value)}
+                  />
+                  <CalibrationSlider
+                    label="earthStrengthBias"
+                    value={activeCalibration.earthStrengthBias}
+                    min={-0.3}
+                    max={0.4}
+                    step={0.01}
+                    resetValue={activeDefaults.earthStrengthBias}
+                    onChange={(value) =>
+                      updateForward(activePaint.id, 'earthStrengthBias', value)
+                    }
+                  />
+                  <CalibrationSlider
+                    label="whiteLiftBias"
+                    value={activeCalibration.whiteLiftBias}
+                    min={-0.2}
+                    max={0.2}
+                    step={0.01}
+                    resetValue={activeDefaults.whiteLiftBias}
+                    onChange={(value) => updateForward(activePaint.id, 'whiteLiftBias', value)}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className={styles.recipeBand}>
+            <div className={styles.recipeBandHeader}>
+              <div>
+                <p>Real mix</p>
+                <h3>Build the exact recipe you mixed in real life.</h3>
+              </div>
+              <span>
+                These wells are the known cause. The comparison above is the effect you are trying
+                to calibrate.
+              </span>
+            </div>
+
+            <div className={styles.paintArcScroller}>
+              <div
+                className={styles.paintArcTrack}
+                style={{ minWidth: `${Math.max(760, enabledPaints.length * 84)}px` }}
+              >
+                {enabledPaints.map((paint, index) => {
+                  const angle =
+                    enabledPaints.length === 1
+                      ? 90
+                      : 28 + (index / Math.max(1, enabledPaints.length - 1)) * 124;
+                  const radius = 230;
+                  const x = Math.cos((angle * Math.PI) / 180) * radius;
+                  const y = Math.sin((angle * Math.PI) / 180) * radius;
+
+                  return (
+                    <button
+                      type="button"
+                      key={paint.id}
+                      className={`${styles.arcPaint} ${
+                        activePaintId === paint.id ? styles.arcPaintActive : ''
+                      }`}
+                      style={{
+                        left: `calc(50% + ${x}px - 34px)`,
+                        top: `calc(100% - ${y}px - 34px)`,
+                        backgroundColor: paint.hex,
+                      }}
+                      onClick={() => assignPaintToSlot(paint.id)}
+                      title={paint.name}
+                    >
+                      <span>{paint.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className={styles.slotsGrid}>
+              {mixSlots.map((slot, index) => {
+                const slotPaint = slot.paintId
+                  ? paints.find((paint) => paint.id === slot.paintId) ?? null
+                  : null;
+
+                return (
+                  <button
+                    type="button"
+                    key={`slot-${index}`}
+                    className={`${styles.slot} ${
+                      selectedSlot === index ? styles.slotSelected : ''
+                    } ${slot.paintId ? styles.slotFilled : ''}`}
+                    onClick={() => {
+                      setSelectedSlot(index);
+                      setActivePopupOpen(false);
+                    }}
+                  >
+                    <span className={styles.slotWell} style={swatchStyle(slotPaint?.hex ?? null)} />
+                    <strong>{slotPaint?.name ?? `Empty well ${index + 1}`}</strong>
+                    <small>
+                      {slot.paintId
+                        ? `${slot.parts} part${slot.parts > 1 ? 's' : ''}`
+                        : 'Tap a paint above to fill'}
+                    </small>
+
+                    {slot.paintId ? (
+                      <span
+                        className={styles.slotClear}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          clearSlot(index);
+                        }}
+                      >
+                        Clear
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className={styles.partsPanel}>
+              <div className={styles.partsHeader}>
+                <div>
+                  <p>Mix parts</p>
+                  <h3>Adjust the real recipe in physical parts.</h3>
+                </div>
+              </div>
+
+              <div className={styles.partsList}>
+                {mixSlots.map((slot, index) => {
+                  const slotPaint = slot.paintId
+                    ? paints.find((paint) => paint.id === slot.paintId) ?? null
+                    : null;
+
+                  if (!slotPaint) return null;
+
+                  return (
+                    <div key={`parts-${index}`} className={styles.partRow}>
+                      <div className={styles.partLabel}>
+                        <span style={swatchStyle(slotPaint.hex)} />
+                        <div>
+                          <strong>{slotPaint.name}</strong>
+                          <small>Slot {index + 1}</small>
+                        </div>
+                      </div>
+
+                      <div className={styles.partStepper}>
+                        <button type="button" onClick={() => setSlotParts(index, slot.parts - 1)}>
+                          −
+                        </button>
+                        <b>{slot.parts}</b>
+                        <button type="button" onClick={() => setSlotParts(index, slot.parts + 1)}>
+                          +
+                        </button>
+                      </div>
+
+                      <input
+                        className={styles.partSlider}
+                        type="range"
+                        min={1}
+                        max={12}
+                        value={slot.parts}
+                        onChange={(event) => setSlotParts(index, Number(event.target.value))}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        </section>
       </Card>
 
-      <section className="mixer-stage mixer-stage-inverse">
-        <div className="mixer-stage-header">
-          <p className="studio-eyebrow">Stage 2</p>
-          <h3 className="panel-heading-title">Tune Recipe Selection</h3>
-          <p className="panel-heading-copy">Target stays fixed. Solver chooses recipe. Forward model predicts outcome. Adjust solver logic—not pigment behavior.</p>
-          <DeltaChip current={targetDistance} previous={previousTargetDistance} />
-        </div>
+      <aside className={`${styles.drawer} ${drawerOpen ? styles.drawerOpen : ''}`}>
+        <div className={styles.drawerInner}>
+          <section className={styles.drawerLeft}>
+            <header className={styles.drawerHeader}>
+              <p>Recipe tuning</p>
+              <h3>Tune how the solver chooses inside your calibrated paint world.</h3>
+              <span>
+                Stage 2 starts only after the forward model is believable. These controls affect
+                recipe judgment — not paint behavior.
+              </span>
+            </header>
 
-        <div className="mixer-stage-grid">
-          <Card className="p-4 sm:p-5 mixer-surface">
-            <h4 className="mixer-subheading">Target Color</h4>
-            <div className="mt-4 space-y-3">
-              <input className="studio-input" value={targetHex} onChange={(event) => setTargetHex(event.target.value)} placeholder="#7A8FB3" />
-              <input type="color" className="studio-color-input" value={normalizedTarget ?? '#000000'} onChange={(event) => setTargetHex(event.target.value)} />
-              <label>
-                <span className="mb-1 block text-xs font-medium text-[color:var(--text-muted)]">Solve context</span>
-                <select className="studio-select" value={settings.solveMode ?? 'on-hand'} onChange={(event) => onSettingsChange({ ...settings, solveMode: event.target.value as UserSettings['solveMode'] })}>
-                  {Object.entries(solveModeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
+            <div className={styles.drawerGroup}>
+              <h4>Exploration</h4>
+
+              <CalibrationSlider
+                label="maxComponents"
+                value={calibrationSnapshot.inverseSearch.ratioSearch.maxComponents}
+                min={1}
+                max={4}
+                step={1}
+                resetValue={defaultDeveloperCalibration.inverseSearch.ratioSearch.maxComponents}
+                onChange={(value) => updateInverseNumber('ratioSearch', 'maxComponents', value)}
+              />
+              <CalibrationSlider
+                label="neighborhoodRadius"
+                value={calibrationSnapshot.inverseSearch.ratioSearch.neighborhoodRadius}
+                min={1}
+                max={6}
+                step={1}
+                resetValue={
+                  defaultDeveloperCalibration.inverseSearch.ratioSearch.neighborhoodRadius
+                }
+                onChange={(value) =>
+                  updateInverseNumber('ratioSearch', 'neighborhoodRadius', value)
+                }
+              />
+              <CalibrationSlider
+                label="familyBeamWidth"
+                value={calibrationSnapshot.inverseSearch.global.familyBeamWidth}
+                min={3}
+                max={20}
+                step={1}
+                resetValue={defaultDeveloperCalibration.inverseSearch.global.familyBeamWidth}
+                onChange={(value) => updateInverseNumber('global', 'familyBeamWidth', value)}
+              />
+
+              <label className={styles.inlineCheck}>
+                <span>Enable dark ratio families</span>
+                <input
+                  type="checkbox"
+                  checked={calibrationSnapshot.inverseSearch.ratioSearch.darkRatioFamiliesEnabled}
+                  onChange={(event) =>
+                    updateInverseBoolean(
+                      'ratioSearch',
+                      'darkRatioFamiliesEnabled',
+                      event.target.checked,
+                    )
+                  }
+                />
               </label>
-              <div className="mixer-chip-row">{recentColors.slice(0, 8).map((hex) => <button key={hex} className="mixer-recent-chip" type="button" onClick={() => { setTargetHex(hex); onRecentColor(hex); }}><span className="mixer-recent-swatch" style={{ backgroundColor: hex }} />{hex}</button>)}</div>
             </div>
-          </Card>
 
-          <Card className="p-4 sm:p-5 mixer-surface">
-            <h4 className="mixer-subheading">Solver Recipe + Predicted Match</h4>
-            <div className="mt-4 space-y-3">
-              <div className="mixer-swatch-grid">
-                <div><p className="mixer-swatch-label">Target Color</p><div className="mixer-swatch" style={swatch(normalizedTarget)} /><p>{normalizedTarget ?? 'n/a'}</p></div>
-                <div><p className="mixer-swatch-label">Predicted Match</p><div className="mixer-swatch" style={swatch(topRecipe?.predictedHex)} /><p>{topRecipe?.predictedHex ?? 'n/a'}</p></div>
+            <div className={styles.drawerGroup}>
+              <h4>Ranking + practicality</h4>
+
+              <CalibrationSlider
+                label="practicalRatioHardMaxParts"
+                value={calibrationSnapshot.inverseSearch.global.practicalRatioHardMaxParts}
+                min={6}
+                max={18}
+                step={1}
+                resetValue={
+                  defaultDeveloperCalibration.inverseSearch.global.practicalRatioHardMaxParts
+                }
+                onChange={(value) =>
+                  updateInverseNumber('global', 'practicalRatioHardMaxParts', value)
+                }
+              />
+              <CalibrationSlider
+                label="workableMatchThreshold"
+                value={calibrationSnapshot.inverseSearch.global.workableMatchThreshold}
+                min={0.1}
+                max={0.6}
+                step={0.01}
+                resetValue={defaultDeveloperCalibration.inverseSearch.global.workableMatchThreshold}
+                onChange={(value) =>
+                  updateInverseNumber('global', 'workableMatchThreshold', value)
+                }
+              />
+              <CalibrationSlider
+                label="cleanlinessPenalty"
+                value={calibrationSnapshot.inverseSearch.mutedTargets.cleanlinessPenalty}
+                min={0.5}
+                max={4}
+                step={0.1}
+                resetValue={
+                  defaultDeveloperCalibration.inverseSearch.mutedTargets.cleanlinessPenalty
+                }
+                onChange={(value) =>
+                  updateInverseNumber('mutedTargets', 'cleanlinessPenalty', value)
+                }
+              />
+              <CalibrationSlider
+                label="muddinessPenalty"
+                value={calibrationSnapshot.inverseSearch.vividTargets.muddinessPenalty}
+                min={0.5}
+                max={4}
+                step={0.1}
+                resetValue={defaultDeveloperCalibration.inverseSearch.vividTargets.muddinessPenalty}
+                onChange={(value) =>
+                  updateInverseNumber('vividTargets', 'muddinessPenalty', value)
+                }
+              />
+            </div>
+
+            <div className={styles.drawerGroup}>
+              <h4>Advanced heuristics</h4>
+
+              <label className={styles.numericField}>
+                <span>darkTargets.minDarkShare</span>
+                <input
+                  type="number"
+                  value={calibrationSnapshot.inverseSearch.darkTargets.minDarkShare}
+                  onChange={(event) =>
+                    updateInverseNumber('darkTargets', 'minDarkShare', Number(event.target.value))
+                  }
+                />
+              </label>
+
+              <label className={styles.numericField}>
+                <span>darkTargets.maxYellowShare</span>
+                <input
+                  type="number"
+                  value={calibrationSnapshot.inverseSearch.darkTargets.maxYellowShare}
+                  onChange={(event) =>
+                    updateInverseNumber(
+                      'darkTargets',
+                      'maxYellowShare',
+                      Number(event.target.value),
+                    )
+                  }
+                />
+              </label>
+
+              <label className={styles.numericField}>
+                <span>yellows.maxBlueShareLight</span>
+                <input
+                  type="number"
+                  value={calibrationSnapshot.inverseSearch.yellows.maxBlueShareLight}
+                  onChange={(event) =>
+                    updateInverseNumber(
+                      'yellows',
+                      'maxBlueShareLight',
+                      Number(event.target.value),
+                    )
+                  }
+                />
+              </label>
+
+              <label className={styles.numericField}>
+                <span>greenTargets.vividOffHuePenalty</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={calibrationSnapshot.inverseSearch.greenTargets.vividOffHuePenalty}
+                  onChange={(event) =>
+                    updateInverseNumber(
+                      'greenTargets',
+                      'vividOffHuePenalty',
+                      Number(event.target.value),
+                    )
+                  }
+                />
+              </label>
+            </div>
+
+            <footer className={styles.drawerFooter}>
+              <button className={styles.resetButton} type="button" onClick={() => resetDeveloperCalibration()}>
+                Reset calibration defaults
+              </button>
+            </footer>
+          </section>
+
+          <section className={styles.drawerRight}>
+            <h4>Target + outcome</h4>
+
+            <label className={styles.targetField}>
+              <span>Target color</span>
+              <input
+                value={targetHex}
+                onChange={(event) => setTargetHex(event.target.value)}
+                placeholder="#7A8FB3"
+              />
+            </label>
+
+            <input
+              type="color"
+              className={styles.targetColorInput}
+              value={normalizedTarget ?? '#000000'}
+              onChange={(event) => {
+                setTargetHex(event.target.value);
+                onRecentColor(event.target.value);
+              }}
+            />
+
+            <label className={styles.targetField}>
+              <span>Solve context</span>
+              <select
+                value={settings.solveMode ?? 'on-hand'}
+                onChange={(event) =>
+                  onSettingsChange({
+                    ...settings,
+                    solveMode: event.target.value as UserSettings['solveMode'],
+                  })
+                }
+              >
+                {Object.entries(solveModeLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className={styles.resultSwatches}>
+              <div>
+                <p>Target</p>
+                <span style={swatchStyle(normalizedTarget)} />
+                <small>{normalizedTarget ?? 'n/a'}</small>
               </div>
-              <p className="text-xs text-[color:var(--text-muted)]">Solver recipe: {topRecipe?.recipeText ?? 'n/a'} · Practical ratio: {topRecipe?.practicalRatioText ?? 'n/a'} · ΔE {targetDistance?.toFixed(3) ?? 'n/a'}</p>
-              {topRecipe ? <button type="button" className="studio-button studio-button-primary" onClick={() => normalizedTarget ? onSaveRecipe(topRecipe, normalizedTarget) : null}>Save selected solve recipe</button> : null}
-              <div className="studio-panel">
-                <p className="text-xs text-[color:var(--text-muted)]">Live solver explanation</p>
-                <p className="text-sm text-[color:var(--text-strong)]">{topRecipe ? `${topRecipe.predictedHex} from ${topRecipe.recipeText}` : 'No solve result yet'}</p>
+              <div>
+                <p>Predicted</p>
+                <span style={swatchStyle(topRecipe?.predictedHex)} />
+                <small>{topRecipe?.predictedHex ?? 'n/a'}</small>
               </div>
             </div>
-          </Card>
+
+            <div className={`${styles.metricCard} ${styles[compareTone(targetDistance)]}`}>
+              <span>Solver match</span>
+              <strong>ΔE {formatDelta(targetDistance)}</strong>
+              <small>{compareCopy(targetDistance)}</small>
+            </div>
+
+            <p className={styles.recipeCopy}>
+              Recipe: {topRecipe?.practicalRatioText ?? 'n/a'}
+            </p>
+
+            {topRecipe && normalizedTarget ? (
+              <button
+                type="button"
+                className={styles.saveButton}
+                onClick={() => onSaveRecipe(topRecipe, normalizedTarget)}
+              >
+                Save solver recipe
+              </button>
+            ) : null}
+
+            {recentColors.length ? (
+              <div className={styles.recentRow}>
+                {recentColors.slice(0, 8).map((hex) => (
+                  <button key={hex} type="button" onClick={() => setTargetHex(hex)}>
+                    <span style={{ backgroundColor: hex }} />
+                    {hex}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </section>
         </div>
-
-        <Card className="p-4 sm:p-5 mixer-surface">
-          <h4 className="mixer-subheading">Solver Controls</h4>
-          <p className="mixer-support-copy">These affect recipe exploration, ranking, and practicality inside resolveSolverRuntimeConfig → solveColorTarget.</p>
-
-          <div className="mixer-control-board">
-            <section className="mixer-control-card">
-              <p className="text-sm font-semibold text-[color:var(--text-strong)]">Recipe exploration</p>
-              <CalibrationSlider label="ratioSearch.maxComponents" value={calibrationSnapshot.inverseSearch.ratioSearch.maxComponents} min={1} max={4} step={1} resetValue={defaultDeveloperCalibration.inverseSearch.ratioSearch.maxComponents} onChange={(value) => updateInverseNumber('ratioSearch', 'maxComponents', value)} />
-              <CalibrationSlider label="ratioSearch.neighborhoodRadius" value={calibrationSnapshot.inverseSearch.ratioSearch.neighborhoodRadius} min={1} max={6} step={1} resetValue={defaultDeveloperCalibration.inverseSearch.ratioSearch.neighborhoodRadius} onChange={(value) => updateInverseNumber('ratioSearch', 'neighborhoodRadius', value)} />
-              <CalibrationSlider label="global.familyBeamWidth" value={calibrationSnapshot.inverseSearch.global.familyBeamWidth} min={3} max={20} step={1} resetValue={defaultDeveloperCalibration.inverseSearch.global.familyBeamWidth} onChange={(value) => updateInverseNumber('global', 'familyBeamWidth', value)} />
-              <label className="mixer-check"><span>ratioSearch.darkRatioFamiliesEnabled</span><input type="checkbox" checked={calibrationSnapshot.inverseSearch.ratioSearch.darkRatioFamiliesEnabled} onChange={(event) => updateInverseBoolean('ratioSearch', 'darkRatioFamiliesEnabled', event.target.checked)} /></label>
-            </section>
-            <section className="mixer-control-card">
-              <p className="text-sm font-semibold text-[color:var(--text-strong)]">Ranking / practicality</p>
-              <CalibrationSlider label="global.practicalRatioHardMaxParts" value={calibrationSnapshot.inverseSearch.global.practicalRatioHardMaxParts} min={6} max={18} step={1} resetValue={defaultDeveloperCalibration.inverseSearch.global.practicalRatioHardMaxParts} onChange={(value) => updateInverseNumber('global', 'practicalRatioHardMaxParts', value)} />
-              <CalibrationSlider label="global.workableMatchThreshold" value={calibrationSnapshot.inverseSearch.global.workableMatchThreshold} min={0.1} max={0.6} step={0.01} resetValue={defaultDeveloperCalibration.inverseSearch.global.workableMatchThreshold} onChange={(value) => updateInverseNumber('global', 'workableMatchThreshold', value)} />
-              <CalibrationSlider label="mutedTargets.cleanlinessPenalty" value={calibrationSnapshot.inverseSearch.mutedTargets.cleanlinessPenalty} min={0.5} max={4} step={0.1} resetValue={defaultDeveloperCalibration.inverseSearch.mutedTargets.cleanlinessPenalty} onChange={(value) => updateInverseNumber('mutedTargets', 'cleanlinessPenalty', value)} />
-              <CalibrationSlider label="vividTargets.muddinessPenalty" value={calibrationSnapshot.inverseSearch.vividTargets.muddinessPenalty} min={0.5} max={4} step={0.1} resetValue={defaultDeveloperCalibration.inverseSearch.vividTargets.muddinessPenalty} onChange={(value) => updateInverseNumber('vividTargets', 'muddinessPenalty', value)} />
-            </section>
-            <section className="mixer-control-card">
-              <p className="text-sm font-semibold text-[color:var(--text-strong)]">Advanced solver constants surfaced</p>
-              <label><span className="mixer-field-label">darkTargets.minDarkShare</span><input className="studio-input" type="number" step="1" value={calibrationSnapshot.inverseSearch.darkTargets.minDarkShare} onChange={(event) => updateInverseNumber('darkTargets', 'minDarkShare', Number(event.target.value))} /></label>
-              <label><span className="mixer-field-label">darkTargets.maxYellowShare</span><input className="studio-input" type="number" step="1" value={calibrationSnapshot.inverseSearch.darkTargets.maxYellowShare} onChange={(event) => updateInverseNumber('darkTargets', 'maxYellowShare', Number(event.target.value))} /></label>
-              <label><span className="mixer-field-label">neutrals.balancePenalty</span><input className="studio-input" type="number" step="0.1" value={calibrationSnapshot.inverseSearch.neutrals.balancePenalty} onChange={(event) => updateInverseNumber('neutrals', 'balancePenalty', Number(event.target.value))} /></label>
-              <label><span className="mixer-field-label">yellows.maxBlueShareLight</span><input className="studio-input" type="number" step="1" value={calibrationSnapshot.inverseSearch.yellows.maxBlueShareLight} onChange={(event) => updateInverseNumber('yellows', 'maxBlueShareLight', Number(event.target.value))} /></label>
-              <label><span className="mixer-field-label">greenTargets.vividOffHuePenalty</span><input className="studio-input" type="number" step="0.01" value={calibrationSnapshot.inverseSearch.greenTargets.vividOffHuePenalty} onChange={(event) => updateInverseNumber('greenTargets', 'vividOffHuePenalty', Number(event.target.value))} /></label>
-              <label className="mixer-check"><span>greenTargets.requireEarthForDarkNatural</span><input type="checkbox" checked={calibrationSnapshot.inverseSearch.greenTargets.requireEarthForDarkNatural} onChange={(event) => updateInverseBoolean('greenTargets', 'requireEarthForDarkNatural', event.target.checked)} /></label>
-            </section>
-          </div>
-
-          <p className="mt-4 text-xs text-[color:var(--text-muted)]">Live pipeline: target {normalizeHex(targetHex) ?? 'invalid'} → solver recipe {topRecipe?.practicalRatioText ?? 'none'} → forward prediction {topRecipe?.predictedHex ?? 'none'}.</p>
-        </Card>
-      </section>
-
-      <Card className="p-4 sm:p-5">
-        <p className="studio-eyebrow">Calibration persistence</p>
-        <p className="text-sm text-[color:var(--text-strong)]">Forward pigment and solver tuning edits persist in browser localStorage via developerCalibration and feed runtime resolvers app-wide.</p>
-        <p className="text-xs text-[color:var(--text-muted)] mt-1">Forward case snapshots also persist locally; no backend calibration path was introduced in this pass.</p>
-        <p className="text-xs text-[color:var(--text-muted)] mt-1">Current forward prediction profile: {forwardPrediction ? `${forwardPrediction.hex} · ${analyzeColor(forwardPrediction.hex)?.hueFamily ?? 'n/a'}` : 'No forward recipe selected'}.</p>
-      </Card>
+      </aside>
     </div>
   );
 };
