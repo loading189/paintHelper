@@ -1,3 +1,4 @@
+import styles from './SessionsPage.module.css';
 import { StudioPanel } from '../../components/studio/StudioPanel';
 import type { PaintingSession } from '../../types/models';
 
@@ -24,9 +25,9 @@ export const SessionsPage = ({
         <div className="studio-mini-stat"><span>Projects</span><strong>{sessions.length}</strong></div>
       </div>
     </StudioPanel>
-    <div className="session-grid">
+    <div className={styles.sessionGrid}>
       {sessions.map((session) => (
-        <button key={session.id} type="button" className={`session-card ${currentSessionId === session.id ? 'session-card-active' : ''}`} onClick={() => onSelect(session.id)}>
+        <button key={session.id} type="button" className={`${styles.sessionCard} ${currentSessionId === session.id ? styles.sessionCardActive : ''}`} onClick={() => onSelect(session.id)}>
           <p className="studio-eyebrow">{session.status}</p>
           <h3 className="mt-2 text-xl font-semibold text-[color:var(--text-strong)]">{session.title}</h3>
           <p className="mt-2 text-sm leading-6 text-[color:var(--text-muted)]">{session.notes ?? 'No project notes yet.'}</p>
