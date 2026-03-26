@@ -1,4 +1,5 @@
 import type { HTMLAttributes, PropsWithChildren } from 'react';
+import styles from './StudioPanel.module.css';
 
 type StudioPanelProps = PropsWithChildren<{
   title?: string;
@@ -11,10 +12,10 @@ type StudioPanelProps = PropsWithChildren<{
 export const StudioPanel = ({ children, title, eyebrow, description, tone = 'default', className = '', ...rest }: StudioPanelProps) => (
   <section className={`studio-surface studio-surface-${tone} ${className}`.trim()} {...rest}>
     {eyebrow || title || description ? (
-      <header className="mb-5">
+      <header className={styles.header}>
         {eyebrow ? <p className="studio-eyebrow">{eyebrow}</p> : null}
-        {title ? <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[color:var(--text-strong)]">{title}</h2> : null}
-        {description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[color:var(--text-muted)]">{description}</p> : null}
+        {title ? <h2 className={styles.title}>{title}</h2> : null}
+        {description ? <p className={styles.description}>{description}</p> : null}
       </header>
     ) : null}
     {children}

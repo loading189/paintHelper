@@ -32,8 +32,6 @@
 
   --radius-panel: 14px;
   --radius-card: 12px;
-  --radius-soft: 10px;
-  --radius-pill: 999px;
 
   --transition-fast: 140ms ease;
   --transition-slow: 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -91,8 +89,7 @@ select,
 textarea,
 summary,
 .studio-card,
-.studio-surface,
-.studio-panel {
+.studio-surface {
   transition:
     background-color var(--transition-fast),
     border-color var(--transition-fast),
@@ -146,10 +143,8 @@ summary:focus-visible {
   }
 }
 
-/* App-wide design-system primitives shared across pages. */
 @layer components {
   .studio-card,
-  .studio-panel,
   .studio-surface {
     border: 1px solid var(--border-soft);
     background: var(--bg-panel);
@@ -159,11 +154,6 @@ summary:focus-visible {
   .studio-card {
     position: relative;
     border-radius: var(--radius-card);
-  }
-
-  .studio-panel {
-    border-radius: var(--radius-card);
-    padding: 14px;
   }
 
   .studio-surface {
@@ -182,6 +172,7 @@ summary:focus-visible {
 
   .studio-eyebrow,
   .studio-kicker {
+    margin: 0;
     font-size: 0.66rem;
     font-weight: 600;
     letter-spacing: 0.14em;
@@ -213,6 +204,12 @@ summary:focus-visible {
     color: var(--text-body);
     background: rgba(255, 255, 255, 0.03);
     border-color: var(--border-soft);
+  }
+
+  .studio-button-danger {
+    color: #ffe4e4;
+    background: rgba(146, 92, 92, 0.22);
+    border-color: rgba(193, 136, 147, 0.38);
   }
 
   .studio-input,
@@ -263,10 +260,17 @@ summary:focus-visible {
     background: rgba(137, 166, 220, 0.08);
   }
 
+  .studio-chip-muted {
+    color: var(--text-muted);
+    border-color: var(--border-soft);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
   .studio-metric {
     border-radius: 14px;
     border: 1px solid var(--border-soft);
     background: var(--bg-panel);
     padding: 12px;
   }
+
 }

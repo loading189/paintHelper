@@ -1,0 +1,19 @@
+.header {
+  margin-bottom: 20px;
+}
+
+.title {
+  margin: 8px 0 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--text-strong);
+}
+
+.description {
+  margin: 8px 0 0;
+  max-width: 48rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}

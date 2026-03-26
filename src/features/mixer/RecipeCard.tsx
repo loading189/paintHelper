@@ -21,7 +21,7 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
     <Card className={`p-4 sm:p-5 ${styles.recipeCard}`}>
       <div className={styles.recipeTopline}>
         <div>
-          <div className="flex flex-wrap gap-2">
+          <div className={styles.recipeChips}>
             <span className="studio-chip">Recipe #{rank}</span>
             <span className="studio-chip studio-chip-success">{recipe.qualityLabel}</span>
           </div>
@@ -40,7 +40,7 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
       </div>
 
       <div className={styles.recipeGrid}>
-        <div className="space-y-5">
+        <div className={styles.columnStack}>
           <SwatchComparisonPanel
             targetHex={recipe.targetAnalysis.normalizedHex}
             predictedHex={recipe.predictedHex}
@@ -48,8 +48,8 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
             predictedHelper={recipe.qualityLabel}
           />
 
-          <section className={`studio-panel studio-panel-strong ${styles.palettePanel}`}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <section className={`studio-surface studio-surface-strong ${styles.palettePanel}`}>
+            <div className={styles.paletteHeader}>
               <div>
                 <p className="studio-eyebrow">Palette recipe</p>
                 <p className="panel-heading-title panel-heading-title-sm">Build this pile first</p>
@@ -61,14 +61,14 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
                 const paint = paintMap.get(component.paintId);
                 return (
                   <li key={`${component.paintId}-${index}`} className={styles.componentRow}>
-                    <div className="flex items-center gap-3">
+                    <div className={styles.componentIdentity}>
                       <span className={styles.componentSwatch} style={{ backgroundColor: paint?.hex ?? '#c7beb2' }} />
                       <div>
-                        <p className="font-semibold text-[color:var(--text-strong)]">{paint?.name ?? component.paintId}</p>
-                        <p className="text-xs text-[color:var(--text-muted)]">{showPartsRatios ? `${recipe.practicalParts[index]} part${recipe.practicalParts[index] === 1 ? '' : 's'}` : 'Mix component'}</p>
+                        <p className={styles.componentName}>{paint?.name ?? component.paintId}</p>
+                        <p className={styles.componentParts}>{showPartsRatios ? `${recipe.practicalParts[index]} part${recipe.practicalParts[index] === 1 ? '' : 's'}` : 'Mix component'}</p>
                       </div>
                     </div>
-                    {showPercentages ? <p className="text-sm font-semibold text-[color:var(--text-strong)]">{recipe.practicalPercentages[index]}%</p> : null}
+                    {showPercentages ? <p className={styles.componentPercent}>{recipe.practicalPercentages[index]}%</p> : null}
                   </li>
                 );
               })}
@@ -78,13 +78,13 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
           <NextAdjustmentBlock adjustments={recipe.detailedAdjustments} />
         </div>
 
-        <div className="space-y-5">
-          <section className="studio-panel studio-panel-muted">
+        <div className={styles.columnStack}>
+          <section className="studio-surface studio-surface-muted">
             <p className="studio-eyebrow">Working notes</p>
             <p className="panel-heading-title panel-heading-title-sm">{('headline' in recipe.achievability ? recipe.achievability.headline : recipe.achievability.summary) ?? 'Use as a starting point'}</p>
-            <p className="mt-3 text-sm leading-6 text-[color:var(--text-muted)]">{recipe.achievability.detail}</p>
+            <p className={styles.workingNotes}>{recipe.achievability.detail}</p>
             {recipe.guidanceText.length ? (
-              <ul className="mt-4 space-y-2 text-sm leading-6 text-[color:var(--text-body)]">
+              <ul className={styles.guidanceList}>
                 {recipe.guidanceText.map((line) => <li key={line}>• {line}</li>)}
               </ul>
             ) : null}
@@ -100,28 +100,28 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
                 <span className="studio-chip studio-chip-info">Expand</span>
               </div>
             </summary>
-            <div className="mt-4 space-y-4">
+            <div className={styles.detailsBody}>
               <MixPathBlock steps={recipe.mixPath} warnings={recipe.stabilityWarnings} layeringSuggestion={recipe.layeringSuggestion} />
-              <div className="grid gap-3 text-sm text-[color:var(--text-body)]">
+              <div className={styles.detailGrid}>
                 <div className={styles.detailBlock}>
-                  <p className="font-semibold text-[color:var(--text-strong)]">Score summary</p>
-                  <p className="mt-2">Mode: {recipe.scoreBreakdown.mode}</p>
-                  <p>Primary truth score: {recipe.scoreBreakdown.primaryScore.toFixed(3)}</p>
-                  <p>Regularization penalties: {recipe.scoreBreakdown.regularizationPenalty.toFixed(3)}</p>
-                  <p>Regularization bonuses: {recipe.scoreBreakdown.regularizationBonus.toFixed(3)}</p>
+                  <p className={styles.detailHeading}>Score summary</p>
+                  <p className={styles.detailMetric}>Mode: {recipe.scoreBreakdown.mode}</p>
+                  <p className={styles.detailMetric}>Primary truth score: {recipe.scoreBreakdown.primaryScore.toFixed(3)}</p>
+                  <p className={styles.detailMetric}>Regularization penalties: {recipe.scoreBreakdown.regularizationPenalty.toFixed(3)}</p>
+                  <p className={styles.detailMetric}>Regularization bonuses: {recipe.scoreBreakdown.regularizationBonus.toFixed(3)}</p>
                   {recipe.scoreBreakdown.legacyHeuristicPenalty > 0 || recipe.scoreBreakdown.legacyHeuristicBonus > 0 ? (
-                    <p>Legacy heuristic delta: {(recipe.scoreBreakdown.legacyHeuristicPenalty - recipe.scoreBreakdown.legacyHeuristicBonus).toFixed(3)}</p>
+                    <p className={styles.detailMetric}>Legacy heuristic delta: {(recipe.scoreBreakdown.legacyHeuristicPenalty - recipe.scoreBreakdown.legacyHeuristicBonus).toFixed(3)}</p>
                   ) : null}
-                  <p>Final score: {recipe.scoreBreakdown.finalScore.toFixed(3)}</p>
-                  <p>Spectral distance: {recipe.scoreBreakdown.spectralDistance.toFixed(3)}</p>
-                  <p>Value difference: {recipe.scoreBreakdown.valueDifference.toFixed(3)}</p>
-                  <p>Hue difference: {recipe.scoreBreakdown.hueDifference.toFixed(3)}</p>
-                  <p>Chroma difference: {recipe.scoreBreakdown.chromaDifference.toFixed(3)}</p>
+                  <p className={styles.detailMetric}>Final score: {recipe.scoreBreakdown.finalScore.toFixed(3)}</p>
+                  <p className={styles.detailMetric}>Spectral distance: {recipe.scoreBreakdown.spectralDistance.toFixed(3)}</p>
+                  <p className={styles.detailMetric}>Value difference: {recipe.scoreBreakdown.valueDifference.toFixed(3)}</p>
+                  <p className={styles.detailMetric}>Hue difference: {recipe.scoreBreakdown.hueDifference.toFixed(3)}</p>
+                  <p className={styles.detailMetric}>Chroma difference: {recipe.scoreBreakdown.chromaDifference.toFixed(3)}</p>
                 </div>
                 {recipe.whyThisRanked.length ? (
                   <div className={styles.detailBlock}>
-                    <p className="font-semibold text-[color:var(--text-strong)]">Why this ranked</p>
-                    <ul className="mt-2 space-y-2">
+                    <p className={styles.detailHeading}>Why this ranked</p>
+                    <ul className={styles.whyList}>
                       {recipe.whyThisRanked.map((line) => <li key={line}>• {line}</li>)}
                     </ul>
                   </div>

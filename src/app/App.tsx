@@ -173,7 +173,7 @@ const App = () => {
                   </button>
                   <input
                     ref={uploadInputRef}
-                    className="hidden"
+                    className={shellStyles.hiddenInput}
                     type="file"
                     accept="image/*"
                     onChange={(event) => void handleHeaderUpload(event.target.files?.[0])}

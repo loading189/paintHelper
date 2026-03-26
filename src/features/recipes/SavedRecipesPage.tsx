@@ -77,7 +77,7 @@ export const SavedRecipesPage = ({ recipes, paints, onDelete, onLoadIntoMixer, o
                   </div>
 
                   <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.1fr),minmax(0,0.9fr)]">
-                    <div className="studio-panel studio-panel-strong px-5 py-5">
+                    <div className="studio-surface studio-surface-strong px-5 py-5">
                       <p className="studio-eyebrow">Mix summary</p>
                       {recipe.practicalRatioText ? <p className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-[color:var(--text-strong)]">{recipe.practicalRatioText}</p> : null}
                       {recipe.exactRatioText && recipe.exactRatioText !== recipe.practicalRatioText ? <p className="mt-2 text-sm text-[color:var(--text-muted)]">Exact ratio: {recipe.exactRatioText}</p> : null}
@@ -107,7 +107,7 @@ export const SavedRecipesPage = ({ recipes, paints, onDelete, onLoadIntoMixer, o
                       ) : null}
 
                       {isEditing ? (
-                        <div className="studio-panel studio-panel-muted space-y-3 px-5 py-5">
+                        <div className="studio-surface studio-surface-muted space-y-3 px-5 py-5">
                           <label className="block">
                             <span className="mb-2 block text-[13px] font-semibold tracking-[-0.01em] text-[color:var(--text-strong)]">Reference name</span>
                             <input className="studio-input" value={recipe.savedName ?? ''} placeholder="Recipe name" onChange={(event) => onUpdate({ ...recipe, savedName: event.target.value })} />
@@ -118,7 +118,7 @@ export const SavedRecipesPage = ({ recipes, paints, onDelete, onLoadIntoMixer, o
                           </label>
                         </div>
                       ) : recipe.notes ? (
-                        <div className="studio-panel studio-panel-muted px-5 py-5">
+                        <div className="studio-surface studio-surface-muted px-5 py-5">
                           <p className="studio-eyebrow">Notes</p>
                           <p className="mt-3 text-sm leading-7 text-[color:var(--text-body)]">{recipe.notes}</p>
                         </div>
