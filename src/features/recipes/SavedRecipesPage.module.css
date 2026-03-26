@@ -1,0 +1,52 @@
+.pageStack { display: grid; gap: 1.5rem; }
+.sectionCard { padding: 1.25rem; }
+.summaryGrid { display: grid; gap: 1.5rem; }
+.metricsGrid { display: grid; gap: 0.75rem; }
+.metricValue { margin: 0.5rem 0 0; font-size: 1.5rem; font-weight: 600; letter-spacing: -0.03em; color: var(--text-strong); }
+.metricNote { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--text-muted); }
+.emptyState { border-radius: 28px; border: 1px dashed var(--border-strong); background: color-mix(in srgb, var(--bg-panel) 82%, transparent); padding: 2.5rem 1.25rem; text-align: center; }
+.emptyTitle { margin: 0.75rem 0 0; font-size: 1.25rem; font-weight: 600; letter-spacing: -0.03em; color: var(--text-strong); }
+.emptyCopy { margin: 0.75rem auto 0; max-width: 42rem; font-size: 0.875rem; line-height: 1.75; color: var(--text-muted); }
+.recipeGrid { display: grid; gap: 1.5rem; }
+.recipeHeader { display: flex; flex-direction: column; gap: 1rem; }
+.recipeTitle { margin: 0.5rem 0 0; font-size: 1.55rem; font-weight: 600; letter-spacing: -0.04em; color: var(--text-strong); }
+.recipeMeta { margin: 0.5rem 0 0; font-size: 0.875rem; line-height: 1.5; color: var(--text-muted); }
+.recipeChips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.swatchRow { margin-top: 1.25rem; display: grid; gap: 1rem; }
+.detailGrid { margin-top: 1.25rem; display: grid; gap: 1rem; }
+.mixSurface { padding: 1.25rem; }
+.ratioText { margin: 0.5rem 0 0; font-size: 1.875rem; font-weight: 600; letter-spacing: -0.05em; color: var(--text-strong); }
+.exactText { margin: 0.5rem 0 0; font-size: 0.875rem; color: var(--text-muted); }
+.componentList { margin: 1rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.625rem; font-size: 0.875rem; line-height: 1.6; color: var(--text-body); }
+.componentItem { border-radius: 22px; border: 1px solid var(--border-soft); background: rgba(8, 11, 16, 0.66); padding: 0.75rem 1rem; }
+.componentName { font-weight: 600; color: var(--text-strong); }
+.sideStack { display: grid; gap: 1rem; }
+.adjustmentsBox { border-radius: 28px; border: 1px solid rgba(84,111,88,0.16); background: rgba(84,111,88,0.08); padding: 1.25rem; font-size: 0.875rem; color: var(--text-body); }
+.adjustmentsList { margin: 0.75rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.625rem; line-height: 1.6; }
+.adjustmentsItem { border-radius: 20px; border: 1px solid rgba(84,111,88,0.14); background: rgba(251,248,243,0.74); padding: 0.75rem 1rem; color: #283127; }
+.editorSurface { padding: 1.25rem; display: grid; gap: 0.75rem; }
+.fieldLabel { display: block; }
+.fieldTitle { display: block; margin-bottom: 0.5rem; font-size: 13px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-strong); }
+.notesSurface { padding: 1.25rem; }
+.notesCopy { margin: 0.75rem 0 0; font-size: 0.875rem; line-height: 1.75; color: var(--text-body); }
+.notesInput { min-height: 7rem; }
+.actionsCard { border-radius: 30px; border: 1px solid var(--border-soft); background: color-mix(in srgb, var(--bg-panel) 84%, transparent); padding: 1.25rem; }
+.actionsStack { margin-top: 1.25rem; display: grid; gap: 0.75rem; }
+.fullButton { width: 100%; }
+
+@media (min-width: 640px) {
+  .sectionCard { padding: 1.75rem; }
+  .recipeHeader { flex-direction: row; justify-content: space-between; align-items: flex-start; }
+  .swatchRow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .detailGrid { grid-template-columns: minmax(0,1.1fr) minmax(0,0.9fr); }
+}
+
+@media (min-width: 1280px) {
+  .pageStack { gap: 2rem; }
+  .summaryGrid { grid-template-columns: minmax(0,1fr) 360px; align-items: end; }
+  .metricsGrid { grid-template-columns: 1fr; }
+  .recipeGrid { grid-template-columns: minmax(0,1.1fr) 320px; }
+}

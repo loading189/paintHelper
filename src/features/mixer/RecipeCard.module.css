@@ -1,3 +1,5 @@
+.cardPadding { padding: 1rem; }
+@media (min-width: 640px) { .cardPadding { padding: 1.25rem; } }
 .recipeCard {
   overflow: visible;
 }

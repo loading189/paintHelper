@@ -83,11 +83,11 @@ export const ActivePaintingPage = ({
 
   if (!session) {
     return (
-      <Card className="p-6 sm:p-7">
-        <div className="space-y-3">
+      <Card className={styles.emptyCard}>
+        <div className={styles.emptyStateStack}>
           <p className="studio-kicker">Paint</p>
-          <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[color:var(--text-strong)]">No project selected</h2>
-          <p className="text-sm text-[color:var(--text-muted)]">Select or create a project to begin painting.</p>
+          <h2 className={styles.emptyStateTitle}>No project selected</h2>
+          <p className={styles.emptyStateCopy}>Select or create a project to begin painting.</p>
         </div>
       </Card>
     );
