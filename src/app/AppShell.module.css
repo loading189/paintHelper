@@ -114,6 +114,32 @@
   font-size: 0.84rem;
 }
 
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.actionBtnPrimary {
+  color: var(--text-strong);
+  background: linear-gradient(180deg, rgba(74, 96, 136, 0.96), rgba(56, 71, 98, 0.96));
+  border-color: rgba(137, 166, 220, 0.28);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.22);
+}
+
+.actionBtnSecondary {
+  color: var(--text-body);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--border-soft);
+}
+
 .main {
   display: flex;
   flex-direction: column;
