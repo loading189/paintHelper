@@ -102,6 +102,7 @@ function mixHexesWeighted(colors: { hex: string; weight: number }[]) {
     },
     { r: 0, g: 0, b: 0 }
   );
+
   return rgbToHex(mixed.r, mixed.g, mixed.b);
 }
 
@@ -137,26 +138,22 @@ function formatDistanceLabel(distance: number) {
   return 'still drifting';
 }
 
-function getBridgeStrength(distance: number) {
-  return clamp(1 - distance / 80, 0.12, 1);
-}
-
 function getPaintById(paints: PaintOption[], id: string) {
   return paints.find((p) => p.id === id) ?? null;
 }
 
-function buildArcPositions(count: number) {
-  const radiusX = 32;
-  const radiusY = 19;
-  const start = -168;
-  const end = -12;
+function buildStageTwoArcPositions(count: number) {
+  const radiusX = 22;
+  const radiusY = 10.5;
+  const start = -154;
+  const end = -26;
 
   if (count <= 1) {
-    return [{ x: -28, y: -16 }];
+    return [{ x: -15, y: -8 }];
   }
 
   return Array.from({ length: count }).map((_, i) => {
-    const t = i / (count - 1);
+    const t = count === 1 ? 0.5 : i / (count - 1);
     const angle = ((start + (end - start) * t) * Math.PI) / 180;
 
     return {
@@ -225,7 +222,9 @@ function recipeToString(recipe: SolverRecipeItem[], paints: PaintOption[]) {
     .filter((item) => item.paintId && item.parts > 0)
     .map(
       (item) =>
-        `${item.parts} part${item.parts > 1 ? 's' : ''} ${getPaintById(paints, item.paintId)?.name ?? 'Unknown'}`
+        `${item.parts} part${item.parts > 1 ? 's' : ''} ${
+          getPaintById(paints, item.paintId)?.name ?? 'Unknown'
+        }`
     )
     .join(' · ');
 }
@@ -250,6 +249,7 @@ function ProgressDots({
       {stages.map((stage) => {
         const isActive = stage.key === current;
         const isUnlocked = unlocked.includes(stage.key);
+
         return (
           <button
             key={stage.key}
@@ -268,42 +268,6 @@ function ProgressDots({
         );
       })}
     </div>
-  );
-}
-
-function PaintArcButton({
-  paint,
-  index,
-  total,
-  active,
-  onClick,
-}: {
-  paint: PaintOption;
-  index: number;
-  total: number;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const positions = buildArcPositions(total);
-  const pos = positions[index];
-
-  return (
-    <button
-      type="button"
-      className={[styles.arcPaint, active ? styles.arcPaintActive : ''].join(' ')}
-      style={
-        {
-          '--arc-x': `${pos.x}rem`,
-          '--arc-y': `${pos.y}rem`,
-          '--paint-glow': paint.hex,
-        } as React.CSSProperties
-      }
-      onClick={onClick}
-      title={paint.name}
-    >
-      <span className={styles.arcPaintSwatch} style={{ background: paint.hex }} />
-      <span className={styles.arcPaintLabel}>{paint.name}</span>
-    </button>
   );
 }
 
@@ -353,7 +317,9 @@ export default function MixerPage() {
   const [actualHex, setActualHex] = useState('#7f5ca8');
   const [lockedReality, setLockedReality] = useState<LockedReality | null>(null);
 
-  const [forwardTuningByPaintId, setForwardTuningByPaintId] = useState<Record<string, ForwardTuning>>({});
+  const [forwardTuningByPaintId, setForwardTuningByPaintId] = useState<
+    Record<string, ForwardTuning>
+  >({});
   const [activeForwardPaintId, setActiveForwardPaintId] = useState<string | null>(null);
 
   const [inverseTuning, setInverseTuning] = useState<InverseTuning>(DEFAULT_INVERSE_TUNING);
@@ -385,7 +351,10 @@ export default function MixerPage() {
     return colorDistance(lockedReality.actualHex, predictedStage2Hex);
   }, [lockedReality, predictedStage2Hex]);
 
-  const bridgeStrength = getBridgeStrength(stage2Distance);
+  const stage2DistanceLabel = useMemo(
+    () => formatDistanceLabel(stage2Distance),
+    [stage2Distance]
+  );
 
   const stage3Solve = useMemo(() => {
     if (!lockedReality) return null;
@@ -425,9 +394,7 @@ export default function MixerPage() {
   }, [currentStage]);
 
   function updateRealitySlot(index: number, patch: Partial<RealitySlot>) {
-    setRealitySlots((prev) =>
-      prev.map((slot, i) => (i === index ? { ...slot, ...patch } : slot))
-    );
+    setRealitySlots((prev) => prev.map((slot, i) => (i === index ? { ...slot, ...patch } : slot)));
   }
 
   function lockReality() {
@@ -503,7 +470,6 @@ export default function MixerPage() {
             ↺
           </button>
 
-
           <div className={styles.topBarRight}>
             <ProgressDots
               current={currentStage}
@@ -525,7 +491,6 @@ export default function MixerPage() {
           >
             {currentStage === 'build' && (
               <section className={styles.stageLayoutGolden}>
-
                 <div className={styles.goldenLarge}>
                   <div className={styles.paintComposerCompact}>
                     <div className={styles.visualRecipeBuilderCompact}>
@@ -573,7 +538,9 @@ export default function MixerPage() {
                               >
                                 −
                               </button>
+
                               <div className={styles.partsValue}>{slot.parts}</div>
+
                               <button
                                 type="button"
                                 className={styles.partsButton}
@@ -676,154 +643,191 @@ export default function MixerPage() {
             )}
 
             {currentStage === 'matchColor' && lockedReality && (
-              <section className={styles.stageHero}>
+              <section className={styles.stageTwoShell}>
+                <div className={styles.stageTwoMain}>
+                  <div className={styles.stageTwoIntro}>
+                    <p className={styles.stageTwoEyebrow}>Stage 2</p>
+                    <h2 className={styles.stageTwoTitle}>Match the Color</h2>
+                    <p className={styles.stageTwoSubtitle}>
+                      Tune the paints until the predicted mixture settles into the same color as the
+                      real one.
+                    </p>
+                  </div>
 
+                  <div className={styles.stageTwoScene}>
+                    <div className={styles.stageTwoGlow} aria-hidden="true" />
+                    <div className={styles.stageTwoConnector} aria-hidden="true" />
 
-                <div className={styles.stageTwoLayout}>
-                  <div className={styles.stageTwoCenter}>
-                    <div className={styles.circleCluster}>
-                      <div className={styles.heroCircleBlock}>
-                        <div className={styles.heroCircleLabel}>Actual Mix</div>
-                        <div className={styles.heroCircleHalo}>
+                    <div className={styles.stageTwoComparison}>
+                      <div className={styles.stageTwoCircleGroup}>
+                        <div className={styles.stageTwoCircleLabelWrap}>
+                          <span className={styles.stageTwoCircleLabel}>Actual</span>
+                        </div>
+                        <div className={styles.stageTwoCircleHalo}>
                           <div
-                            className={styles.heroCircle}
+                            className={styles.stageTwoCircle}
                             style={{
                               background: `radial-gradient(circle at 35% 30%, #fff8 0%, ${lockedReality.actualHex} 35%, ${lockedReality.actualHex} 62%, #0008 100%)`,
                             }}
                           />
                         </div>
+                        <p className={styles.stageTwoHex}>{lockedReality.actualHex}</p>
                       </div>
 
-                      <div
-                        className={styles.connectionBridge}
-                        style={{ '--bridge-strength': bridgeStrength } as React.CSSProperties}
-                      >
-                        <div className={styles.connectionBeam} />
-                        <div className={styles.connectionLabel}>
-                          {formatDistanceLabel(stage2Distance)}
+                      <div className={styles.stageTwoCircleGroup}>
+                        <div className={styles.stageTwoCircleLabelWrap}>
+                          <span className={styles.stageTwoCircleLabel}>Predicted</span>
                         </div>
-                      </div>
-
-                      <div className={styles.heroCircleBlock}>
-                        <div className={styles.heroCircleLabel}>Predicted Mix</div>
-                        <div className={styles.heroCircleHalo}>
+                        <div className={styles.stageTwoCircleHalo}>
                           <div
-                            className={styles.heroCircle}
+                            className={styles.stageTwoCircle}
                             style={{
                               background: `radial-gradient(circle at 35% 30%, #fff8 0%, ${predictedStage2Hex} 35%, ${predictedStage2Hex} 62%, #0008 100%)`,
                             }}
                           />
                         </div>
-                      </div>
-
-                      <div className={styles.arcLayer}>
-                        {lockedRealityPaints.map((paint, index) => (
-                          <PaintArcButton
-                            key={paint.id}
-                            paint={paint}
-                            index={index}
-                            total={lockedRealityPaints.length}
-                            active={paint.id === activeForwardPaintId}
-                            onClick={() =>
-                              setActiveForwardPaintId((prev) => (prev === paint.id ? null : paint.id))
-                            }
-                          />
-                        ))}
+                        <p className={styles.stageTwoHex}>{predictedStage2Hex}</p>
                       </div>
                     </div>
 
-                    <div className={styles.heroRail}>
-                      <div className={styles.heroRailHeader}>
-                        <div>
-                          <div className={styles.heroRailKicker}>Locked recipe</div>
-                          <div className={styles.heroRailRecipe}>
-                            {recipeToString(lockedReality.slots, paints)}
-                          </div>
-                        </div>
-                        <div className={styles.distanceBadge}>Δ {stage2Distance.toFixed(1)}</div>
+                    <div className={styles.stageTwoOrbit} aria-hidden="false">
+                      {lockedRealityPaints.map((paint, index) => {
+                        const positions = buildStageTwoArcPositions(lockedRealityPaints.length);
+                        const pos = positions[index];
+
+                        return (
+                          <button
+                            key={paint.id}
+                            type="button"
+                            className={[
+                              styles.stageTwoOrbitPaint,
+                              activeForwardPaintId === paint.id
+                                ? styles.stageTwoOrbitPaintActive
+                                : '',
+                            ].join(' ')}
+                            style={
+                              {
+                                '--arc-x': `${pos.x}rem`,
+                                '--arc-y': `${pos.y}rem`,
+                                '--paint-glow': paint.hex,
+                              } as React.CSSProperties
+                            }
+                            onClick={() =>
+                              setActiveForwardPaintId((prev) =>
+                                prev === paint.id ? null : paint.id
+                              )
+                            }
+                            title={paint.name}
+                          >
+                            <span
+                              className={styles.stageTwoOrbitPaintSwatch}
+                              style={{ background: paint.hex }}
+                            />
+                            <span className={styles.stageTwoOrbitPaintLabel}>{paint.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className={styles.stageTwoFooter}>
+                      <div className={styles.stageTwoRecipeLine}>
+                        {recipeToString(lockedReality.slots, paints)}
+                      </div>
+                      <div className={styles.stageTwoDeltaLine}>
+                        <span className={styles.stageTwoDeltaLabel}>Delta</span>
+                        <span className={styles.stageTwoDeltaValue}>
+                          {stage2Distance.toFixed(1)} · {stage2DistanceLabel}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  <aside className={styles.stageTwoSide}>
+                  <div className={styles.bottomActionRail}>
+                    <div className={styles.bottomActionCopy}>
+                      Keep tuning until the predicted circle feels like the real one.
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.primaryCta}
+                      onClick={confirmForwardCalibration}
+                    >
+                      This feels right
+                    </button>
+                  </div>
+                </div>
+
+                <aside
+                  className={[
+                    styles.stageTwoSidebar,
+                    activeForwardPaint ? styles.stageTwoSidebarOpen : '',
+                  ].join(' ')}
+                >
+                  <div className={styles.stageTwoSidebarInner}>
                     {activeForwardPaint && activeForwardTuning ? (
-                      <div className={styles.sideTuningPanel}>
-                        <div className={styles.sideTuningTop}>
-                          <div className={styles.forwardPopupKicker}>Selected Paint</div>
-                          <div className={styles.singlePaintOrbWrap}>
-                            <div
-                              className={styles.singlePaintOrb}
-                              style={{
-                                background: `radial-gradient(circle at 35% 30%, #fff8 0%, ${activeForwardPaint.hex} 38%, ${activeForwardPaint.hex} 64%, #0008 100%)`,
-                              }}
-                            />
+                      <>
+                        <div className={styles.stageTwoSidebarHeader}>
+                          <div
+                            className={styles.stageTwoSidebarSwatch}
+                            style={{
+                              background: `radial-gradient(circle at 35% 30%, #fff8 0%, ${activeForwardPaint.hex} 38%, ${activeForwardPaint.hex} 64%, #0008 100%)`,
+                            }}
+                          />
+                          <div className={styles.stageTwoSidebarHeading}>
+                            <p className={styles.stageTwoSidebarEyebrow}>Selected paint</p>
+                            <h3 className={styles.stageTwoSidebarTitle}>
+                              {activeForwardPaint.name}
+                            </h3>
+                            <p className={styles.stageTwoSidebarHex}>{activeForwardPaint.hex}</p>
                           </div>
-                          <div className={styles.singlePaintName}>{activeForwardPaint.name}</div>
-                          <p className={styles.smallWhisper}>
-                            Tune this paint in isolation, then watch how it shifts the predicted
-                            mix.
-                          </p>
                         </div>
 
-                        <div className={styles.forwardGrid}>
-                          <TuningSlider
-                            label="Tinting Strength"
-                            min={0.6}
-                            max={1.4}
-                            step={0.01}
-                            value={activeForwardTuning.tintingStrength}
-                            onChange={(v) => setForwardValue('tintingStrength', v)}
-                          />
-                          <TuningSlider
-                            label="Chroma Bias"
-                            min={-1}
-                            max={1}
-                            step={0.01}
-                            value={activeForwardTuning.chromaBias}
-                            onChange={(v) => setForwardValue('chromaBias', v)}
-                          />
-                          <TuningSlider
-                            label="Darkness Bias"
-                            min={-1}
-                            max={1}
-                            step={0.01}
-                            value={activeForwardTuning.darknessBias}
-                            onChange={(v) => setForwardValue('darknessBias', v)}
-                          />
-                          <TuningSlider
-                            label="Temperature Bias"
-                            min={-1}
-                            max={1}
-                            step={0.01}
-                            value={activeForwardTuning.temperatureBias}
-                            onChange={(v) => setForwardValue('temperatureBias', v)}
-                          />
+                        <div className={styles.stageTwoSidebarBody}>
+                          <div className={styles.stageTwoSliderGrid}>
+                            <TuningSlider
+                              label="Tinting Strength"
+                              min={0.6}
+                              max={1.4}
+                              step={0.01}
+                              value={activeForwardTuning.tintingStrength}
+                              onChange={(v) => setForwardValue('tintingStrength', v)}
+                            />
+                            <TuningSlider
+                              label="Chroma Bias"
+                              min={-1}
+                              max={1}
+                              step={0.01}
+                              value={activeForwardTuning.chromaBias}
+                              onChange={(v) => setForwardValue('chromaBias', v)}
+                            />
+                            <TuningSlider
+                              label="Darkness Bias"
+                              min={-1}
+                              max={1}
+                              step={0.01}
+                              value={activeForwardTuning.darknessBias}
+                              onChange={(v) => setForwardValue('darknessBias', v)}
+                            />
+                            <TuningSlider
+                              label="Temperature Bias"
+                              min={-1}
+                              max={1}
+                              step={0.01}
+                              value={activeForwardTuning.temperatureBias}
+                              onChange={(v) => setForwardValue('temperatureBias', v)}
+                            />
+                          </div>
                         </div>
-                      </div>
+                      </>
                     ) : (
-                      <div className={styles.sideTuningPanelEmpty}>
-                        <div className={styles.forwardPopupKicker}>Forward Calibration</div>
-                        <p className={styles.smallWhisper}>
-                          Select one of the paints orbiting the center to tune how that pigment
-                          behaves.
+                      <div className={styles.stageTwoSidebarEmpty}>
+                        <p className={styles.stageTwoSidebarEmptyTitle}>Forward calibration</p>
+                        <p className={styles.stageTwoSidebarEmptyText}>
+                          Select a paint from the arc to tune its role in the mixture.
                         </p>
                       </div>
                     )}
-                  </aside>
-                </div>
-
-                <div className={styles.bottomActionRail}>
-                  <div className={styles.bottomActionCopy}>
-                    Keep tuning until the predicted circle emotionally matches the real one.
                   </div>
-                  <button
-                    type="button"
-                    className={styles.primaryCta}
-                    onClick={confirmForwardCalibration}
-                  >
-                    This feels right
-                  </button>
-                </div>
+                </aside>
               </section>
             )}
 
@@ -849,6 +853,7 @@ export default function MixerPage() {
                         {lockedReality.slots.map((item, index) => {
                           const paint = getPaintById(paints, item.paintId);
                           if (!paint) return null;
+
                           return (
                             <div key={`${item.paintId}-${index}`} className={styles.recipeToken}>
                               <span
@@ -881,6 +886,7 @@ export default function MixerPage() {
                         {stage3Solve.recipe.map((item, index) => {
                           const paint = getPaintById(paints, item.paintId);
                           if (!paint) return null;
+
                           return (
                             <div key={`${item.paintId}-${index}`} className={styles.recipeToken}>
                               <span
@@ -936,7 +942,9 @@ export default function MixerPage() {
                       max={1}
                       step={0.01}
                       value={inverseTuning.hueFamilyBias}
-                      onChange={(v) => setInverseTuning((prev) => ({ ...prev, hueFamilyBias: v }))}
+                      onChange={(v) =>
+                        setInverseTuning((prev) => ({ ...prev, hueFamilyBias: v }))
+                      }
                     />
                   </div>
                 </aside>

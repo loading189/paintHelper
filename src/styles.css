@@ -533,8 +533,6 @@ summary:focus-visible {
   .swatch-tile,
   .prep-target-card,
   .prep-candidate-card,
-  .mixer-component-row,
-  .mixer-detail-block,
   .studio-metric,
   .studio-toggle,
   .studio-disclosure {
@@ -564,8 +562,7 @@ summary:focus-visible {
   .studio-panel-strong,
   .prep-sidebar-panel-primary,
   .paint-card-ratio-band,
-  .recipe-ratio-hero,
-  .mixer-hero-panel {
+  .recipe-ratio-hero {
     background: var(--bg-panel-2);
     border-color: rgba(137, 166, 220, 0.14);
   }
@@ -586,7 +583,6 @@ summary:focus-visible {
   .prep-candidate-card:hover,
   .session-card:hover,
   .swatch-tile:hover,
-  .mixer-recent-chip:hover,
   .target-card:hover,
   .active-card:hover {
     transform: translateY(-1px);
@@ -697,7 +693,6 @@ summary:focus-visible {
   /* layouts */
   .prep-layout,
   .paint-layout,
-  .mixer-layout,
   .studio-workstation {
     display: grid;
     gap: 14px;
@@ -711,10 +706,6 @@ summary:focus-visible {
 
   .paint-layout {
     grid-template-columns: minmax(0, 2.2fr) minmax(320px, 0.88fr);
-  }
-
-  .mixer-layout {
-    grid-template-columns: minmax(320px, 0.84fr) minmax(0, 1.16fr);
   }
 
   .prep-toolbar {
@@ -851,8 +842,6 @@ summary:focus-visible {
 
   .prep-target-card,
   .prep-candidate-card,
-  .mixer-component-row,
-  .mixer-detail-block,
   .studio-metric,
   .comparison-block,
   .sample-row,
@@ -899,8 +888,7 @@ summary:focus-visible {
   }
 
   .prep-target-swatch,
-  .prep-candidate-swatch,
-  .mixer-component-swatch {
+  .prep-candidate-swatch {
     display: inline-block;
     width: 40px;
     height: 40px;
@@ -926,9 +914,7 @@ summary:focus-visible {
   }
 
   .prep-ratio-hero,
-  .mixer-ratio-display,
-  .paint-card-ratio-display,
-  .mixer-hero-ratio {
+  .paint-card-ratio-display {
     margin: 6px 0 0;
     font-size: clamp(1.5rem, 2vw, 2.1rem);
     line-height: 0.95;
@@ -938,7 +924,6 @@ summary:focus-visible {
   }
 
   .prep-ratio-copy,
-  .mixer-hero-copy,
   .paint-card-recipe-text {
     margin: 8px 0 0;
     font-size: 0.86rem;
@@ -1125,8 +1110,7 @@ summary:focus-visible {
     gap: 6px;
   }
 
-  .paint-reference-palette-pill,
-  .mixer-recent-chip {
+  .paint-reference-palette-pill {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -1139,8 +1123,7 @@ summary:focus-visible {
     color: var(--text-body);
   }
 
-  .paint-reference-palette-swatch,
-  .mixer-recent-swatch {
+  .paint-reference-palette-swatch {
     width: 11px;
     height: 11px;
     border-radius: 999px;
@@ -1165,8 +1148,6 @@ summary:focus-visible {
 
   .paint-recipe-card-shell,
   .paint-board,
-  .mixer-results-column,
-  .mixer-side-rail,
   .workspace-header-actions,
   .prep-sidebar-stack {
     display: flex;
@@ -1178,7 +1159,6 @@ summary:focus-visible {
   .paint-status-grid,
   .paint-board-summary,
   .paint-swatch-row,
-  .mixer-recipe-grid,
   .target-grid,
   .session-grid,
   .extracted-grid,
@@ -1216,8 +1196,7 @@ summary:focus-visible {
   }
 
   .paint-card-ratio-band,
-  .recipe-ratio-hero,
-  .mixer-hero-panel {
+  .recipe-ratio-hero {
     border-radius: 10px;
     border: 1px solid rgba(137, 166, 220, 0.14);
     padding: 12px 14px;
@@ -1249,80 +1228,6 @@ summary:focus-visible {
 
   .paint-status-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  /* mixer */
-  .mixer-control-card,
-  .mixer-recipe-card {
-    overflow: visible;
-  }
-
-  .mixer-hero-note {
-    margin: 10px 0 0;
-    font-size: 0.84rem;
-    line-height: 1.5;
-    color: var(--text-body);
-  }
-
-  .mixer-recipe-topline {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 14px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--border-soft);
-  }
-
-  .mixer-recipe-title {
-    margin: 8px 0 0;
-    font-size: 1.12rem;
-    line-height: 1.18;
-    font-weight: 600;
-    letter-spacing: -0.04em;
-    color: var(--text-strong);
-  }
-
-  .mixer-recipe-copy {
-    margin: 6px 0 0;
-    font-size: 0.86rem;
-    line-height: 1.5;
-    color: var(--text-muted);
-  }
-
-  .mixer-recipe-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-start;
-  }
-
-  .mixer-recipe-grid {
-    grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
-    margin-top: 16px;
-  }
-
-  .mixer-palette-panel {
-    padding: 14px;
-  }
-
-  .mixer-component-list {
-    margin: 14px 0 0;
-    padding: 0;
-    list-style: none;
-    display: grid;
-    gap: 10px;
-  }
-
-  .mixer-component-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-  }
-
-  .mixer-detail-block {
-    padding: 12px 14px;
   }
 
   /* grids / lists */
@@ -1449,10 +1354,8 @@ summary:focus-visible {
   .prep-layout,
   .prep-layout-dense,
   .paint-layout,
-  .mixer-layout,
   .studio-workstation,
   .prep-toolbar,
-  .mixer-recipe-grid,
   .workspace-mode-meta,
   .workspace-stat-row,
   .paint-card-hero-grid,
@@ -1533,9 +1436,7 @@ summary:focus-visible {
   .studio-inline-field,
   .studio-input-compact,
   .studio-button,
-  .studio-save-btn,
-  .mixer-recipe-actions,
-  .mixer-recipe-actions .studio-button {
+  .studio-save-btn {
     width: 100%;
   }
 
