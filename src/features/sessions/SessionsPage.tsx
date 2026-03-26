@@ -13,14 +13,14 @@ export const SessionsPage = ({
   onSelect: (id: string) => void;
   onCreate: () => void;
 }) => (
-  <div className="space-y-6">
+  <div className={styles.page}>
     <StudioPanel
       tone="strong"
       eyebrow="Projects"
       title="Painting projects"
       description="Manage local-only projects, reopen saved reference-led palettes, and jump straight back into Prep or Paint."
     >
-      <div className="flex flex-wrap gap-3">
+      <div className={styles.panelActions}>
         <button className="studio-button studio-button-primary" type="button" onClick={onCreate}>Create project</button>
         <div className={styles.miniStat}><span>Projects</span><strong>{sessions.length}</strong></div>
       </div>
@@ -29,9 +29,9 @@ export const SessionsPage = ({
       {sessions.map((session) => (
         <button key={session.id} type="button" className={`${styles.sessionCard} ${currentSessionId === session.id ? styles.sessionCardActive : ''}`} onClick={() => onSelect(session.id)}>
           <p className="studio-eyebrow">{session.status}</p>
-          <h3 className="mt-2 text-xl font-semibold text-[color:var(--text-strong)]">{session.title}</h3>
-          <p className="mt-2 text-sm leading-6 text-[color:var(--text-muted)]">{session.notes ?? 'No project notes yet.'}</p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs uppercase tracking-[0.14em] text-[color:var(--text-subtle)]">
+          <h3 className={styles.sessionTitle}>{session.title}</h3>
+          <p className={styles.sessionNotes}>{session.notes ?? 'No project notes yet.'}</p>
+          <div className={styles.sessionMeta}>
             <span>{session.targets.length} selected colors</span>
             <span>{session.extractedCandidatePalette.length + session.sampledColors.length} candidates</span>
             <span>Updated {new Date(session.updatedAt).toLocaleDateString()}</span>

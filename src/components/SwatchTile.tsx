@@ -1,3 +1,5 @@
+import styles from './SwatchTile.module.css';
+
 type SwatchTileProps = {
   label: string;
   hex: string;
@@ -19,41 +21,33 @@ export const SwatchTile = ({
 
   return (
     <div
-      className={`rounded-[16px] border border-[color:var(--border-soft)] bg-[color:var(--surface-1)]/88 p-4 ${
-        isHero ? 'min-h-[250px]' : 'min-h-[190px]'
-      }`}
+      className={`${styles.tile} ${isHero ? styles.tileHero : styles.tileDefault}`}
       data-testid={testId}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className={styles.tileHeader}>
         <div>
           <p className="studio-kicker">{label}</p>
-          <p
-            className={`mt-1.5 font-semibold tracking-[-0.05em] text-[color:var(--text-strong)] ${
-              isHero ? 'text-[1.35rem] sm:text-[1.5rem]' : 'text-[1rem]'
-            }`}
-          >
+          <p className={`${styles.hex} ${isHero ? styles.hexHero : styles.hexDefault}`}>
             {hex}
           </p>
         </div>
 
         {helper ? (
-          <span className="inline-flex h-7 items-center rounded-[9px] border border-[color:var(--border-soft)] px-2.5 text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+          <span className={styles.helper}>
             {helper}
           </span>
         ) : null}
       </div>
 
-      <div className="mt-4 rounded-[12px] border border-[color:var(--border-soft)] bg-[color:var(--surface-inset)] p-2.5">
+      <div className={styles.swatchFrame}>
         <div
-          className={`rounded-[10px] border border-black/10 ${
-            isHero ? 'h-44 sm:h-52' : 'h-28 sm:h-32'
-          }`}
+          className={`${styles.swatch} ${isHero ? styles.swatchHero : styles.swatchDefault}`}
           style={{ backgroundColor: hex }}
         />
       </div>
 
       {footer ? (
-        <p className="mt-3 text-[0.82rem] leading-6 text-[color:var(--text-muted)]">
+        <p className={styles.footer}>
           {footer}
         </p>
       ) : null}

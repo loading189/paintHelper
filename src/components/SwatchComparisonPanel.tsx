@@ -1,4 +1,5 @@
 import { SwatchTile } from './SwatchTile';
+import styles from './SwatchComparisonPanel.module.css';
 
 export const SwatchComparisonPanel = ({
   targetHex,
@@ -11,7 +12,7 @@ export const SwatchComparisonPanel = ({
   targetHelper?: string;
   predictedHelper?: string;
 }) => (
-  <div className="grid gap-3 sm:grid-cols-2">
+  <div className={styles.panel}>
     <SwatchTile
       label="Target"
       hex={targetHex}

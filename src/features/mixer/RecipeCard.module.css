@@ -12,6 +12,12 @@
   border-bottom: 1px solid var(--border-soft);
 }
 
+.recipeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .recipeTitle {
   margin: 8px 0 0;
   font-size: 1.12rem;
@@ -51,8 +57,21 @@
   margin-top: 16px;
 }
 
+.columnStack {
+  display: grid;
+  gap: 20px;
+}
+
 .palettePanel {
   padding: 14px;
+}
+
+.paletteHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .componentList {
@@ -81,6 +100,12 @@
   gap: 10px;
 }
 
+.componentIdentity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .componentSwatch {
   display: inline-block;
   width: 40px;
@@ -91,8 +116,72 @@
   flex-shrink: 0;
 }
 
+.componentName {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.componentParts {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.componentPercent {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.workingNotes {
+  margin: 12px 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.guidanceList {
+  margin: 16px 0 0;
+  display: grid;
+  gap: 8px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+
+.detailsBody {
+  margin-top: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.detailGrid {
+  display: grid;
+  gap: 12px;
+  font-size: 0.875rem;
+  color: var(--text-body);
+}
+
 .detailBlock {
   padding: 12px 14px;
+}
+
+.detailHeading {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.detailMetric {
+  margin: 8px 0 0;
+}
+
+.whyList {
+  margin: 8px 0 0;
+  display: grid;
+  gap: 8px;
 }
 
 @media (max-width: 1200px) {

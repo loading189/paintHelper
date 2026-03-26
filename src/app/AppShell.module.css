@@ -179,3 +179,7 @@
     width: 100%;
   }
 }
+
+.hiddenInput {
+  display: none;
+}
