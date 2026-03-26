@@ -165,7 +165,7 @@ const App = () => {
               {view === 'paint' ? (
                 <>
                   <button
-                    className="studio-button studio-button-secondary"
+                    className={`${shellStyles.actionBtn} ${shellStyles.actionBtnSecondary}`}
                     type="button"
                     onClick={() => uploadInputRef.current?.click()}
                   >
@@ -182,7 +182,7 @@ const App = () => {
               ) : null}
 
               <button
-                className="studio-save-btn"
+                className={`${shellStyles.actionBtn} ${shellStyles.actionBtnPrimary}`}
                 onClick={saveProject}
                 disabled={isPreparingSave}
               >
@@ -191,7 +191,7 @@ const App = () => {
             </>
           ) : (
             <button
-              className="studio-save-btn"
+              className={`${shellStyles.actionBtn} ${shellStyles.actionBtnPrimary}`}
               onClick={() => {
                 const session = createPaintingSession({
                   title: `Painting ${state.sessions.length + 1}`,

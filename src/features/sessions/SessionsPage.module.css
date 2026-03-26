@@ -26,3 +26,25 @@
   border-color: rgba(137, 166, 220, 0.18);
   background: var(--bg-panel-2);
 }
+
+.miniStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.miniStat strong {
+  color: var(--text-strong);
+  font-size: 0.84rem;
+  letter-spacing: 0;
+}

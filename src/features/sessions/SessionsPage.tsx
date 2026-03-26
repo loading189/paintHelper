@@ -22,7 +22,7 @@ export const SessionsPage = ({
     >
       <div className="flex flex-wrap gap-3">
         <button className="studio-button studio-button-primary" type="button" onClick={onCreate}>Create project</button>
-        <div className="studio-mini-stat"><span>Projects</span><strong>{sessions.length}</strong></div>
+        <div className={styles.miniStat}><span>Projects</span><strong>{sessions.length}</strong></div>
       </div>
     </StudioPanel>
     <div className={styles.sessionGrid}>
