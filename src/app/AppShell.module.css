@@ -1,0 +1,155 @@
+.appShell {
+  position: relative;
+  min-height: 100vh;
+  padding: 14px;
+  isolation: isolate;
+}
+
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(121, 146, 196, 0.05), transparent 22%),
+    radial-gradient(circle at 80% 8%, rgba(184, 148, 103, 0.03), transparent 18%);
+  filter: blur(16px);
+}
+
+.header {
+  position: sticky;
+  top: 10px;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 54px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: rgba(13, 17, 23, 0.82);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-panel);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: max-content;
+}
+
+.brandDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--accent-blue);
+  box-shadow: 0 0 18px rgba(137, 166, 220, 0.35);
+  flex-shrink: 0;
+}
+
+.brandText {
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.navBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.navBtn:hover {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-body);
+  transform: translateY(-1px);
+}
+
+.navBtnActive {
+  background: var(--accent-blue-soft);
+  border-color: rgba(137, 166, 220, 0.24);
+  color: var(--text-strong);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.projectInput {
+  width: 220px;
+  min-height: 36px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--bg-inset);
+  color: var(--text-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  font-size: 0.84rem;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (max-width: 1280px) {
+  .header {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 900px) {
+  .header,
+  .actions,
+  .nav {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .appShell {
+    padding: 12px;
+  }
+
+  .header {
+    top: 8px;
+  }
+
+  .nav,
+  .actions,
+  .projectInput {
+    width: 100%;
+  }
+}

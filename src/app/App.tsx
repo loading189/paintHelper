@@ -8,6 +8,7 @@ import { createPaintingSession, createStarterSessionState, prepareSessionForPain
 import { createLockedConfigDraft, saveLockedConfiguration } from '../lib/storage/configRegistry';
 import type { Paint, WorkspaceView } from '../types/models';
 import { createId } from '../lib/utils/id';
+import shellStyles from './AppShell.module.css';
 
 const navItems: Array<{ id: WorkspaceView; label: string }> = [
   { id: 'paint', label: 'Paint' },
@@ -123,21 +124,21 @@ const App = () => {
   };
 
   return (
-    <div className="studio-app-shell">
-      <div className="studio-bg" />
+    <div className={shellStyles.appShell}>
+      <div className={shellStyles.bg} />
 
-      <header className="studio-header">
-        <div className="studio-brand">
-          <div className="studio-dot" />
-          <span>Paint Mix Matcher</span>
+      <header className={shellStyles.header}>
+        <div className={shellStyles.brand}>
+          <div className={shellStyles.brandDot} />
+          <span className={shellStyles.brandText}>Paint Mix Matcher</span>
         </div>
 
-        <nav className="studio-nav">
+        <nav className={shellStyles.nav}>
           {navItems.map((item) => (
             <button
               key={item.id}
-              className={`studio-nav-btn ${
-                view === item.id ? 'active' : ''
+              className={`${shellStyles.navBtn} ${
+                view === item.id ? shellStyles.navBtnActive : ''
               }`}
               onClick={() => setView(item.id)}
             >
@@ -146,11 +147,11 @@ const App = () => {
           ))}
         </nav>
 
-        <div className="studio-actions">
+        <div className={shellStyles.actions}>
           {currentSession ? (
             <>
               <input
-                className="studio-project-input"
+                className={shellStyles.projectInput}
                 value={currentSession.title}
                 onChange={(e) =>
                   updateSession({
@@ -208,7 +209,7 @@ const App = () => {
         </div>
       </header>
 
-      <main className="studio-main">
+      <main className={shellStyles.main}>
         {view === 'paint' && (
           <ActivePaintingPage
             session={currentSession}
