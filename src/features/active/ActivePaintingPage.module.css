@@ -90,3 +90,9 @@
   .paintCockpitLayout { grid-template-columns: 1fr; grid-template-areas: 'stage' 'recipe' 'tray'; }
   .paintCockpitStage { min-height: 58vh; }
 }
+
+.emptyCard { padding: 1.5rem; }
+.emptyStateStack { display: grid; gap: 0.75rem; }
+.emptyStateTitle { margin: 0; font-size: 1.5rem; font-weight: 600; letter-spacing: -0.04em; color: var(--text-strong); }
+.emptyStateCopy { margin: 0; font-size: 0.875rem; color: var(--text-muted); }
+@media (min-width: 640px) { .emptyCard { padding: 1.75rem; } }

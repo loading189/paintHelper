@@ -18,7 +18,7 @@ export const RecipeCard = ({ rank, recipe, paints, showPercentages, showPartsRat
   const paintMap = new Map(paints.map((paint) => [paint.id, paint]));
 
   return (
-    <Card className={`p-4 sm:p-5 ${styles.recipeCard}`}>
+    <Card className={`${styles.cardPadding} ${styles.recipeCard}`}>
       <div className={styles.recipeTopline}>
         <div>
           <div className={styles.recipeChips}>
